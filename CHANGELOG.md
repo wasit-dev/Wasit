@@ -4,9 +4,11 @@ All notable changes to Wasit are recorded here. Versions follow [Semantic Versio
 
 ## Unreleased
 
-Planned for 0.4.0. Recorded here rather than in an issue because two of the
+Planned for 0.5.0. Recorded here rather than in an issue because two of the
 three change what a check *proves*, and anyone reading this file to decide
-whether to upgrade needs to see that before the version lands.
+whether to upgrade needs to see that before the version lands. These three were
+earmarked for 0.4.0 before 0.4.0 was spent on the two correctness fixes below;
+they are unchanged, only renumbered.
 
 **Will change results — `X402-06` gains on-chain verification.** The check
 currently passes on any 2xx, which means it establishes that the target accepted
@@ -29,6 +31,53 @@ exits 0 today while `--role mpp-channel` exits 2 for the same class of
 configuration error, so `wasit wallet status --role x402 && deploy` proceeds on
 a key that could not be read. `status` with no `--role` keeps exiting 0: there,
 one unreadable key is a row in a table, not a failed question.
+
+## [0.4.0] — 2026-09-17
+
+All three packages, versioned together as usual. Two correctness fixes, both in
+how a run reports what it actually established. Neither adds a check; both
+change what existing checks report in situations where the old answer was
+wrong.
+
+**Fixed — a charge-mode payment client no longer breaks every later
+channel-mode check.** `Mppx.create` replaces `globalThis.fetch` with a wrapper
+bound to one payment method unless `polyfill: false` is passed. Once `MPP-01`
+created a charge client, every later channel-mode 402 in the same process was
+refused by that wrapper with "No method found for challenges: stellar.channel.
+Available: stellar.charge", reported as a defect in a target that was in fact
+conformant. The CLI hid this because each invocation is a fresh process; the
+MCP server did not, because one process answers many tool calls in a row. Only
+the first payment-mode check in a process produced a trustworthy verdict.
+`fetchTarget` now resolves the underlying fetch through mppx's own
+`Symbol.for("mppx.fetch.wrapper")` tag, so a check observes the target rather
+than whatever a previous check installed on the global. `packages/core`'s
+charge client also passes `polyfill: false`, which is necessary but not
+sufficient on its own: one stale build or one new caller brings the leak back.
+Regression test: `test/unit/fetch-target-isolation.test.ts`.
+
+**Changed — a failed setup is reported as no verdict, not as a defect.**
+`MPP-11`, `MPP-12` and `MPP-14` each need one correctly advancing commitment
+accepted before they can probe anything. That submission used to be attempted
+once, and a refusal was reported as FAIL. Two very different worlds produce that
+refusal identically: a target that wrongly rejects valid vouchers, and a channel
+whose cumulative moved between the challenge being issued and the credential
+being submitted, because something else is paying through it. The submission is
+now retried up to three times, each against a freshly issued challenge, so
+ordinary contention clears on its own. When every attempt is refused the result
+is ERROR with the new error kind `setup`, carrying all three refusals verbatim,
+and the run exits `2` (`no-verdict`) instead of `1` (`non-conformant`).
+
+**Added — `CheckSetupError` and the `setup` error kind**, exported from
+`@wasit-dev/core`. `errorKind` in `--json` and in the MCP server's
+`structuredContent` can now carry `"setup"` alongside `unreachable`,
+`configuration` and `harness`. A consumer that switches exhaustively on that
+field needs a branch for it.
+
+**Added — `scripts/fixtures.sh`**, which starts, stops and reports on the four
+local fixture servers so a full local run needs one terminal instead of four.
+Also adds `packages/core/test/fixtures/mpp-channel-refusing-server.ts`, a target
+that issues valid challenges and refuses every credential, which reproduces a
+setup failure on demand rather than by racing two runs.
 
 ## [0.3.0] — 2026-09-05
 

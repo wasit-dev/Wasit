@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  CheckSetupError,
   ConfigurationError,
   MalformedResponseError,
   TargetUnreachableError,
@@ -103,6 +104,17 @@ describe("classifyCheckError", () => {
     assert.deepEqual(classifyCheckError(new ConfigurationError("bad url")), {
       kind: "configuration",
       message: "bad url",
+    });
+  });
+
+  // A setup failure is not a verdict about the target. MPP channel checks must
+  // first get a valid commitment accepted, and a channel another payer is using
+  // refuses that the same way a broken target does, so the two must not share a
+  // reporting shape.
+  it("classifies a setup error as its own kind, not as a conformance failure", () => {
+    assert.deepEqual(classifyCheckError(new CheckSetupError("cumulative moved")), {
+      kind: "setup",
+      message: "cumulative moved",
     });
   });
 

@@ -179,7 +179,7 @@ Three, roughly independent:
 
 ## Finding 3 — Stale peer ranges put a second Stellar SDK in every clean install
 
-**Status:** [#70](https://github.com/stellar/stellar-mpp-sdk/issues/70)
+**Status:** filed as [stellar/stellar-mpp-sdk#70](https://github.com/stellar/stellar-mpp-sdk/issues/70); a fix is in review as [PR #74](https://github.com/stellar/stellar-mpp-sdk/pull/74) (open, approved, not yet merged)
 **Severity:** moderate — no defect in the SDK's own logic, but it duplicates a
 runtime dependency across a call boundary and leaves consumers holding
 advisories they have no way to resolve
@@ -320,6 +320,40 @@ materialise a second copy. If the intent is instead to track one supported line,
 bumping the ranges to current and saying so explicitly would achieve the same
 thing. Either way, a published range that no current consumer can satisfy makes
 the duplicate unavoidable.
+
+### Update, 2026-09-13
+
+A maintainer opened [PR #74](https://github.com/stellar/stellar-mpp-sdk/pull/74)
+(branch `fix/cap-71-v2-auth-credentials`, commits by jeesunikim, approved by
+marcelosalloum) that touches this. It has not merged yet, and `@stellar/mpp`
+has not published a new version since it opened, so nothing changes for
+consumers until both happen.
+
+What the diff actually does, verified from the PR's file list: the
+repository's own `package.json` peer dependency on `@stellar/stellar-sdk`
+moves from `^16.0.1` to `^16.3.0`. That is a floor bump, not the range
+widening this finding asked for, and the `mppx` peer stays at `^0.8.1`
+unchanged. It also does not by itself explain the gap this finding measured
+against the published `0.7.1` package, which still declares `^15.1.0`;
+`main` had apparently already moved the floor to `16.0.1` sometime after
+`0.7.1` was cut, before this PR pushed it further to `16.3.0`. Confirm the
+actual `peerDependencies` value in whatever version ships next before
+treating this as resolved.
+
+The PR is not only a version bump. It adds support for CAP-71 V2
+authorization credentials (`SOROBAN_CREDENTIALS_ADDRESS_V2`) alongside the
+existing V1 format, adds a `useUpgradedAuth` client flag to request V2
+during simulation, and moves signature verification onto the SDK's own
+`buildAuthorizationEntryPreimage` so the preimage is derived correctly per
+credential version. Changed files: `sdk/src/charge/client/Charge.ts`,
+`sdk/src/charge/server/Charge.ts`, `sdk/src/shared/getAddressCredentials.ts`,
+`sdk/src/shared/verify-auth.ts`, plus their tests.
+
+That is relevant beyond this finding: Wasit's own charge parser
+(`packages/core/src/mpp/charge.ts`) reads the same credential shape. Once
+`@stellar/mpp` publishes a version built on this PR, re-run MPP-01 against
+it and confirm Wasit still parses both V1 and V2 credentials before bumping
+Wasit's own `@stellar/mpp` dependency.
 
 ---
 

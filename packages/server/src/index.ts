@@ -58,7 +58,7 @@ const resultShape = {
   status: z.enum(["PASS", "FAIL", "ERROR", "SKIP"]),
   detail: z.string(),
   destructive: z.boolean(),
-  /** Present only on ERROR: unreachable | configuration | harness. */
+  /** Present only on ERROR: unreachable | configuration | harness | setup. */
   errorKind: z.string().optional(),
 };
 

@@ -15,7 +15,11 @@
  */
 
 /** Why a check could not produce a verdict about the target. */
-export type CheckErrorKind = "unreachable" | "configuration" | "harness";
+export type CheckErrorKind =
+  | "unreachable"
+  | "configuration"
+  | "harness"
+  | "setup";
 
 /** A check that did not run. Never a statement about the target's conformance. */
 export interface CheckError {
@@ -49,6 +53,25 @@ export class ConfigurationError extends Error {
   public constructor(message: string) {
     super(message);
     this.name = "ConfigurationError";
+  }
+}
+
+/**
+ * A precondition the check needed could not be established, so the check never
+ * reached the rule it exists to test.
+ *
+ * Kept apart from a conformance failure deliberately. MPP channel checks must
+ * first get one correctly advancing commitment accepted before they can probe
+ * anything, and two very different worlds refuse that submission identically: a
+ * target that wrongly rejects valid vouchers, and a channel whose cumulative
+ * moved between the challenge being issued and the credential being submitted,
+ * because something else is paying through it. Reporting the second as a defect
+ * tells an operator their service is broken on the evidence of a busy channel.
+ */
+export class CheckSetupError extends Error {
+  public constructor(message: string) {
+    super(message);
+    this.name = "CheckSetupError";
   }
 }
 
@@ -125,6 +148,36 @@ export function assertHttpUrl(target: string): void {
  * from every other failure. Use this instead of bare `fetch` for anything
  * addressed at the service under test.
  */
+/**
+ * The global symbol mppx tags its fetch wrappers with, so a wrapper can be
+ * recognised across module instances and bundles.
+ * See mppx/dist/client/internal/Fetch.js.
+ */
+const MPPX_FETCH_WRAPPER = Symbol.for("mppx.fetch.wrapper");
+
+/**
+ * Resolves the underlying fetch, stepping past any mppx payment wrapper
+ * installed on `globalThis`.
+ *
+ * `Mppx.create` replaces `globalThis.fetch` with a wrapper bound to one
+ * payment method unless `polyfill: false` is passed. A charge-mode client
+ * created earlier in the process therefore makes every later 402 carrying a
+ * different intent fail with "No method found for challenges", even though the
+ * target is conformant. Checks must observe the target, never a payment client
+ * some other check left behind, so this unwraps rather than trusting the global.
+ */
+function baseFetch(): typeof fetch {
+  let current = globalThis.fetch as typeof fetch & {
+    [MPPX_FETCH_WRAPPER]?: typeof fetch;
+  };
+  const seen = new Set<unknown>();
+  while (current[MPPX_FETCH_WRAPPER] && !seen.has(current)) {
+    seen.add(current);
+    current = current[MPPX_FETCH_WRAPPER] as typeof current;
+  }
+  return current;
+}
+
 export async function fetchTarget(
   target: string,
   init?: Parameters<typeof fetch>[1],
@@ -132,7 +185,7 @@ export async function fetchTarget(
   assertHttpUrl(target);
 
   try {
-    return await fetch(target, init);
+    return await baseFetch()(target, init);
   } catch (error) {
     throw new TargetUnreachableError(target, error);
   }
@@ -152,6 +205,9 @@ export function classifyCheckError(error: unknown): ClassifiedError {
   }
   if (error instanceof ConfigurationError) {
     return { kind: "configuration", message: error.message };
+  }
+  if (error instanceof CheckSetupError) {
+    return { kind: "setup", message: error.message };
   }
   return {
     kind: "harness",

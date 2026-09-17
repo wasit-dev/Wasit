@@ -48,7 +48,8 @@ console.log(summary.exitCode); // 0 conformant, 1 non-conformant, 2 no verdict
 
 Every check function returns `Promise<CheckResult[]>` and never rejects for a
 target-side problem — a check that couldn't run (unreachable target, bad
-config) comes back as an `ERROR` or `SKIP` result, not a thrown error.
+config, a setup step that was never accepted) comes back as an `ERROR` or
+`SKIP` result, not a thrown error.
 
 ## x402 checks
 
@@ -98,7 +99,8 @@ Every check's exact pass criteria and spec reference is in the
 
 **`FAIL`, `ERROR`, and `SKIP` are different claims.** `FAIL` means the target
 answered and didn't conform. `ERROR` means no verdict was produced at all —
-unreachable, misconfigured, or the harness itself failed. `SKIP` is neither.
+unreachable, misconfigured, a precondition the check needed was never
+established, or the harness itself failed. `SKIP` is neither.
 Conflating "your service is broken" with "we never reached your service"
 would make a tool worse than no tool.
 

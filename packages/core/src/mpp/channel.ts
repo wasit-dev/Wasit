@@ -1,7 +1,8 @@
 import { type ChannelState, getChannelState } from "@stellar/mpp/channel/server";
 import type { CheckResult } from "../check.js";
 import { errored, skippedDestructive } from "../check.js";
-import { readChannelWithdrawn, signChannelCommitment } from "./channel-commitment.js";
+import { CheckSetupError } from "../errors.js";
+import { readChannelWithdrawn } from "./channel-commitment.js";
 import {
   buildChannelCredential,
   fetchChannelChallenge,
@@ -87,6 +88,76 @@ function failure(id: string, name: string, detail: string): CheckResult[] {
 }
 
 /**
+ * Attempts allowed when establishing the accepted commitment a check needs.
+ *
+ * One attempt is what turned a busy channel into a reported defect. Many
+ * attempts would hide a target that always refuses valid vouchers. Three is
+ * enough that ordinary contention clears, because every attempt re-reads the
+ * cumulative from a freshly issued challenge, while a real refusal reproduces
+ * on all of them.
+ */
+const SETUP_ATTEMPTS = 3;
+
+/** What the target accepted, in the forms the probes that follow need it. */
+interface AcceptedCommitment {
+  /** The absolute cumulative the target accepted. */
+  readonly amount: bigint;
+  /** The exact credential accepted, for replaying it byte for byte. */
+  readonly credential: string;
+  /** The commitment signature, for re-presenting it against a new challenge. */
+  readonly signature: string;
+}
+
+/**
+ * Advances the channel's cumulative by exactly one request price.
+ *
+ * Every ordering and replay check needs this first: a commitment the target has
+ * just accepted, so the probe that follows differs from it in exactly the one
+ * respect the check is about. Reading the cumulative from a freshly issued
+ * challenge on every attempt is what makes these checks re-runnable against a
+ * channel with any prior history, and what lets a retry recover when another
+ * payer advanced the cumulative mid-run.
+ *
+ * @throws {CheckSetupError} No attempt was accepted, so the check has no verdict.
+ */
+async function advanceCumulative(
+  options: MppChannelCheckOptions,
+): Promise<AcceptedCommitment> {
+  const { target, commitmentSecretHex, network, rpcUrl } = options;
+  const refusals: string[] = [];
+
+  for (let attempt = 1; attempt <= SETUP_ATTEMPTS; attempt += 1) {
+    const challenge = await fetchChannelChallenge(target);
+    const amount = challenge.cumulativeAmount + challenge.requestedAmount;
+    const { credential, signature } = await buildChannelCredential({
+      challenge,
+      amount,
+      commitmentSecretHex,
+      network,
+      rpcUrl,
+    });
+
+    const submission = await submitCredential(target, credential);
+    if (submission.status === 200) return { amount, credential, signature };
+
+    refusals.push(
+      `attempt ${attempt}: ${amount} refused with HTTP ${submission.status}: ` +
+        `${submission.body}`,
+    );
+  }
+
+  throw new CheckSetupError(
+    `A correctly advancing commitment was refused ${SETUP_ATTEMPTS} times, each ` +
+      `one signed against a freshly issued challenge, so this check never ` +
+      `reached the rule it tests (${refusals.join("; ")}). Either the target ` +
+      `refuses valid vouchers, which is a defect in its own right, or the ` +
+      `channel's cumulative is being advanced by something else while this run ` +
+      `is in progress. Re-run against a channel nothing else is paying through ` +
+      `to tell the two apart.`,
+  );
+}
+
+/**
  * MPP-11: A commitment that does not advance the cumulative must be rejected.
  *
  * The server applies two distinct rules (cumulativeMonotonicityError):
@@ -107,25 +178,7 @@ export async function runMppChannelOrderingCheck(
   const { target, commitmentSecretHex, network, rpcUrl } = options;
 
   try {
-    const opening = await fetchChannelChallenge(target);
-    const baseline = opening.cumulativeAmount + opening.requestedAmount;
-
-    const { credential } = await buildChannelCredential({
-      challenge: opening,
-      amount: baseline,
-      commitmentSecretHex,
-      network,
-      rpcUrl,
-    });
-    const accepted = await submitCredential(target, credential);
-    if (accepted.status !== 200) {
-      return failure(
-        id,
-        name,
-        `Setup failed: a correctly advancing commitment (${baseline}) was not accepted — ` +
-          `HTTP ${accepted.status}: ${accepted.body}`,
-      );
-    }
+    const { amount: baseline } = await advanceCumulative(options);
 
     // (a) Exactly equal to the cumulative the server now holds.
     const equalChallenge = await fetchChannelChallenge(target);
@@ -219,28 +272,10 @@ export async function runMppChannelReplayCheck(
 ): Promise<CheckResult[]> {
   const id = "MPP-12";
   const name = "Challenge Replay Rejection";
-  const { target, commitmentSecretHex, network, rpcUrl } = options;
+  const { target } = options;
 
   try {
-    const opening = await fetchChannelChallenge(target);
-    const amount = opening.cumulativeAmount + opening.requestedAmount;
-    const { credential } = await buildChannelCredential({
-      challenge: opening,
-      amount,
-      commitmentSecretHex,
-      network,
-      rpcUrl,
-    });
-
-    const first = await submitCredential(target, credential);
-    if (first.status !== 200) {
-      return failure(
-        id,
-        name,
-        `Setup failed: a valid commitment (${amount}) was not accepted — ` +
-          `HTTP ${first.status}: ${first.body}`,
-      );
-    }
+    const { credential } = await advanceCumulative(options);
 
     const replay = await submitCredential(target, credential);
     if (replay.status !== 402) {
@@ -280,32 +315,10 @@ export async function runMppChannelCommitmentReplayCheck(
 ): Promise<CheckResult[]> {
   const id = "MPP-14";
   const name = "Commitment Replay Rejection";
-  const { target, commitmentSecretHex, network, rpcUrl } = options;
+  const { target } = options;
 
   try {
-    const opening = await fetchChannelChallenge(target);
-    const amount = opening.cumulativeAmount + opening.requestedAmount;
-
-    const signature = await signChannelCommitment({
-      channelContract: opening.channelContract,
-      amount,
-      commitmentSecretHex,
-      networkPassphrase: networkPassphrase(network),
-      rpcUrl: resolveRpcUrl(network, rpcUrl),
-    });
-
-    const first = await submitCredential(
-      target,
-      serializeChannelCredential({ challenge: opening, amount, signature }),
-    );
-    if (first.status !== 200) {
-      return failure(
-        id,
-        name,
-        `Setup failed: a valid commitment (${amount}) was not accepted — ` +
-          `HTTP ${first.status}: ${first.body}`,
-      );
-    }
+    const { amount, signature } = await advanceCumulative(options);
 
     // Fresh challenge, same commitment. The signature is still cryptographically
     // valid; only the cumulative rule can reject it.

@@ -81,8 +81,17 @@ service" are not the same claim:
   challenge, missing `channel`/`amount`, non-numeric amounts.
 - **ERROR** — no verdict was produced about the target at all. Either it could
   not be reached (`unreachable`), or the run is misconfigured
-  (`configuration`), or the harness itself failed (`harness`). An ERROR is
+  (`configuration`), or a precondition the check needed could not be
+  established (`setup`), or the harness itself failed (`harness`). An ERROR is
   never a statement about the target's conformance.
+
+  `setup` exists because MPP-11, MPP-12 and MPP-14 must each get one correctly
+  advancing commitment accepted before they can probe anything. That submission
+  is retried three times, each against a freshly issued challenge, so a channel
+  another payer is advancing mid-run recovers on its own. When all three are
+  refused the run reports `setup` rather than FAIL, because a target that
+  refuses valid vouchers and a channel in concurrent use are indistinguishable
+  from the client side, and only one of them is a defect.
 
 Exit codes follow from that: `0` every check conformed, `1` at least one
 conformance failure, `2` at least one check produced no verdict. A run with

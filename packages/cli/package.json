@@ -1,6 +1,6 @@
 {
   "name": "@wasit-dev/cli",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "CLI for x402/MPP protocol-conformance testing on Stellar \u2014 verifies a service's payment flow settles on-chain per spec.",
   "type": "module",
   "bin": {
@@ -41,7 +41,7 @@
     "typecheck": "tsc -p test/tsconfig.json"
   },
   "dependencies": {
-    "@wasit-dev/core": "^0.3.0",
+    "@wasit-dev/core": "^0.4.0",
     "cfonts": "^3.3.1",
     "commander": "^15.0.0",
     "dotenv": "^17.4.2",

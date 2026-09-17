@@ -11,6 +11,7 @@ import {
   toStructuredRun,
 } from "../../src/check.js";
 import {
+  CheckSetupError,
   ConfigurationError,
   MalformedResponseError,
   TargetUnreachableError,
@@ -135,6 +136,16 @@ describe("errored", () => {
 
     assert.equal(built.error?.kind, "configuration");
     assert.match(built.detail, /^Check could not run \(configuration\)/);
+  });
+
+  it("reports a setup failure as no verdict rather than as a defect", () => {
+    const result = errored("MPP-11", "Cumulative Commitment Ordering", new CheckSetupError("refused 3 times"));
+
+    assert.equal(checkStatus(result), "ERROR");
+    assert.equal(result.pass, false);
+    assert.equal(result.error?.kind, "setup");
+    assert.equal(summarize([result]).exitCode, 2);
+    assert.equal(toStructuredRun([result]).outcome, "no-verdict");
   });
 
   it("never marks an errored result as passing", () => {

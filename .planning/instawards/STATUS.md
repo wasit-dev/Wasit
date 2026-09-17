@@ -35,7 +35,7 @@ table below.
 | SOW submitted / sprint start (draft text) | 29 Jul 2026 / 1 Aug 2026 — actual effective date is 28 Aug 2026 (funds received), day-count runs from there |
 | npm org | `@wasit-dev` (created this engagement; `wasit` alone was unavailable) |
 | Published packages | `@wasit-dev/core@0.3.0`, `@wasit-dev/cli@0.3.0`, `@wasit-dev/server@0.3.0` — published 2026-09-06, all three tagged at `19ee60f` and released on GitHub. Verified from the registry the same day: `docs/evidence/2026-09-06-npm-package-parity-run.md` |
-| Upstream findings filed | [#66](https://github.com/stellar/stellar-mpp-sdk/issues/66) channel error taxonomy · [#67](https://github.com/stellar/stellar-mpp-sdk/issues/67) `feePayer.envelopeSigner` naming · [#70](https://github.com/stellar/stellar-mpp-sdk/issues/70) stale peer ranges. Canonical write-up: `docs/findings/upstream-sdk.md` |
+| Upstream findings filed | [#66](https://github.com/stellar/stellar-mpp-sdk/issues/66) channel error taxonomy · [#67](https://github.com/stellar/stellar-mpp-sdk/issues/67) `feePayer.envelopeSigner` naming · [#70](https://github.com/stellar/stellar-mpp-sdk/issues/70) stale peer ranges (fix in review as [PR #74](https://github.com/stellar/stellar-mpp-sdk/pull/74), not yet merged). Canonical write-up: `docs/findings/upstream-sdk.md` |
 | Tests | 70, offline (no keys, no target, no network). `npm test` and `npm run typecheck -w packages/core` both run in CI |
 | Network | Stellar Testnet only (mainnet out of scope) |
 | Repo layout | `packages/core` (check suites) · `packages/cli` (`wasit` command) · `packages/server` (`wasit-mcp` / MCP tools) |

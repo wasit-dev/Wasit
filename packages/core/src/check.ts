@@ -157,7 +157,10 @@ export interface StructuredCheckResult {
   readonly status: CheckStatus;
   readonly detail: string;
   readonly destructive: boolean;
-  /** Present only when `status` is "ERROR": unreachable | configuration | harness. */
+  /**
+   * Present only when `status` is "ERROR":
+   * unreachable | configuration | harness | setup.
+   */
   readonly errorKind?: string;
 }
 

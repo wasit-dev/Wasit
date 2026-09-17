@@ -244,7 +244,7 @@ export async function runMppChargeChecks(
 
   const advertised = await fetchChargeChallenge(target);
 
-  const mppx = Mppx.create({ methods: [charge({ secretKey: payerSecretKey })] });
+  const mppx = Mppx.create({ methods: [charge({ secretKey: payerSecretKey })], polyfill: false });
 
   let paid: Response;
   try {
