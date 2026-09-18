@@ -302,6 +302,18 @@ node packages/cli/dist/index.js mpp-charge --target http://localhost:3002/data
 node packages/cli/dist/index.js mpp-channel --target http://localhost:3003/data
 ```
 
+<div align="center">
+  <img src="docs/media/d1-x402.gif" alt="wasit running the x402 checks against a local fixture, five read-only then all seven" width="720" />
+</div>
+
+That recording is the published package, not a local build: it opens with
+`npx -y @wasit-dev/cli@0.4.0 --version` printing `0.4.0`, then lists the
+catalogue, then runs read-only and full. The full run settles a real testnet
+payment in `X402-06` and has a deliberately corrupted one rejected in
+`X402-07`. The raw asciinema capture is
+[`docs/media/d1-x402.cast`](docs/media/d1-x402.cast), replayable with
+`asciinema play`.
+
 A passing run looks like this:
 
 ```
