@@ -47,10 +47,20 @@ That recording doubles as the x402 half of a registry parity run for 0.4.0,
 which `docs/evidence/2026-09-17-cross-check-isolation-run.md` lists as an open
 gap: every command in it came from the registry rather than a local build.
 
-**D3 recording captured, not yet published.** `docs/media/d3-mcp-session.mov`,
-26 MB, kept out of git (`.gitignore` excludes `docs/media/*.mov|mp4|webm`).
-Large raw video does not belong in a repo history it can never be removed from;
-it is published as a GitHub Release asset on `v0.4.0` instead, and the link
-recorded here once uploaded.
+**D3 recording captured, not yet published.** Raw capture
+`docs/media/d3-mcp-session.mov` (26 MB), compressed to
+`docs/media/d3-mcp-session.mp4` (2.2 MB, 1280x1386, 60s). Both are kept out of
+git: `.gitignore` excludes `docs/media/*.mov|mp4|webm`, because large binaries
+do not belong in a history they can never be removed from. The video is
+published as a GitHub Release asset on `v0.4.0` instead, and the link recorded
+here once uploaded. At 2.2 MB it also fits GitHub's attachment limit, so
+dragging it into the release description gives a player that runs in the page
+rather than a file a reviewer has to download.
+
+A poster frame, `docs/media/d3-mcp-session-poster.png`, **is** committed: it is
+the last frame, showing the MPP channel suite conformant immediately after the
+charge tool call in the same session. Both recordings sit side by side in a
+two-column table in the README's Trying It section, each clickable, so the front
+page carries the evidence without either one dominating the scroll.
 
 **Still open:** the two-minute walkthrough video, and hosting links for D3.

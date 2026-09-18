@@ -302,17 +302,33 @@ node packages/cli/dist/index.js mpp-charge --target http://localhost:3002/data
 node packages/cli/dist/index.js mpp-channel --target http://localhost:3003/data
 ```
 
-<div align="center">
-  <img src="docs/media/d1-x402.gif" alt="wasit running the x402 checks against a local fixture, five read-only then all seven" width="720" />
-</div>
+<table>
+  <tr>
+    <td width="50%" valign="top" align="center">
+      <a href="docs/media/d1-x402.gif"><img src="docs/media/d1-x402.gif" width="380" alt="The wasit CLI running the x402 checks against a local fixture: five read-only, then all seven" /></a>
+      <br />
+      <sub><b>CLI</b> &middot; <code>npx @wasit-dev/cli@0.4.0</code><br />catalogue, read-only 5/5, then 7/7 with a settled payment</sub>
+    </td>
+    <td width="50%" valign="top" align="center">
+      <a href="https://github.com/wasit-dev/wasit/releases/tag/v0.4.0"><img src="docs/media/d3-mcp-session-poster.png" width="380" alt="The same checks run as MCP tool calls from Claude Code, ending with the MPP channel suite conformant" /></a>
+      <br />
+      <sub><b>MCP</b> &middot; the same checks from Claude Code<br />charge then channel in one session &middot; <a href="https://github.com/wasit-dev/wasit/releases/tag/v0.4.0">watch</a></sub>
+    </td>
+  </tr>
+</table>
 
-That recording is the published package, not a local build: it opens with
-`npx -y @wasit-dev/cli@0.4.0 --version` printing `0.4.0`, then lists the
-catalogue, then runs read-only and full. The full run settles a real testnet
-payment in `X402-06` and has a deliberately corrupted one rejected in
-`X402-07`. The raw asciinema capture is
+Click either one for full size. Both ran against the published packages rather
+than a local build: the CLI capture opens with `--version` printing `0.4.0`, and
+the MCP session started the server through `npx -y @wasit-dev/server@0.4.0`. The
+raw asciinema capture behind the left-hand one is
 [`docs/media/d1-x402.cast`](docs/media/d1-x402.cast), replayable with
 `asciinema play`.
+
+The right-hand session is worth a second look. It calls `wasit_mpp_charge_test`
+and then `wasit_mpp_channel_test` back to back in a single server process. Until
+0.4.0 that sequence failed every time, for a reason that had nothing to do with
+the target being tested:
+[the write-up](docs/evidence/2026-09-17-cross-check-isolation-run.md).
 
 A passing run looks like this:
 
