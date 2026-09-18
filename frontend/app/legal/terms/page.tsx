@@ -93,7 +93,7 @@ export default function TermsPage() {
                 GitHub
               </a>{" "}
               or via{" "}
-              <a href="https://x.com/ImutNajmi" target="_blank" rel="noreferrer noopener">
+              <a href="https://x.com/wasithq" target="_blank" rel="noreferrer noopener">
                 X
               </a>.
             </p>

@@ -19,9 +19,10 @@ missing fields, a settlement that moved the wrong amount. This is a statement
 about the target.
 
 **ERROR** — no verdict was produced. Sub-classified as `unreachable` (no HTTP
-conversation took place), `configuration` (the run is set up wrongly), or
-`harness` (Wasit or a dependency failed). **An ERROR is never a statement about
-the target's conformance.**
+conversation took place), `configuration` (the run is set up wrongly), `setup`
+(a precondition the check needed could not be established), or `harness` (Wasit
+or a dependency failed). **An ERROR is never a statement about the target's
+conformance.**
 
 **SKIP** — the check did not run, for a stated reason: a destructive check
 without opt-in, missing expected parameters, or a dependency on an earlier check
@@ -53,6 +54,46 @@ response.
 
 A malformed response is deliberately **not** an error. The target answered; the
 answer was wrong. That is a finding.
+
+## When a precondition cannot be established
+
+`MPP-11`, `MPP-12` and `MPP-14` cannot probe anything until one correctly
+advancing commitment has been accepted. Each of them therefore submits one
+first, and for a long time a refusal of that submission was reported as FAIL.
+
+That was the same mistake this document exists to prevent, one level deeper.
+Two very different worlds refuse that submission identically: a target that
+wrongly rejects valid vouchers, which is a defect, and a channel whose
+cumulative moved between the challenge being issued and the credential being
+submitted, because another payer is using it, which is nothing at all. Nothing
+observable from the client distinguishes them.
+
+The submission is now retried up to three times, each against a freshly issued
+challenge, so the cumulative is re-read every time and ordinary contention
+clears by itself. When every attempt is refused, the result is `setup`, carrying
+all three refusals verbatim and saying plainly that either reading is possible
+and that a re-run against a quiet channel is what tells them apart. Retrying
+does not hide a target that always refuses: that target reproduces on all three.
+
+## State one check leaves behind for the next
+
+A check must observe the target, never the leftovers of an earlier check in the
+same process.
+
+`Mppx.create` replaces `globalThis.fetch` with a wrapper bound to a single
+payment method unless `polyfill: false` is passed. Once `MPP-01` built a charge
+client, every later channel-mode 402 in that process was refused by that wrapper
+rather than by the service, and reported as a defect in a target that was in
+fact conformant. The CLI never showed it, because each invocation is a fresh
+process. The MCP server did, because one process answers many tool calls in a
+row, so only the first payment-mode check in a session produced a trustworthy
+verdict.
+
+Passing `polyfill: false` at the call site is necessary and not sufficient: one
+stale build or one new caller brings the leak back silently. So `fetchTarget()`
+resolves the underlying fetch through mppx's own
+`Symbol.for("mppx.fetch.wrapper")` tag before using it. The guard is structural
+rather than a promise to remember.
 
 ## Cascading failures
 

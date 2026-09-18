@@ -115,6 +115,23 @@ A run with both a failure and an error exits `1`: a real finding outranks a
 missing one. Skipped checks never affect the exit code — a skipped check is
 neither a pass nor a defect.
 
+An `ERROR` line names why no verdict was reached, in parentheses:
+
+| Kind | Meaning |
+|---|---|
+| `unreachable` | No HTTP conversation took place at all |
+| `configuration` | The run is set up wrongly: bad URL, unknown network, unreadable key |
+| `setup` | A precondition the check needed could not be established |
+| `harness` | Wasit or one of its dependencies failed |
+
+`setup` appears on `MPP-11`, `MPP-12` and `MPP-14`, which each need one
+correctly advancing commitment accepted before they can probe anything. That
+submission is retried three times against fresh challenges; if all three are
+refused, the check reports `setup` rather than blaming the target, because a
+target that refuses valid vouchers and a channel another payer is advancing look
+identical from here. Re-run against a channel nothing else is using to tell them
+apart. See [../design/error-model.md](../design/error-model.md).
+
 ## Check Catalogue
 
 ```bash

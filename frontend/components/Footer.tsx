@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 const GITHUB_URL = "https://github.com/wasit-dev/wasit";
-const X_URL = "https://x.com/ImutNajmi";
+const X_URL = "https://x.com/wasithq";
 
 const FOOTER_COLUMNS: { title: string; links: { label: string; href: string; external?: boolean }[] }[] = [
   {

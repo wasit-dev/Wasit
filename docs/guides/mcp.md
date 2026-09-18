@@ -134,6 +134,14 @@ and `no-verdict` must never be read as `conformant`. When any check errored, the
 prose channel carries an explicit caveat that no statement was made about the
 target's conformance.
 
+A result with `"status": "ERROR"` also carries `errorKind`, one of
+`unreachable`, `configuration`, `setup` or `harness`. `setup` means a
+precondition the check needed could not be established — for the channel checks,
+that one correctly advancing commitment was refused three times running, which a
+channel in concurrent use produces just as readily as a non-conformant target.
+An agent should report that as "no verdict", never as a defect, and suggest a
+re-run against a channel nothing else is paying through.
+
 ## Why the destructive tool is a separate tool
 
 `MPP-13` closes a payment channel. The settlement is final, the channel cannot

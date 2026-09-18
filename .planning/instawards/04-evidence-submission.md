@@ -44,6 +44,7 @@ was modeled on.
 | npm package | https://www.npmjs.com/package/@wasit-dev/server |
 | MCP config | https://github.com/wasit-dev/wasit/blob/main/docs/guides/mcp.md |
 | Screen recording (check triggered from Claude Code via MCP) | _pending — Job 03_ |
+| Written record of checks triggered from Claude Code via MCP | https://github.com/wasit-dev/wasit/blob/main/docs/evidence/2026-09-17-cross-check-isolation-run.md — four tool calls in one session, including `wasit_mpp_charge_test` followed immediately by `wasit_mpp_channel_test` in the same server process, with the charge settled on-chain. Not the SOW row, which asks for a recording; this is the transcript the recording will show, and it also documents the defect that made exactly this sequence fail before 0.4.0 |
 
 ### Overall
 
@@ -77,6 +78,14 @@ verified to behave identically to source across all thirteen checks
 they answer the question a reviewer asks before reading any check result at
 all — does the thing actually work when someone else installs it, and does it
 agree with an implementation it did not write.
+
+Partial progress 2026-09-17: D3 gained a written record of a real Claude Code
+MCP session. It matters more than its row suggests, because the defect fixed the
+same day meant that before 0.4.0 only the *first* payment-mode tool call in an
+MCP session produced a trustworthy verdict — so a D3 recording made before this
+fix would have been a recording of a tool giving wrong answers. The recording
+itself still depends on Job 3, and should be made from the published 0.4.0
+package rather than a local build.
 
 The third-party-authorization item is unaffected by any of this and still
 depends on Job 2. Every remaining `_pending_` row depends on Job 3.

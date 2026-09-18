@@ -11,7 +11,7 @@ it is not a schema validator: a response can have every field in the right place
 and still take money without settling it. Settlement is verified on-chain — from
 the token contract's own transfer event rather than the service's own response —
 for MPP charge mode today. Extending that to the x402 payment checks is tracked
-for 0.4.0; until then they exercise the real flow and judge the target on its
+for 0.5.0; until then they exercise the real flow and judge the target on its
 HTTP behaviour.
 
 [![CI](https://github.com/wasit-dev/wasit/actions/workflows/ci.yml/badge.svg)](https://github.com/wasit-dev/wasit/actions/workflows/ci.yml)
@@ -35,6 +35,7 @@ HTTP behaviour.
 ## Table of Contents
 
 - [How It Works](#how-it-works)
+- [Who You May Point It At](#who-you-may-point-it-at)
 - [What a Passing Result Means](#what-a-passing-result-means)
 - [The Problem](#the-problem)
 - [Status](#status)
@@ -85,6 +86,24 @@ own transfer event, not just the transaction it was asked to make.
 The CLI and the MCP server are thin adapters over the same suite functions. They
 cannot disagree about the same target, because there is only one implementation
 of each check.
+
+---
+
+## Who You May Point It At
+
+Wasit settles real payments and can permanently close a payment channel, so
+pointing it at a service is an action taken against someone else's system.
+**Testing any target outside your own control requires the operator's explicit
+written authorization.** That is a rule binding on the builder and on every user
+of the tool, not a feature of the software: no tool can work out from a URL
+alone who owns the service behind it.
+
+Two guards follow from that rather than replace it. The destructive check does
+not run at all without an explicit opt-in, and in the MCP server the destructive
+tool is not even registered unless a person started the process intending it to
+exist. Everything else is on the operator running the tool.
+[SECURITY.md](SECURITY.md) states the full policy, including how keys are
+handled and how findings about someone else's service are disclosed.
 
 ---
 
@@ -240,18 +259,32 @@ would: the CLI's own binary and the MCP server over stdio. It runs in CI too.
 
 ## Trying It
 
-Three fixture servers are bundled — real servers built on the official SDKs, not
-mocks. Testing against a mock would mean testing against our own assumptions;
-one of the defects listed above was found precisely because the fixtures are
-real.
+Four fixture servers are bundled. Three are real servers built on the official
+SDKs, not mocks — testing against a mock would mean testing against our own
+assumptions, and one of the defects listed above was found precisely because the
+fixtures are real. The fourth is a deliberate misbehaver, described below.
 
-Each runs in its own terminal:
+Start them all at once:
 
 ```bash
-npx tsx packages/core/test/fixtures/x402-real-server.ts      # :3001/protected
-npx tsx packages/core/test/fixtures/mpp-charge-server.ts     # :3002/data
-npx tsx packages/core/test/fixtures/mpp-channel-server.ts    # :3003/data
+./scripts/fixtures.sh start     # start, then `status`, `logs`, `stop`
 ```
+
+Or run any of them by hand, one terminal each:
+
+```bash
+npx tsx packages/core/test/fixtures/x402-real-server.ts             # :3001/protected
+npx tsx packages/core/test/fixtures/mpp-charge-server.ts            # :3002/data
+npx tsx packages/core/test/fixtures/mpp-channel-server.ts           # :3003/data
+npx tsx packages/core/test/fixtures/mpp-channel-refusing-server.ts  # :3004/data
+```
+
+The fourth issues valid channel challenges and then refuses every credential. It
+is not a conformance target and must never be used as one. It exists to
+reproduce, on demand, a run where the precondition a channel check needs cannot
+be established, so the reporting path for that case can be exercised without
+racing two runs against a real channel. Pointed at it, `MPP-11`, `MPP-12` and
+`MPP-14` all report `ERROR (setup)` and the run exits `2`.
 
 Then, from another terminal:
 
