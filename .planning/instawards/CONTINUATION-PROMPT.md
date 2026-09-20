@@ -37,36 +37,56 @@ on npm as `@wasit-dev/core`, `@wasit-dev/cli`, `@wasit-dev/server`.
 
 Read `.planning/instawards/STATUS.md` first, every time. It has the job
 board, the binding SOW deliverables, open decisions, and a full session log.
-As of the last update there: packages at `0.3.0`, 70 offline tests passing
-in CI, three upstream SDK findings filed
+
+As of 2026-09-20: all three packages published at **0.4.0**, tagged `v0.4.0`
+and pushed. Three upstream SDK findings filed
 ([#66](https://github.com/stellar/stellar-mpp-sdk/issues/66),
 [#67](https://github.com/stellar/stellar-mpp-sdk/issues/67),
-[#70](https://github.com/stellar/stellar-mpp-sdk/issues/70)), and the
-published packages verified against source with a real testnet settlement
-run.
+[#70](https://github.com/stellar/stellar-mpp-sdk/issues/70)).
 
-Two jobs are still open: third-party validation (outreach sent to three
-candidates, no confirmed run back yet) and recordings (terminal GIF, MCP
-screen recording, the two-minute walkthrough video: none started). Evidence
-submission depends on both.
+**0.4.0 fixed two defects in Wasit itself**, both about claims it had no basis
+for, and both worth knowing before touching the MPP code. First, `Mppx.create`
+replaces `globalThis.fetch` with a wrapper bound to one payment method unless
+`polyfill: false` is passed, so after `MPP-01` every later channel-mode 402 in
+the same process was refused by that wrapper instead of by the service. The CLI
+never showed it (fresh process per invocation); the MCP server did, which meant
+only the first payment-mode check in a session had been trustworthy. Fixed at
+the call site and structurally, by having `fetchTarget` unwrap any
+`Symbol.for("mppx.fetch.wrapper")` before use. Second, `MPP-11`, `MPP-12` and
+`MPP-14` each need one advancing commitment accepted before they can probe, and
+a refusal of that step used to be reported as FAIL; it is now retried three
+times against fresh challenges and then reported as `ERROR` with the new
+`errorKind: "setup"` and exit code 2. Full write-up:
+`docs/evidence/2026-09-17-cross-check-isolation-run.md`.
 
-Most recent work (not yet in the session log, not yet committed): a reply
-came in on the SDK side for finding #70. `stellar/stellar-mpp-sdk#74` is an
-open, approved (not yet merged) PR that bumps the SDK's own
-`@stellar/stellar-sdk` floor from `^16.0.1` to `^16.3.0` and adds CAP-71 V2
-authorization credential support (`SOROBAN_CREDENTIALS_ADDRESS_V2` alongside
-the existing V1 format, a `useUpgradedAuth` client flag, verification moved
-onto the SDK's own `buildAuthorizationEntryPreimage`). This is a floor bump,
-not the range widening the finding asked for, and no new `@stellar/mpp`
-version has published yet, so nothing changes for Wasit's own dependency
-tree until both the merge and a release happen.
-`docs/findings/upstream-sdk.md`, `README.md`, and
-`.planning/instawards/STATUS.md` were updated to record this. `git status`
-shows those three files modified and uncommitted; Najmi commits them
-himself. Open follow-up once `@stellar/mpp` actually publishes on this PR:
-re-run MPP-01 and confirm Wasit's charge parser (`packages/core/src/mpp/charge.ts`)
-still reads both V1 and V2 credentials correctly before bumping Wasit's own
-`@stellar/mpp` dependency.
+Local test loop: `./scripts/fixtures.sh start|status|logs|stop` runs all four
+fixture servers from one terminal (x402 :3001/protected, charge :3002/data,
+channel :3003/data, and a deliberately refusing channel :3004/data that
+reproduces a setup failure on demand). `packages/core/test/manual/charge-then-channel.ts`
+runs both MPP suites in one process, which is the shape the MCP server has and
+the only way to catch cross-check leakage.
+
+Job board state: **Job 03 (recordings)** has the D1 terminal GIF done
+(`docs/media/d1-x402.gif`, recorded from the published package) and the D3 MCP
+session captured but only published as a release asset; the **two-minute
+walkthrough video is the one item left**, and its script and shot list are
+written but not yet recorded. **Job 02 (third-party validation with operator
+authorization)** is still open and is the one SOW line Najmi cannot close
+alone. **Job 04 (evidence submission)** is unblocked on everything except
+those two.
+
+Also open, not a SOW item:
+[stellar/stellar-dev-skill#136](https://github.com/stellar/stellar-dev-skill/pull/136)
+adds Wasit to the Community skills list on skills.stellar.org. Checks green,
+Copilot approval recommended, human review pending. The skill file itself stays
+in this repo at `skills/wasit/SKILL.md`; only a card linking to its raw URL goes
+upstream. A merge means listed, not endorsed, and the site says so explicitly,
+so the completion summary must not read it as approval. Confirm with
+`curl -s https://skills.stellar.org/llms.txt | grep -i wasit` once merged.
+
+Two things deliberately left undone and worth not re-deriving: no registry
+parity run exists yet for 0.4.0 (the D1 recording covers the x402 half of it),
+and the GitHub Release for `v0.4.0` may still need its video attached.
 
 For full technical history (every check implemented, every bug found and
 fixed, every architecture decision and why), read the memory files in order:
