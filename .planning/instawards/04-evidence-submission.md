@@ -62,6 +62,7 @@ was modeled on.
 | Upstream SDK defect report #2 | https://github.com/stellar/stellar-mpp-sdk/issues/67 |
 | Upstream SDK defect report #3 | https://github.com/stellar/stellar-mpp-sdk/issues/70 — stale peer ranges; a clean consumer install resolves two Stellar SDKs, and every advisory `npm audit` reports traces to the nested older copy |
 | Upstream finding independently confirmed by a downstream project | RouteDock PR #241 (github.com/winsznx/routedock/pull/241) — **not** the D2 third-party-authorization item: RouteDock was tested without contacting its operator (see `docs/evidence/2026-08-15-third-party-run.md`) |
+| Listed as a Stellar ecosystem agent skill | [stellar/stellar-dev-skill#136](https://github.com/stellar/stellar-dev-skill/pull/136) — **open, not merged**, submitted 2026-09-20. Adds an ecosystem card pointing at `skills/wasit/SKILL.md` in this repo, so the skill stays under our own maintenance rather than being copied upstream. Community skills on skills.stellar.org are explicitly "not reviewed, endorsed, or maintained by the Stellar Development Foundation", so a merge means listed, not blessed, and the completion summary should say it that way |
 
 ## Result
 Not started — waiting on Jobs 2 and 3.
