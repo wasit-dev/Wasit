@@ -36,11 +36,12 @@ of them.
 
 | Task | File |
 |---|---|
-| Run checks from a terminal, interactively or scripted | `docs/guides/cli.md` |
-| Wire an MCP client (Claude Code, Claude Desktop, other) | `docs/guides/mcp.md` |
-| Look up what a specific check ID (`X402-0x`, `MPP-0x`) asserts | `docs/CHECKS.md` |
-| Set up testnet keys and environment variables | `docs/guides/configuration.md` |
-| Understand what a passing result does and does not mean | `docs/design/scope-boundary.md` |
+| Run checks from a terminal, interactively or scripted | [`docs/guides/cli.md`](https://github.com/wasit-dev/wasit/blob/main/docs/guides/cli.md) |
+| Wire an MCP client (Claude Code, Claude Desktop, other) | [`docs/guides/mcp.md`](https://github.com/wasit-dev/wasit/blob/main/docs/guides/mcp.md) |
+| Look up what a specific check ID (`X402-0x`, `MPP-0x`) asserts | [`docs/CHECKS.md`](https://github.com/wasit-dev/wasit/blob/main/docs/CHECKS.md) |
+| Set up testnet keys and environment variables | [`docs/guides/configuration.md`](https://github.com/wasit-dev/wasit/blob/main/docs/guides/configuration.md) |
+| Understand what a passing result does and does not mean | [`docs/design/scope-boundary.md`](https://github.com/wasit-dev/wasit/blob/main/docs/design/scope-boundary.md) |
+| Understand how FAIL, ERROR and SKIP differ | [`docs/design/error-model.md`](https://github.com/wasit-dev/wasit/blob/main/docs/design/error-model.md) |
 
 ## Essentials
 
@@ -79,6 +80,15 @@ Every tool returns both prose and a `structuredContent` object with `outcome`
 and a per-check result array. `outcome` is the field to read, not an exit
 code: an integer means nothing to an agent on its own, and `no-verdict` is
 never a pass.
+
+A per-check `status` of `ERROR` carries an `errorKind` of `unreachable`,
+`configuration`, `setup` or `harness`, and means no verdict was reached about
+the target. Report it as such, never as a defect. `setup` in particular means a
+precondition the check needed could not be established: for the channel checks,
+that one correctly advancing commitment was refused three times running, which a
+channel another payer is using produces just as readily as a non-conformant
+target. The right follow-up is a re-run against a channel nothing else is paying
+through, not a bug report against the service.
 
 ## Related
 
