@@ -84,20 +84,18 @@ each repo and endpoint was checked by hand:
 
 | Candidate | Why | Live endpoint | Status |
 |---|---|---|---|
-| StellarSight (pedro-pelicioni/stellarsight) | x402 Bazaar discovery index on Stellar; repo pushed 2026-09-23; their own issue #3 asks for a seller-side check that validates a listing before it is announced, which is what Wasit does | `https://stellarsight.xyz/v1/fx/usd-brl` answers 402 on `stellar:testnet`; **read-only Wasit run 5/5 PASS**, no payment made. Asset is their own `SXT` token, not USDC, so a full run needs them to send some or to self-test | Draft ready, not sent |
-| CleverCon (clevercon-protocol/clevercon) | Agent spending vaults that pay external x402/MPP services; pushed 2026-09-22 | None found yet; they are primarily a payer | Draft ready, not sent; asks whether they run an endpoint |
+| StellarSight (pedro-pelicioni/stellarsight) | x402 Bazaar discovery index on Stellar; repo pushed 2026-09-23; their own issue #3 asks for a seller-side check that validates a listing before it is announced, which is what Wasit does | `https://stellarsight.xyz/v1/fx/usd-brl` answers 402 on `stellar:testnet`; **read-only Wasit run 5/5 PASS**, no payment made. Asset is their own `SXT` token, not USDC, so a full run needs them to send some or to self-test | **Sent 2026-09-24**: [#13](https://github.com/pedro-pelicioni/stellarsight/issues/13) |
+| CleverCon (clevercon-protocol/clevercon) | Agent spending vaults that pay external x402/MPP services; pushed 2026-09-22 | None found yet; they are primarily a payer | **Sent 2026-09-24**: [#134](https://github.com/clevercon-protocol/clevercon/issues/134); asks whether they run an endpoint |
 | Talos (enliven17/talos-stellar) | Agents sell services via x402; pushed 2026-09-24 | `talos-stellar.vercel.app` returned 500 | Not contacted |
 | OFFER-HUB/X402 | Hackathon repo | None; last push 2026-04-12 | Ruled out |
 
-Drafts live in the session scratchpad and are quoted in the session log; post
-only after Najmi approves.
+Both posted 2026-09-24 with Najmi's approval.
 
 The SOW fallback was also run the same day, against `stellar/stellar-mpp-sdk`'s
 own example servers: `docs/evidence/2026-09-24-official-sdk-reference-run.md`.
 It covers the remainder and does not satisfy this job's row.
 
 ## Next action
-Post the two round-two drafts once approved, then re-check all threads
-around 2026-10-01. If StellarSight says yes, run the full x402 suite against
+Re-check all threads (round one and two) around 2026-10-01. If StellarSight says yes, run the full x402 suite against
 `/v1/fx/usd-brl` and record it as the D2 authorization evidence, naming them
 only with permission.

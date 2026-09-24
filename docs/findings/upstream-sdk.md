@@ -369,7 +369,7 @@ registry today. Treat this finding as fixed upstream, unreleased.
 
 ## Finding 4 — Rejected channel vouchers are reported as HTTP 500 since the mppx 0.10 bump
 
-**Status:** not yet filed. Present on `main` since
+**Status:** filed as [stellar/stellar-mpp-sdk#82](https://github.com/stellar/stellar-mpp-sdk/issues/82) on 2026-09-24. Present on `main` since
 [#78](https://github.com/stellar/stellar-mpp-sdk/pull/78) (merged 2026-09-22);
 not in any release, since `@stellar/mpp@latest` is still `0.7.1`
 **Severity:** moderate. Enforcement is intact and no voucher is honoured

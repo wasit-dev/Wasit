@@ -97,7 +97,8 @@ hold for the channel server.
 
 **Status.** Unreleased. `@stellar/mpp@latest` on npm is still `0.7.1`, which
 predates #78, so no consumer installing from the registry sees this today. It
-ships with the next release unless fixed first. Filed as upstream Finding 4 in
+ships with the next release unless fixed first. Filed as
+[stellar/stellar-mpp-sdk#82](https://github.com/stellar/stellar-mpp-sdk/issues/82); canonical write-up is Finding 4 in
 `docs/findings/upstream-sdk.md`.
 
 ---
