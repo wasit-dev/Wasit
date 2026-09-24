@@ -68,9 +68,12 @@ the only way to catch cross-check leakage.
 
 Job board state: **Job 03 (recordings)** has the D1 terminal GIF done
 (`docs/media/d1-x402.gif`, recorded from the published package) and the D3 MCP
-session captured but only published as a release asset; the **two-minute
-walkthrough video is the one item left**, and its script and shot list are
-written but not yet recorded. **Job 02 (third-party validation with operator
+session captured and already embedded in the `v0.4.0` GitHub Release
+description; the **two-minute walkthrough video is the one item left**, and
+Najmi has chosen to defer it deliberately rather than have a script drafted
+from scratch. A prior claim that its script and shot list were already written
+could not be verified anywhere in the repo, `.planning/`, or project memory as
+of 2026-09-20; treat that as not written until Najmi says otherwise. **Job 02 (third-party validation with operator
 authorization)** is still open and is the one SOW line Najmi cannot close
 alone. **Job 04 (evidence submission)** is unblocked on everything except
 those two.
@@ -84,9 +87,11 @@ upstream. A merge means listed, not endorsed, and the site says so explicitly,
 so the completion summary must not read it as approval. Confirm with
 `curl -s https://skills.stellar.org/llms.txt | grep -i wasit` once merged.
 
-Two things deliberately left undone and worth not re-deriving: no registry
-parity run exists yet for 0.4.0 (the D1 recording covers the x402 half of it),
-and the GitHub Release for `v0.4.0` may still need its video attached.
+One thing deliberately left undone and worth not re-deriving: no registry
+parity run exists yet for 0.4.0 (the D1 recording covers the x402 half of it).
+The GitHub Release for `v0.4.0` already has the MCP video embedded in its
+description (verified 2026-09-20 by resolving the `user-attachments` link in the
+release body to its underlying `video/mp4` asset); do not redo that.
 
 For full technical history (every check implemented, every bug found and
 fixed, every architecture decision and why), read the memory files in order:

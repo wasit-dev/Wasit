@@ -50,13 +50,34 @@ self-hosted reference service and run Wasit against it under our own
 authorization — not as strong as independent third-party validation, but it
 satisfies the letter of the requirement and keeps the timeline moving.
 
+## Re-check, 2026-09-24 (week 4)
+
+- **Outreach threads:** yripper/stellarpay#1, Stellar-Light/stellar-pay#3 and
+  Blockchain-Oracle/xlmtools#1 are all still open with **zero comments**.
+  RouteDock #206 is closed, and the permission comment there got no reply.
+- **xlmtools: ruled out.** The 522 outage has cleared, but `api.xlmtools.com`
+  now returns 200 with the same HTML page, for an unrelated site, on every
+  path, including `/search` and `/health`. The root `xlmtools.com` serves the
+  same page. The domain registration is unchanged since April, the repo was
+  last pushed 2026-04-14, and `@xlmtools/cli`/`@xlmtools/mcp` were last
+  published 2026-04-14/15. Whatever is answering on that host is not the
+  operator's API, so there is nothing to test.
+- **defi-copilot: ruled out for now.** `api.fxjrin.com` still presents a
+  certificate with no subject and no SAN matching the host, so no HTTPS client
+  can connect. The repo was last pushed 2026-04-12, and the outreach issue was
+  never sent.
+- **AgentOracle:** `TKCollective/x402-research-skill` no longer resolves on
+  GitHub.
+- Wasit was **not** run against either xlmtools or fxjrin. Neither host is
+  serving the operator's API, and no operator has authorized a run.
+
 ## Next action
-Five candidates still open with no reply (RouteDock, yripper/stellarpay,
-Stellar-Light/stellar-pay, xlmtools, fxjrin/defi-copilot). Two of those
-are currently blocked on the target's own infrastructure rather than
-waiting on a reply: xlmtools by its 522 outage, defi-copilot by its API
-host's TLS cert not covering its own hostname — retry both once fixed.
-AgentOracle is effectively resolved as a non-candidate for now (no live
-Stellar payment option to test) unless they reply saying otherwise.
-Re-check the five live threads before Job 04 starts; if none has
-converted by then, trigger the fallback.
+No candidate is left that could convert without a reply: the three live
+threads are waiting on their operators, and both infrastructure-blocked
+candidates are dormant projects, not temporary outages. The next step is
+Najmi's decision on the SOW fallback. Either keep waiting on the three
+threads, or stand up self-hosted reference services from the official SDKs
+now and state plainly in the completion summary that the third-party
+authorization row did not convert. The fallback covers the remainder, not
+this row. A fresh round of outreach to newly active x402/MPP projects is the
+only other way to reach this row.

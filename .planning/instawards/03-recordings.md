@@ -1,6 +1,6 @@
 # Job 03 — Recordings
 
-Status: ⬜ **TODO** · Deliverable: **D1 + D3 + Overall** (evidence) ·
+Status: 🟡 **IN PROGRESS** (D1 and D3 done, walkthrough deferred) · Deliverable: **D1 + D3 + Overall** (evidence) ·
 Depends on: #1 (npm publish, so the recordings show the real published
 packages, not a local checkout)
 
@@ -64,3 +64,9 @@ two-column table in the README's Trying It section, each clickable, so the front
 page carries the evidence without either one dominating the scroll.
 
 **Still open:** the two-minute walkthrough video, and hosting links for D3.
+
+**2026-09-24 — D3 hosting link recorded.** The MCP session video is embedded in the
+[`v0.4.0` GitHub Release](https://github.com/wasit-dev/wasit/releases/tag/v0.4.0)
+description as a `user-attachments` video, playable in place. D1 and D3 are both
+carried into `04-evidence-submission.md`. **Only the two-minute walkthrough video
+remains**, deliberately deferred and with no script written yet.

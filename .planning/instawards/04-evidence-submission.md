@@ -1,6 +1,6 @@
 # Job 04 — Evidence Submission Package
 
-Status: ⬜ **TODO** (template below, partially fillable already) ·
+Status: 🟡 **IN PROGRESS** (every row filled except D2's third-party rows and the walkthrough video) ·
 Depends on: #1, #2, #3
 
 ## Goal
@@ -27,7 +27,7 @@ was modeled on.
 | npm package | https://www.npmjs.com/package/@wasit-dev/cli |
 | Published package behaves as documented | https://github.com/wasit-dev/wasit/blob/main/docs/evidence/2026-09-06-npm-package-parity-run.md — `@wasit-dev/cli@0.3.0` installed from the registry and a build of `main` produce identical outcomes, counts and per-check statuses across all thirteen checks. Not a SOW row; it closes the gap that produced the `0.1.1` defect, where the published CLI lacked a subcommand its published docs described |
 | Validated against the reference implementation | https://github.com/wasit-dev/Wasit/blob/main/docs/evidence/2026-09-06-reference-implementation-run.md — 7/7 against `stellar/x402-stellar`'s own `simple-paywall` example at `45d735a`, run from the published package. The first x402 implementation Wasit has been judged by rather than one this project wrote, which is why it also surfaced two weaknesses in Wasit itself; both are in the document. Not a SOW row, and **not** the D2 authorization item — their open-source example on our machine, no operator contacted |
-| Terminal recording / GIF | _pending — Job 03_ |
+| Terminal recording / GIF | [`docs/media/d1-x402.gif`](https://github.com/wasit-dev/wasit/blob/main/docs/media/d1-x402.gif), shown in the README's [Trying It](https://github.com/wasit-dev/wasit#trying-it) section, with its asciinema source `docs/media/d1-x402.cast` beside it. Recorded from the published package (`npx -y @wasit-dev/cli@0.4.0`, opening with `--version`), 7/7 on a full run including a settled payment and a rejected corrupted signature |
 
 ### Deliverable 2 — MPP Charge and Channel Flow Simulator
 
@@ -43,7 +43,7 @@ was modeled on.
 |---|---|
 | npm package | https://www.npmjs.com/package/@wasit-dev/server |
 | MCP config | https://github.com/wasit-dev/wasit/blob/main/docs/guides/mcp.md |
-| Screen recording (check triggered from Claude Code via MCP) | _pending — Job 03_ |
+| Screen recording (check triggered from Claude Code via MCP) | Embedded in the [`v0.4.0` GitHub Release](https://github.com/wasit-dev/wasit/releases/tag/v0.4.0) description (60s, playable in place); poster frame in the README's Trying It section. Shows `wasit_mpp_charge_test` followed by `wasit_mpp_channel_test` in one server process, the sequence that failed before 0.4.0 |
 | Written record of checks triggered from Claude Code via MCP | https://github.com/wasit-dev/wasit/blob/main/docs/evidence/2026-09-17-cross-check-isolation-run.md — four tool calls in one session, including `wasit_mpp_charge_test` followed immediately by `wasit_mpp_channel_test` in the same server process, with the charge settled on-chain. Not the SOW row, which asks for a recording; this is the transcript the recording will show, and it also documents the defect that made exactly this sequence fail before 0.4.0 |
 
 ### Overall
@@ -51,7 +51,7 @@ was modeled on.
 | Evidence (per SOW) | Proof |
 |---|---|
 | Live website | https://usewasit.dev |
-| One-page completion summary | _pending — write once Jobs 1–3 are closed_ |
+| One-page completion summary | [docs/evidence/2026-09-20-completion-summary.md](https://github.com/wasit-dev/wasit/blob/main/docs/evidence/2026-09-20-completion-summary.md) — draft, not yet reviewed by Kenny; the walkthrough-video row it links to is still pending |
 | Two-minute walkthrough video | _pending — Job 03_ |
 
 ### Upstream contributions (supporting evidence, not a SOW line item)
@@ -90,3 +90,9 @@ package rather than a local build.
 
 The third-party-authorization item is unaffected by any of this and still
 depends on Job 2. Every remaining `_pending_` row depends on Job 3.
+
+_(Superseded 2026-09-24: Job 3 has since delivered D1 and D3; the only Job 3 row still pending is the walkthrough video.)_
+
+Partial progress 2026-09-20: drafted the one-page completion summary at `docs/evidence/2026-09-20-completion-summary.md`, mapping every SOW deliverable to its current evidence and stating the two open gaps plainly (third-party authorization still unconverted, no registry parity run for 0.4.0's MPP half). It also corrects an assumption from the 2026-09-17 session: the `v0.4.0` GitHub Release already has the MCP session video embedded in its description, confirmed by following the `user-attachments` link in the release body to its underlying `video/mp4` asset: that row does not need redoing. The walkthrough video itself stays deliberately deferred: its script and shot list, referenced as already written in `CONTINUATION-PROMPT.md`, could not be found anywhere in the repo, `.planning/`, or project memory, and Najmi chose to set it aside rather than have one drafted from scratch this session. Draft is unreviewed by Kenny.
+
+Partial progress 2026-09-24: filled the D1 and D3 recording rows, which had stayed `_pending_` after both recordings landed. Rows still pending: D2's written findings document and third-party authorization (both Job 02), and the walkthrough video (Job 03). Job 02 now has no candidate that could convert without a reply (see `02-third-party-validation.md`), so those two D2 rows wait on the fallback decision.
