@@ -71,13 +71,33 @@ satisfies the letter of the requirement and keeps the timeline moving.
 - Wasit was **not** run against either xlmtools or fxjrin. Neither host is
   serving the operator's API, and no operator has authorized a run.
 
+## Why round one got no replies, and round two (2026-09-24)
+
+Round one's message said "Not asking for anything from you — this is just a
+heads-up", so it asked no question and gave nobody a reason to reply. The row
+this job exists to close needs an explicit yes. Its links also still pointed at
+`dzakwannajmi/wasit` instead of `wasit-dev/wasit`.
+
+Round two asks one direct yes/no question. Candidates came from Raven
+(`scout.searchProjects` on x402/MPP, filtered to activity since July), then
+each repo and endpoint was checked by hand:
+
+| Candidate | Why | Live endpoint | Status |
+|---|---|---|---|
+| StellarSight (pedro-pelicioni/stellarsight) | x402 Bazaar discovery index on Stellar; repo pushed 2026-09-23; their own issue #3 asks for a seller-side check that validates a listing before it is announced, which is what Wasit does | `https://stellarsight.xyz/v1/fx/usd-brl` answers 402 on `stellar:testnet`; **read-only Wasit run 5/5 PASS**, no payment made. Asset is their own `SXT` token, not USDC, so a full run needs them to send some or to self-test | Draft ready, not sent |
+| CleverCon (clevercon-protocol/clevercon) | Agent spending vaults that pay external x402/MPP services; pushed 2026-09-22 | None found yet; they are primarily a payer | Draft ready, not sent; asks whether they run an endpoint |
+| Talos (enliven17/talos-stellar) | Agents sell services via x402; pushed 2026-09-24 | `talos-stellar.vercel.app` returned 500 | Not contacted |
+| OFFER-HUB/X402 | Hackathon repo | None; last push 2026-04-12 | Ruled out |
+
+Drafts live in the session scratchpad and are quoted in the session log; post
+only after Najmi approves.
+
+The SOW fallback was also run the same day, against `stellar/stellar-mpp-sdk`'s
+own example servers: `docs/evidence/2026-09-24-official-sdk-reference-run.md`.
+It covers the remainder and does not satisfy this job's row.
+
 ## Next action
-No candidate is left that could convert without a reply: the three live
-threads are waiting on their operators, and both infrastructure-blocked
-candidates are dormant projects, not temporary outages. The next step is
-Najmi's decision on the SOW fallback. Either keep waiting on the three
-threads, or stand up self-hosted reference services from the official SDKs
-now and state plainly in the completion summary that the third-party
-authorization row did not convert. The fallback covers the remainder, not
-this row. A fresh round of outreach to newly active x402/MPP projects is the
-only other way to reach this row.
+Post the two round-two drafts once approved, then re-check all threads
+around 2026-10-01. If StellarSight says yes, run the full x402 suite against
+`/v1/fx/usd-brl` and record it as the D2 authorization evidence, naming them
+only with permission.

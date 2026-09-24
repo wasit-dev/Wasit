@@ -1,12 +1,13 @@
 # Upstream Findings
 
-Three findings in `@stellar/mpp`, all found while building Wasit and all
-reproducible against current, published versions. This document
+Four findings in `@stellar/mpp`, all found while building Wasit. The first
+three reproduce against current, published versions; the fourth is on `main`
+and unreleased. This document
 is the canonical write-up; the GitHub issues filed against
 [`stellar/stellar-mpp-sdk`](https://github.com/stellar/stellar-mpp-sdk) are
 summaries that link back here.
 
-None is a defect in any service under test. All three are in the official SDK
+None is a defect in any service under test. All four are in the official SDK
 or in the metadata it publishes.
 
 ## Versions
@@ -363,6 +364,46 @@ on 2026-09-14 (merge commit `1ee3f25`). Neither has reached consumers yet:
 still declares `@stellar/stellar-sdk@^15.1.0` and `mppx@^0.6.29`. The
 duplicate-SDK install described above therefore still reproduces from the
 registry today. Treat this finding as fixed upstream, unreleased.
+
+---
+
+## Finding 4 — Rejected channel vouchers are reported as HTTP 500 since the mppx 0.10 bump
+
+**Status:** not yet filed. Present on `main` since
+[#78](https://github.com/stellar/stellar-mpp-sdk/pull/78) (merged 2026-09-22);
+not in any release, since `@stellar/mpp@latest` is still `0.7.1`
+**Severity:** moderate. Enforcement is intact and no voucher is honoured
+twice, but every refusal is reported to the client as a server fault
+**Evidence:** `docs/evidence/2026-09-24-official-sdk-reference-run.md`
+
+### Summary
+
+Against the SDK's own unmodified `examples/channel-server.ts`, a stale
+commitment, a replayed credential, a replayed commitment and a commitment above
+the channel balance are all refused with **HTTP 500
+`internal-payment-error`** on `afd8fb5`, where `1ee3f25`, the commit before #78,
+refused the same probes with **HTTP 402 `verification-failed`**. Same channel,
+same key, same Wasit binary, minutes apart: `MPP-11`, `MPP-12` and `MPP-14`
+went from 3/3 PASS to 3/3 FAIL.
+
+### Cause
+
+`StellarMppError` extends `Error`, so none of the SDK's error classes is an
+`mppx` `Errors.PaymentError`. `mppx`'s server wraps any non-`PaymentError`
+thrown from `verify`: 0.8.x wrapped it in `VerificationFailedError` (402), and
+0.10.1 wraps it in `InternalPaymentError` (500), logging
+`mppx: internal verification error`. #78's description scopes the 0.8 → 0.10
+breaking changes to `mppx`'s Tempo/EVM code and says no code changes were
+needed. This path is outside that scope.
+
+### Suggested fix
+
+Make the SDK's verification errors `mppx` `PaymentError`s, for example by
+deriving `ChannelVerificationError` and `PaymentVerificationError` from
+`Errors.VerificationFailedError` or rethrowing them as one at the `verify`
+boundary. That restores 402, and lets the SDK's own message reach the client
+instead of the generic "An internal payment error occurred.". A regression test that asserts the status of a rejected
+voucher would have caught this, and would catch the next `mppx` bump.
 
 ---
 
