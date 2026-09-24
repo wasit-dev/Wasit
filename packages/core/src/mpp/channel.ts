@@ -88,6 +88,20 @@ function failure(id: string, name: string, detail: string): CheckResult[] {
 }
 
 /**
+ * Explains a replay that did not get HTTP 402.
+ *
+ * Only a 2xx means the replay was honoured. Any other status still refused it,
+ * so the rule held and only the protocol's status contract was broken; calling
+ * that a double-spend would be a claim the response does not support.
+ */
+export function describeReplayOutcome(status: number): string {
+  return status >= 200 && status < 300
+    ? `This is a double-spend.`
+    : `The replay was still refused, so this is not a double-spend, but a ` +
+        `refusal must be HTTP 402 so a client can tell it from a server fault.`;
+}
+
+/**
  * Attempts allowed when establishing the accepted commitment a check needs.
  *
  * One attempt is what turned a busy channel into a reported defect. Many
@@ -282,8 +296,8 @@ export async function runMppChannelReplayCheck(
       return failure(
         id,
         name,
-        `An identical credential was accepted twice — expected HTTP 402 on replay, ` +
-          `got ${replay.status}: ${replay.body}. This is a double-spend.`,
+        `A byte-identical credential was not rejected with HTTP 402 on replay — ` +
+          `got ${replay.status}: ${replay.body}. ${describeReplayOutcome(replay.status)}`,
       );
     }
 
@@ -331,9 +345,9 @@ export async function runMppChannelCommitmentReplayCheck(
       return failure(
         id,
         name,
-        `A captured commitment (${amount}) was redeemed a second time against a ` +
-          `fresh challenge — expected HTTP 402, got ${replay.status}: ${replay.body}. ` +
-          `This is a double-spend.`,
+        `A captured commitment (${amount}) re-presented against a fresh challenge ` +
+          `was not rejected with HTTP 402 — got ${replay.status}: ${replay.body}. ` +
+          `${describeReplayOutcome(replay.status)}`,
       );
     }
 

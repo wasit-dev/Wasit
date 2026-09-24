@@ -32,6 +32,15 @@ configuration error, so `wasit wallet status --role x402 && deploy` proceeds on
 a key that could not be read. `status` with no `--role` keeps exiting 0: there,
 one unreadable key is a row in a table, not a failed question.
 
+**Fixed in source — `MPP-12` and `MPP-14` no longer call a refused replay a
+double-spend.** Both reported any non-402 response as "accepted twice ... This
+is a double-spend." The official SDK's channel server on `main` refuses replays
+with HTTP 500, so the check claimed a double-spend while the server had in fact
+refused. The verdict stays FAIL, since the required status is 402, but the
+double-spend wording now appears only for a 2xx. Found running against the
+SDK's own example servers; see
+`docs/evidence/2026-09-24-official-sdk-reference-run.md`.
+
 ## [0.4.0] — 2026-09-17
 
 All three packages, versioned together as usual. Two correctness fixes, both in
