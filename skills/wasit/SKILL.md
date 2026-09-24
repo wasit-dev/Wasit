@@ -75,6 +75,10 @@ claude mcp add --transport stdio wasit \
 | `wasit_mpp_channel_test` | `MPP-10`-`12`, `14` | Free |
 | `wasit_mpp_channel_test_with_close` | + `MPP-13` | Destroys a channel; only registered with an explicit opt-in |
 
+For an endpoint that is not a plain `GET`, pass `method`, `body` (sent verbatim,
+JSON) and `headers` to `wasit_x402_test`. Never put a credential in `headers`:
+it ends up in the transcript.
+
 Every tool returns both prose and a `structuredContent` object with `outcome`
 (`conformant` / `non-conformant` / `no-verdict`), pass/fail/error/skip counts,
 and a per-check result array. `outcome` is the field to read, not an exit

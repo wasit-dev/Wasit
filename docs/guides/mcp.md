@@ -98,6 +98,12 @@ echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \
   | python3 -c "import sys,json; print([t['name'] for t in json.load(sys.stdin)['result']['tools']])"
 ```
 
+`wasit_x402_test` takes optional `method`, `body` and `headers` for a paid
+endpoint that is not a plain `GET`, matching the CLI's `--method`, `--body` and
+`--header`. Every probe, including the payment checks, is sent with the same
+request shape. Header values appear in the agent's transcript, so never pass a
+credential as a header; test an endpoint that needs one with the CLI instead.
+
 ## Resource
 
 `wasit://checks` serves `docs/CHECKS.md` — the authority on what each check

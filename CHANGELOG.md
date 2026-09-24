@@ -41,6 +41,14 @@ double-spend wording now appears only for a 2xx. Found running against the
 SDK's own example servers; see
 `docs/evidence/2026-09-24-official-sdk-reference-run.md`.
 
+**Added — `wasit_x402_test` accepts `method`, `body` and `headers`.** The
+CLI's `--method`, `--body` and `--header` have existed since 0.1.0, but the MCP
+tool could only send a `GET`, so an agent could not test a paid `POST`
+endpoint at all. The same request shape is applied to every probe, including
+`X402-06` and `X402-07`. A body sent with `GET` or `HEAD` is refused as a
+configuration error. Header values travel through the agent's transcript, which
+the tool description and `docs/guides/mcp.md` say plainly.
+
 ## [0.4.0] — 2026-09-17
 
 All three packages, versioned together as usual. Two correctness fixes, both in

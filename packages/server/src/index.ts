@@ -174,6 +174,28 @@ server.registerTool(
         .boolean()
         .optional()
         .describe("Skip the payment checks (X402-06/07) even if a payer key is set"),
+      method: z
+        .string()
+        .optional()
+        .describe(
+          'HTTP method the paid endpoint uses, default "GET". Endpoints that ' +
+            'compute something usually take "POST".',
+        ),
+      body: z
+        .string()
+        .optional()
+        .describe(
+          "Request body, sent verbatim; implies Content-Type: application/json. " +
+            "Not allowed with GET or HEAD.",
+        ),
+      headers: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe(
+          "Extra request headers the endpoint needs before it will issue a " +
+            "challenge. Values appear in the agent's transcript, so never pass " +
+            "credentials here; use the CLI's --header for an endpoint that needs one.",
+        ),
     },
     outputSchema: runOutputShape,
     annotations: {
@@ -183,8 +205,15 @@ server.registerTool(
       openWorldHint: true,
     },
   },
-  async ({ target, network, readOnly }) => {
-    const results = await runX402ReadChecks({ target });
+  async ({ target, network, readOnly, method, body, headers }) => {
+    // Same request shape for every probe, exactly as the CLI's --method,
+    // --body and --header build it, so a POST endpoint is tested as a POST.
+    const shape = {
+      ...(method !== undefined ? { method } : {}),
+      ...(body !== undefined ? { body } : {}),
+      ...(headers !== undefined ? { headers } : {}),
+    };
+    const results = await runX402ReadChecks({ target, ...shape });
     const payerKey = process.env.STELLAR_PRIVATE_KEY;
 
     if (readOnly !== true && payerKey) {
@@ -193,6 +222,7 @@ server.registerTool(
           target,
           network: network ?? "stellar:testnet",
           payerSecretKey: payerKey,
+          ...shape,
         })),
       );
     }
