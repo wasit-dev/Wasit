@@ -179,7 +179,7 @@ Three, roughly independent:
 
 ## Finding 3 — Stale peer ranges put a second Stellar SDK in every clean install
 
-**Status:** filed as [stellar/stellar-mpp-sdk#70](https://github.com/stellar/stellar-mpp-sdk/issues/70); a fix is in review as [PR #74](https://github.com/stellar/stellar-mpp-sdk/pull/74) (open, approved, not yet merged)
+**Status:** filed as [stellar/stellar-mpp-sdk#70](https://github.com/stellar/stellar-mpp-sdk/issues/70), closed as completed by a maintainer on 2026-09-10; the related [PR #74](https://github.com/stellar/stellar-mpp-sdk/pull/74) merged on 2026-09-14. No `@stellar/mpp` release contains it yet (latest on npm is still `0.7.1`), so consumers see no change until one ships
 **Severity:** moderate — no defect in the SDK's own logic, but it duplicates a
 runtime dependency across a call boundary and leaves consumers holding
 advisories they have no way to resolve
@@ -354,6 +354,15 @@ That is relevant beyond this finding: Wasit's own charge parser
 `@stellar/mpp` publishes a version built on this PR, re-run MPP-01 against
 it and confirm Wasit still parses both V1 and V2 credentials before bumping
 Wasit's own `@stellar/mpp` dependency.
+
+### Update, 2026-09-24
+
+#70 was closed as completed by jeesunikim on 2026-09-10, and PR #74 merged
+on 2026-09-14 (merge commit `1ee3f25`). Neither has reached consumers yet:
+`@stellar/mpp@latest` on npm is still `0.7.1`, published 2026-07-02, and
+still declares `@stellar/stellar-sdk@^15.1.0` and `mppx@^0.6.29`. The
+duplicate-SDK install described above therefore still reproduces from the
+registry today. Treat this finding as fixed upstream, unreleased.
 
 ---
 
