@@ -155,6 +155,9 @@ wasit test --target <url> [options]
 | `--target <url>` | required | Must include the scheme |
 | `--network <id>` | `stellar:testnet` | CAIP-2 |
 | `--payer-key <key>` | `STELLAR_PRIVATE_KEY` | Secret key, `S...` |
+| `--method <verb>` | `GET` | HTTP method the paid endpoint uses. Endpoints that compute something usually take `POST` |
+| `--body <json>` | — | Request body, sent verbatim; implies `Content-Type: application/json` |
+| `--header <name:value>` | — | Extra request header the endpoint needs before it will issue a challenge. Repeatable |
 | `--read-only` | off | Restricts the run to `X402-01`–`05` |
 | `--json` | off | Machine-readable output (see below) instead of formatted text |
 

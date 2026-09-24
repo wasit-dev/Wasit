@@ -39,7 +39,7 @@ interface Script {
 const X402_SCRIPT: Script = {
   command: "wasit test --target https://api.example.com/paid-endpoint",
   ariaLabel:
-    "Example wasit test run against a paid endpoint: all seven x402 checks pass, including a check that a forged payment signature is correctly rejected with HTTP 402.",
+    "Example wasit test run against a paid endpoint: all seven x402 checks pass, including a check that a payment with a corrupted signature is refused with HTTP 402.",
   results: [
     {
       status: "PASS",
