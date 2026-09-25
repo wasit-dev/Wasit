@@ -81,8 +81,11 @@ sent 2026-09-24 with a direct yes/no question, is open with
 [StellarSight](https://github.com/pedro-pelicioni/stellarsight/issues/13) and
 [CleverCon](https://github.com/clevercon-protocol/clevercon/issues/134), and a
 written request went on 2026-09-25 to a developer who had agreed verbally
-([defi-copilot#1](https://github.com/fxjrin/defi-copilot/issues/1)). The
-aggregate findings document follows from an authorized run.
+([defi-copilot#1](https://github.com/fxjrin/defi-copilot/issues/1)). The same
+day, requests went to the other prize winners of Stellar Hacks: Agents that
+operate an x402 or MPP service: [RenderGate](https://github.com/tantk/rendergate/issues/1), which runs on testnet, and [TollPay](https://github.com/rajkaria/toll/issues/1) and an [x402 middleware template](https://github.com/ffarinas/x402-mcp-stellar-template/issues/1), which run on mainnet and were asked whether a testnet instance exists. Wasit is testnet-only, so a
+mainnet-only service cannot be tested even with permission. The aggregate
+findings document follows from an authorized run.
 
 **Two-minute walkthrough video.** The raw footage exists (the D1 and D3
 recordings above). The video has not been cut yet.
