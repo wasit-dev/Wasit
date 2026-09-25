@@ -1,4 +1,7 @@
-# Third-Party Validation — Run 1
+# Ecosystem Survey — x402 Read-Only Checks Against Cloned Public Repos
+
+> **Not the SOW's third-party-authorization item.** Every target was cloned
+> and run on our machine, and no operator was contacted.
 
 **Date:** 2026-08-15
 **Wasit:** branch `main`, x402 read-only checks (`X402-01` … `X402-05`)

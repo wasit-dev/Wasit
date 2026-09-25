@@ -29,7 +29,7 @@ table below.
 
 | Thing | Value |
 |---|---|
-| Builder | Muhammad Dzakwan Najmi (repmoonasci@gmail.com) |
+| Builder | Muhammad Dzakwan Najmi (contact@usewasit.dev) |
 | Website | https://usewasit.dev |
 | Ambassador Chapter | Stellar Chapter Ambassador Indonesia — Lead: Kenny Rivaldi |
 | GitHub repo | https://github.com/wasit-dev/wasit (public) |
