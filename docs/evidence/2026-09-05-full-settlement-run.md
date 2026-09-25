@@ -15,7 +15,7 @@ live via `wasit wallet status` immediately before this run.
 a third-party operator's live service, and no operator authorization was
 needed or claimed. It does not satisfy the SOW's "at least one third-party
 service tested with the operator's explicit authorization" requirement — that
-remains open and tracked separately (`.planning/instawards/02-third-party-validation.md`).
+remains open and tracked separately (see `docs/evidence/README.md`).
 What it does establish is different and previously missing: every
 *non-destructive* payment-settling check in Wasit — `X402-06`, `X402-07` and
 `MPP-01`, the ones that submit and confirm a real Stellar testnet transaction

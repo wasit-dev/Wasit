@@ -26,7 +26,7 @@ published docs described.
 third-party operator's live service. No operator authorization was needed or
 claimed, and this does not satisfy the SOW's "at least one third-party service
 tested with the operator's explicit authorization" requirement, which remains
-open and tracked in `.planning/instawards/02-third-party-validation.md`.
+open and tracked in the evidence package (`docs/evidence/README.md`).
 
 ## Summary
 

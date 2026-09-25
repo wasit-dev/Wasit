@@ -4,7 +4,7 @@
 **Program:** Stellar Chapter Ambassador Indonesia Instaward, $3,600 in XLM
 **Repo:** [github.com/wasit-dev/wasit](https://github.com/wasit-dev/wasit) · **Site:** [usewasit.dev](https://usewasit.dev)
 **Packages:** `@wasit-dev/core`, `@wasit-dev/cli`, `@wasit-dev/server`, all at **0.4.0** on npm
-**Date:** 2026-09-20 (updated 2026-09-24)
+**Date:** 2026-09-20 (updated 2026-09-25)
 
 ## What Wasit is
 
@@ -27,7 +27,9 @@ Every check in the catalogue is exercised against Wasit's own bundled fixture se
 
 ## What is honestly still open
 
-**Third-party validation (D2).** The SOW asks for at least one third-party service tested with the operator's explicit authorization. Six candidates were identified. Two, `yripper/stellarpay#1` and `Stellar-Light/stellar-pay#3`, have live self-test outreach threads with zero replies since 31 August. A permission request to RouteDock got no reply either. `xlmtools` also has an open thread with zero replies, and as of 2026-09-24 its API host no longer serves its API. `defi-copilot`'s API host has presented an invalid TLS certificate throughout, so outreach there was never sent. Both of those projects have been inactive since April. The sixth, AgentOracle, turned out to offer no Stellar payment path to test. This is the one SOW line that depends on someone outside the project responding, and it has not converted yet. The SOW's fallback, self-hosted reference services built from the official SDKs, was run on 2026-09-24 against `stellar/stellar-mpp-sdk`'s own unmodified example servers ([write-up](https://github.com/wasit-dev/wasit/blob/main/docs/evidence/2026-09-24-official-sdk-reference-run.md)), alongside the 2026-09-06 run against `stellar/x402-stellar`. It covers the remainder, and does not stand in for the authorization row, which stays open. A second round of outreach, rewritten to ask a direct yes/no question, went to two projects active this month on 2026-09-24: [StellarSight](https://github.com/pedro-pelicioni/stellarsight/issues/13) and [CleverCon](https://github.com/clevercon-protocol/clevercon/issues/134).
+**Third-party validation (D2).** The SOW asks for at least one third-party service tested with the operator's explicit written authorization, and for D2's findings to be reported in aggregate, naming a service only with its operator's written permission. No operator has granted authorization yet. Round one of outreach, from late August, went unanswered; several of the candidates turned out to have no reachable Stellar payment endpoint. Round two, sent on 2026-09-24 with a direct yes/no question, is open with [StellarSight](https://github.com/pedro-pelicioni/stellarsight/issues/13) and [CleverCon](https://github.com/clevercon-protocol/clevercon/issues/134), and on 2026-09-25 a written request went to a developer who had agreed verbally ([defi-copilot#1](https://github.com/fxjrin/defi-copilot/issues/1)). This is the one SOW line that depends on someone outside the project, and it has not converted yet. The SOW lets the remainder of the three be self-hosted reference services built from the official SDKs; those runs exist for both protocols, against `stellar/x402-stellar` on 2026-09-06 and against `stellar/stellar-mpp-sdk`'s own example servers on 2026-09-24 ([write-up](https://github.com/wasit-dev/wasit/blob/main/docs/evidence/2026-09-24-official-sdk-reference-run.md)). They cover the remainder, not the authorization row.
+
+**Written findings document (D2).** Depends on the authorized run above, so it has not been written. Read-only probes were made against the live endpoints of four candidate services before their operators had agreed (one never connected); that should not have happened, has stopped, and none of those results is reported here.
 
 **Registry parity for 0.4.0.** Closed on 2026-09-24. The x402 half was covered by the terminal recording, and the MPP half by the official-SDK run above, both through `npx @wasit-dev/cli@0.4.0` rather than a local build.
 

@@ -23,7 +23,7 @@ open-source example, run on our own machine from a public repository. No
 service operated by anyone else was contacted. This therefore does **not**
 satisfy the SOW's "at least one third-party service tested with the operator's
 explicit authorization" requirement, which remains open in
-`.planning/instawards/02-third-party-validation.md`.
+the evidence package (`docs/evidence/README.md`).
 
 ## Results
 

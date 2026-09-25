@@ -79,8 +79,10 @@ Supporting, not SOW rows:
 operator has said yes yet. Round one of outreach went unanswered. Round two,
 sent 2026-09-24 with a direct yes/no question, is open with
 [StellarSight](https://github.com/pedro-pelicioni/stellarsight/issues/13) and
-[CleverCon](https://github.com/clevercon-protocol/clevercon/issues/134).
-The aggregate findings document follows from that run.
+[CleverCon](https://github.com/clevercon-protocol/clevercon/issues/134), and a
+written request went on 2026-09-25 to a developer who had agreed verbally
+([defi-copilot#1](https://github.com/fxjrin/defi-copilot/issues/1)). The
+aggregate findings document follows from an authorized run.
 
 **Two-minute walkthrough video.** The raw footage exists (the D1 and D3
 recordings above). The video has not been cut yet.

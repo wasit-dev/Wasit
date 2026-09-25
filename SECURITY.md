@@ -106,7 +106,11 @@ not reuse a key that has any other purpose.
 Three different things can be wrong, and each is told to somebody different:
 a defect in Wasit itself comes to us, a defect Wasit finds in your service
 goes to its operator, and a defect in an upstream SDK goes to its
-maintainers. Report privately in all three cases.
+maintainers. The first two are always reported privately. For an upstream
+open-source SDK, a defect that is exploitable goes to its maintainers
+privately, through their own security policy; a non-exploitable conformance
+defect goes to their public issue tracker, where they already triage bugs.
+Every upstream report Wasit has filed so far is of the second kind.
 
 ### Reporting a vulnerability in Wasit
 
