@@ -14,7 +14,7 @@ Indonesia Instaward · **Repo:** [wasit-dev/wasit](https://github.com/wasit-dev/
 | D1 — x402 CLI + CHECKS.md | Done |
 | D2 — MPP Charge + Channel Simulator | Built and tested; the operator-authorized third-party run, and the aggregate findings document that depends on it, are open |
 | D3 — MCP Server wrapper (optional) | Done |
-| Overall — completion summary + walkthrough video | Summary done; video pending |
+| Overall — completion summary + walkthrough video | Done |
 
 ---
 
@@ -68,7 +68,7 @@ Supporting, not SOW rows:
 | Evidence the SOW asks for | Proof |
 |---|---|
 | One-page completion summary | [2026-09-20-completion-summary.md](2026-09-20-completion-summary.md) |
-| Two-minute walkthrough video | **Pending** |
+| Two-minute walkthrough video | [https://youtu.be/5SbNf7j4dbc](https://youtu.be/5SbNf7j4dbc) |
 | Live website | [usewasit.dev](https://usewasit.dev) |
 
 ---
@@ -86,9 +86,6 @@ day, requests went to the other prize winners of Stellar Hacks: Agents that
 operate an x402 or MPP service: [RenderGate](https://github.com/tantk/rendergate/issues/1), which runs on testnet, and [TollPay](https://github.com/rajkaria/toll/issues/1) and an [x402 middleware template](https://github.com/ffarinas/x402-mcp-stellar-template/issues/1), which run on mainnet and were asked whether a testnet instance exists. Wasit is testnet-only, so a
 mainnet-only service cannot be tested even with permission. The aggregate
 findings document follows from an authorized run.
-
-**Two-minute walkthrough video.** The raw footage exists (the D1 and D3
-recordings above). The video has not been cut yet.
 
 ## Index of runs
 

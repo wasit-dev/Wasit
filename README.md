@@ -22,6 +22,7 @@ HTTP behaviour.
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)](https://www.typescriptlang.org)
 
 [Website](https://usewasit.dev) ·
+[Walkthrough Video](https://youtu.be/5SbNf7j4dbc) ·
 [Check Catalogue](docs/CHECKS.md) ·
 [CLI Guide](docs/guides/cli.md) ·
 [MCP Guide](docs/guides/mcp.md) ·

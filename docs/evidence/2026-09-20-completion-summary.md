@@ -17,7 +17,7 @@ Wasit is an open-source CLI and MCP server that tests whether a service's x402 o
 | **D1** (x402 CLI + CHECKS.md) | Done | [Repo](https://github.com/wasit-dev/wasit), [CHECKS.md](https://github.com/wasit-dev/wasit/blob/main/docs/CHECKS.md), [npm](https://www.npmjs.com/package/@wasit-dev/cli), [terminal recording](https://github.com/wasit-dev/wasit#trying-it) run from the published 0.4.0 package |
 | **D2** (MPP Charge + Channel Simulator) | Partially done | [Terminal output, incl. negative checks](https://github.com/wasit-dev/wasit/blob/main/docs/evidence/2026-09-05-full-settlement-run.md); [run against the official MPP SDK's example servers](https://github.com/wasit-dev/wasit/blob/main/docs/evidence/2026-09-24-official-sdk-reference-run.md); **the third-party-authorization row is open**, see below |
 | **D3** (MCP Server wrapper, optional, built anyway) | Done | [npm](https://www.npmjs.com/package/@wasit-dev/server), [MCP config guide](https://github.com/wasit-dev/wasit/blob/main/docs/guides/mcp.md), [screen recording](https://github.com/wasit-dev/wasit/releases/tag/v0.4.0) |
-| **Overall** (completion summary + walkthrough video) | Partially done | This document; **walkthrough video still pending**, see below |
+| **Overall** (completion summary + walkthrough video) | Done | This document; [two-minute walkthrough video](https://youtu.be/5SbNf7j4dbc) |
 
 ## What "done" means here
 
@@ -25,17 +25,11 @@ Every check in the catalogue is exercised against Wasit's own bundled fixture se
 
 0.4.0 fixed two defects in Wasit itself, found by running the MCP server the way an agent actually uses it rather than the way the CLI does: a charge-mode payment client was silently breaking every channel check that ran afterward in the same process, and a setup failure that looked identical to a real conformance failure was being reported as one. Both are written up at [`docs/evidence/2026-09-17-cross-check-isolation-run.md`](https://github.com/wasit-dev/wasit/blob/main/docs/evidence/2026-09-17-cross-check-isolation-run.md).
 
-## What is honestly still open
+## What is still open
 
 **Third-party validation (D2).** The SOW asks for at least one third-party service tested with the operator's explicit written authorization, and for D2's findings to be reported in aggregate, naming a service only with its operator's written permission. No operator has granted authorization yet. Round one of outreach, from late August, went unanswered; several of the candidates turned out to have no reachable Stellar payment endpoint. Round two, sent on 2026-09-24 with a direct yes/no question, is open with [StellarSight](https://github.com/pedro-pelicioni/stellarsight/issues/13) and [CleverCon](https://github.com/clevercon-protocol/clevercon/issues/134), and on 2026-09-25 a written request went to a developer who had agreed verbally ([defi-copilot#1](https://github.com/fxjrin/defi-copilot/issues/1)), and to the other Stellar Hacks: Agents prize winners that operate an x402 or MPP service: [RenderGate](https://github.com/tantk/rendergate/issues/1), which runs on testnet, and [TollPay](https://github.com/rajkaria/toll/issues/1) and an [x402 middleware template](https://github.com/ffarinas/x402-mcp-stellar-template/issues/1), which run on mainnet and were asked whether a testnet instance exists. This is the one SOW line that depends on someone outside the project, and it has not converted yet. The SOW lets the remainder of the three be self-hosted reference services built from the official SDKs; those runs exist for both protocols, against `stellar/x402-stellar` on 2026-09-06 and against `stellar/stellar-mpp-sdk`'s own example servers on 2026-09-24 ([write-up](https://github.com/wasit-dev/wasit/blob/main/docs/evidence/2026-09-24-official-sdk-reference-run.md)). They cover the remainder, not the authorization row.
 
 **Written findings document (D2).** Depends on the authorized run above, so it has not been written. Read-only probes were made against the live endpoints of four candidate services before their operators had agreed (one never connected); that should not have happened, has stopped, and none of those results is reported here.
-
-**Registry parity for 0.4.0.** Closed on 2026-09-24. The x402 half was covered by the terminal recording, and the MPP half by the official-SDK run above, both through `npx @wasit-dev/cli@0.4.0` rather than a local build.
-
-**Two-minute walkthrough video.** Deliberately not recorded yet. The raw footage exists (a 57.8-second CLI terminal capture and a 60-second MCP session, both already used elsewhere in the repo's evidence), but has not been cut into a walkthrough.
-
-**GitHub Release note.** The `v0.4.0` release on GitHub already carries the MCP session video embedded in its description, playable in place.
 
 ## Not part of this SOW, worth noting
 

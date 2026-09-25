@@ -1,6 +1,6 @@
 # Job 04 — Evidence Submission Package
 
-Status: 🟡 **IN PROGRESS** (every row filled except D2's third-party rows and the walkthrough video) ·
+Status: 🟡 **IN PROGRESS** (every row filled except D2's third-party authorization and aggregate findings rows) ·
 Depends on: #1, #2, #3
 
 ## Goal
@@ -52,7 +52,7 @@ was modeled on.
 |---|---|
 | Live website | https://usewasit.dev |
 | One-page completion summary | [docs/evidence/2026-09-20-completion-summary.md](https://github.com/wasit-dev/wasit/blob/main/docs/evidence/2026-09-20-completion-summary.md) — draft, not yet reviewed by Kenny; the walkthrough-video row it links to is still pending |
-| Two-minute walkthrough video | _pending — Job 03_ |
+| Two-minute walkthrough video | https://youtu.be/5SbNf7j4dbc (published 2026-09-25) |
 
 ### Upstream contributions (supporting evidence, not a SOW line item)
 
