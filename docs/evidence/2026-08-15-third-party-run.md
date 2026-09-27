@@ -19,9 +19,10 @@ challenge-shape checks only, which cost nothing and settle nothing.
 ## Summary
 
 Seven x402-related public repositories in the Stellar ecosystem were examined.
-Three expose a Stellar-denominated paid endpoint that can be exercised from a
-clone; all three conform on every check. The other four do not expose one, for
-four different reasons.
+Three expose a Stellar-denominated paid endpoint that was exercised from a
+clone; all three conform on every check. A fourth (F) also exposes one, which
+this pass missed at the time (corrected below). The remaining three do not
+expose one, for three different reasons.
 
 | Project | x402 package | Verdict |
 |---|---|---|
@@ -30,7 +31,7 @@ four different reasons.
 | C | `@x402/express@latest` | **5/5 PASS** |
 | D | `@coinbase/x402@2.1.0`, `@x402/core@2.11.0` | Stellar path built, not mounted |
 | E | `@x402/core@2.9.0`, `mppx@0.5.7` | Client SDK |
-| F | `x402-stellar@0.2.0` | Client + facilitator |
+| F | `x402-stellar@0.2.0` | Paid endpoint missed by this pass (see correction) |
 | G | none | No x402 code in the public repo |
 
 ## Results
@@ -61,8 +62,13 @@ says nothing about the project.
   on any route, so the Stellar path is not reachable over HTTP.
 - **E** — a client SDK. It is the payer side; every `server.listen` in the
   repository is inside its tests.
-- **F** — the public repository contains a client and a local facilitator. Its
-  resource server mounts no payment middleware.
+- **F** — *corrected 2026-09-28.* This survey originally said F's resource
+  server mounts no payment middleware. That was wrong: the server entry file
+  mounts none, but its route modules each mount x402 payment middleware on a
+  paid endpoint. F does expose a paid endpoint; this pass missed it by reading
+  only the entry file. It uses x402 v1 and a package outside the `@x402/*`
+  line, and was later tested with its operator's written permission; that run
+  is reported separately.
 - **G** — the public repository contains no x402 dependency and no payment
   middleware. The paid implementation is not public, so testing it would need
   the operator's participation.
@@ -78,8 +84,8 @@ confirmations and none for the other spelling.
 
 **A Stellar-denominated x402 endpoint is harder to find than the ecosystem's
 surface suggests.** All seven repositories advertise Stellar x402 support in
-their READMEs, badges, or npm keywords. Four of the seven have no reachable
-Stellar-denominated paid endpoint. Each is a client, mid-migration, or
+their READMEs, badges, or npm keywords. Three of the seven have no reachable
+Stellar-denominated paid endpoint, and a fourth had one that this pass missed. Each is a client, mid-migration, or
 closed-source by choice, but the count of *running, externally exercisable*
 Stellar x402 services is lower than the count of projects describing
 themselves as such.
