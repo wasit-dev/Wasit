@@ -126,7 +126,7 @@ security auditors looking at contract source — see Non-goals below.
   and the MCP server.
 - At least one third-party service tested **with the operator's explicit
   authorization** — this is the one requirement not yet satisfied; see
-  README's Status table and `../.planning/instawards/02-third-party-validation.md`
+  README's Status table and the evidence package (`docs/evidence/README.md`)
   for the current outreach log. An evidence run against public repos without
   contacting the operator does not count toward this.
 - Packages published and installable (`npm install -g @wasit-dev/cli`,

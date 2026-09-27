@@ -24,7 +24,7 @@ server code written by the SDK's maintainers. It also covers the MPP half of the
 **Authorization.** None was needed or sought. These are open-source examples
 run on our machine. **This does not satisfy the SOW's "third-party service
 tested with the operator's explicit authorization" row**, which remains open in
-`.planning/instawards/02-third-party-validation.md`.
+the evidence package (`docs/evidence/README.md`).
 
 ---
 

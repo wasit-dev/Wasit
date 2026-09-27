@@ -1,6 +1,6 @@
 # Job 03 — Recordings
 
-Status: 🟡 **IN PROGRESS** (D1 and D3 done, walkthrough deferred) · Deliverable: **D1 + D3 + Overall** (evidence) ·
+Status: ✅ **DONE** (D1, D3 and the walkthrough video) · Deliverable: **D1 + D3 + Overall** (evidence) ·
 Depends on: #1 (npm publish, so the recordings show the real published
 packages, not a local checkout)
 
@@ -23,7 +23,7 @@ Produce the three recordings the SOW lists as evidence, all still missing.
 ## Acceptance criteria
 - [ ] D1 recording made, hosted somewhere linkable (GitHub, YouTube, Loom).
 - [ ] D3 recording made, same.
-- [ ] Overall walkthrough video made, under ~2 minutes as the SOW specifies.
+- [x] Overall walkthrough video made, under ~2 minutes as the SOW specifies.
 - [ ] All three links recorded here and carried into `04-evidence-submission.md`.
 
 ## Notes
@@ -70,3 +70,6 @@ page carries the evidence without either one dominating the scroll.
 description as a `user-attachments` video, playable in place. D1 and D3 are both
 carried into `04-evidence-submission.md`. **Only the two-minute walkthrough video
 remains**, deliberately deferred and with no script written yet.
+
+**2026-09-25 — walkthrough video published:** https://youtu.be/5SbNf7j4dbc. Script (EN/ID) kept local-only in
+`local/walkthrough-script.md`. Job 03 is complete.
