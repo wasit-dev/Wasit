@@ -1,7 +1,6 @@
 import { errored, skipped, type CheckResult } from "../check.js";
 import {
   ConfigurationError,
-  MalformedResponseError,
   assertHttpUrl,
   fetchTarget,
 } from "../errors.js";
@@ -217,6 +216,34 @@ function checkRequiredFields(payload: unknown): CheckResult {
   };
 }
 
+/**
+ * Reads an x402 v1 challenge from a 402 response body, if that is what it is.
+ *
+ * Returns the parsed body only when it declares `x402Version: 1` and carries an
+ * `accepts` array, the v1 HTTP transport's `PaymentRequirementsResponse`. Any
+ * other body, including a v2 payload misplaced into the body, is not treated
+ * as a challenge.
+ */
+export function readV1BodyChallenge(body: string): Record<string, unknown> | undefined {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return undefined;
+  }
+  const record = asRecord(parsed);
+  return record?.["x402Version"] === 1 && Array.isArray(record["accepts"]) ? record : undefined;
+}
+
+/** A body that cannot be read is simply not a v1 challenge. */
+async function readText(response: Response): Promise<string> {
+  try {
+    return await response.text();
+  } catch {
+    return "";
+  }
+}
+
 /** X402-05: the network identifier must be CAIP-2. */
 function checkNetworkIdentifier(payload: unknown): CheckResult {
   const network = firstAccept(payload)?.["network"];
@@ -237,7 +264,8 @@ function checkNetworkIdentifier(payload: unknown): CheckResult {
     pass,
     detail: pass
       ? `Network identifier "${network}" is valid.`
-      : `"${network}" does not match stellar:testnet or stellar:pubnet.`,
+      : `"${network}" does not match stellar:testnet or stellar:pubnet, the CAIP-2 ` +
+        `identifiers the \`exact\` scheme on Stellar defines.`,
   };
 }
 
@@ -308,6 +336,13 @@ export async function runX402ReadChecks(
   const headerValue =
     response.headers.get("PAYMENT-REQUIRED") ?? response.headers.get("X-Payment");
 
+  // x402 v1 signals payment in the response body rather than a header. The
+  // `exact` scheme on Stellar is defined for v2 only, so a missing header is
+  // still X402-02's failure — but a v1 challenge in the body still has terms
+  // worth checking, and skipping them would hide which ones diverge.
+  const v1Payload =
+    headerValue === null ? readV1BodyChallenge(await readText(response)) : undefined;
+
   const r2: CheckResult = {
     id: "X402-02",
     name: "Payment Header Present",
@@ -315,8 +350,30 @@ export async function runX402ReadChecks(
     detail:
       headerValue !== null
         ? "Payment header found."
-        : "Neither PAYMENT-REQUIRED nor X-Payment header was present.",
+        : v1Payload !== undefined
+          ? `Neither PAYMENT-REQUIRED nor X-Payment header was present. The ` +
+            `response body carries an x402 v1 challenge instead; the \`exact\` ` +
+            `scheme on Stellar is defined for v2 only, which signals payment in ` +
+            `the PAYMENT-REQUIRED header.`
+          : "Neither PAYMENT-REQUIRED nor X-Payment header was present.",
   };
+
+  if (headerValue === null && v1Payload !== undefined) {
+    return emit([
+      r1,
+      r2,
+      {
+        id: "X402-03",
+        name: "Header Payload Decodable",
+        pass: true,
+        detail:
+          "No header to decode; the x402 v1 challenge in the response body " +
+          "decoded to valid JSON.",
+      },
+      checkRequiredFields(v1Payload),
+      checkNetworkIdentifier(v1Payload),
+    ]);
+  }
 
   if (headerValue === null) {
     return emit([
@@ -378,6 +435,14 @@ export interface X402PaymentCheckOptions extends RequestShape {
   readonly onResult?: (result: CheckResult) => void;
 }
 
+/** The payment flow was never started, so neither payment check has a verdict. */
+class PaymentNotAttemptedError extends Error {
+  public constructor(reason: string) {
+    super(reason);
+    this.name = "PaymentNotAttemptedError";
+  }
+}
+
 function buildX402Client(network: string, payerSecretKey: string) {
   const signer = createEd25519Signer(payerSecretKey, network as `${string}:${string}`);
   const client = new x402Client().register(
@@ -407,9 +472,20 @@ async function preparePayment(options: X402PaymentCheckOptions) {
       challenge.headers.get(name),
     );
   } catch (error) {
-    throw new MalformedResponseError(
-      `The challenge could not be read as x402 payment requirements: ` +
-        `${(error as Error).message}`,
+    // The read checks already report what is wrong with the challenge. Failing
+    // X402-06/07 here too would count one broken challenge three times, and
+    // would make X402-07 read as a signature that was not rejected when no
+    // payment was ever sent. docs/CHECKS.md: an unreadable challenge produces
+    // no verdict.
+    const v1 = readV1BodyChallenge(await readText(challenge)) !== undefined;
+    throw new PaymentNotAttemptedError(
+      v1
+        ? `the target issued an x402 v1 challenge, and Wasit pays through the ` +
+            `v2 \`exact\` scheme on Stellar, the only version the spec defines, ` +
+            `so no payment was attempted (see X402-02).`
+        : `the challenge could not be read as x402 payment requirements ` +
+            `(${(error as Error).message}), so no payment was attempted ` +
+            `(see X402-02–04).`,
     );
   }
 
@@ -509,6 +585,14 @@ export async function runX402PaymentChecks(
   try {
     accepted = await checkSignatureAccepted(options);
   } catch (error) {
+    if (error instanceof PaymentNotAttemptedError) {
+      const notAttempted = [
+        skipped("X402-06", "Signature Resubmit Accepted", error.message),
+        skipped("X402-07", "Invalid Signature Rejected", error.message),
+      ];
+      for (const result of notAttempted) options.onResult?.(result);
+      return notAttempted;
+    }
     accepted = errored("X402-06", "Signature Resubmit Accepted", error);
   }
   results.push(accepted);

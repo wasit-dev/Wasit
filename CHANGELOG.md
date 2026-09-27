@@ -49,6 +49,18 @@ endpoint at all. The same request shape is applied to every probe, including
 configuration error. Header values travel through the agent's transcript, which
 the tool description and `docs/guides/mcp.md` say plainly.
 
+**Fixed — an x402 v1 challenge is read, and an unpayable challenge no longer
+fails the payment checks.** Run with the operator's written authorization
+against a service that speaks x402 v1, 0.4.0 reported `X402-02` FAIL, skipped
+`X402-03`–`05`, and reported `X402-06` and `X402-07` as FAIL although no payment
+was ever built or sent, so `X402-07` read as a corrupted signature that was not
+rejected. `docs/CHECKS.md` already said a challenge that cannot be read has no
+verdict. Now `X402-02` still fails, because the `exact` scheme on Stellar is
+defined for v2 only, but says a v1 challenge was found in the body;
+`X402-03`–`05` inspect that body; and `X402-06`/`X402-07` are skipped with the
+reason. The same skip applies to any challenge the payment client cannot read.
+Seven offline tests, each mutation-checked.
+
 ## [0.4.0] — 2026-09-17
 
 All three packages, versioned together as usual. Two correctness fixes, both in

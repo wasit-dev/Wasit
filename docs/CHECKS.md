@@ -13,7 +13,7 @@ in every test report.
 | ID | Check Name | Spec Reference | What It Checks | Pass Criteria |
 |---|---|---|---|---|
 | `X402-01` | 402 Response Status | x402 spec, HTTP semantics | An unpaid request must be answered with status code `402` | Response status is exactly `402`, not `401`/`403`/other |
-| `X402-02` | Payment Header Present | x402 built-on-stellar guide | The 402 response must include a payment header | Either `PAYMENT-REQUIRED` or `X-Payment` header is present (both are checked — the spec itself is not yet consistent, see note in README) |
+| `X402-02` | Payment Header Present | x402 built-on-stellar guide | The 402 response must include a payment header | Either `PAYMENT-REQUIRED` or `X-Payment` header is present (both are checked — the spec itself is not yet consistent, see note in README). An x402 v1 challenge in the response body fails this check, and `X402-03`–`05` still inspect it; see the note on v1 below |
 | `X402-03` | Header Payload Decodable | x402 spec §payment-required-object | The header value must be valid base64 that decodes to JSON | `atob()` + `JSON.parse()` succeed without error |
 | `X402-04` | Required Fields Present | x402 spec §payment-required-object | The payload must include the core payment terms, under the field names its own advertised version requires | `network` and `payTo` are present and non-empty, and the price field matches the advertised `x402Version`: `maxAmountRequired` for v1, `amount` for v2 (renamed in v2, which also drops the embedded resource object). The version is read from the challenge rather than accepting whichever name happens to appear, because a service advertising `x402Version: 2` while emitting the v1 field name is not conformant to the version it claims — and reporting that as a merely absent price would hide the actual defect. An unrecognised version fails: the field names cannot be checked against a version whose schema is unknown. |
 | `X402-05` | Network Identifier Valid | x402 built-on-stellar guide | Network id format follows CAIP-2 | Matches the pattern `stellar:testnet` or `stellar:pubnet` |
@@ -37,6 +37,24 @@ nothing left to inspect, and they are **skipped rather than failed**. A target
 answering 404 produces one finding, not five. The same applies across the
 payment checks: when `X402-06` cannot exercise the payment flow at all,
 `X402-07` is skipped rather than credited with a rejection it never observed.
+
+**Note on x402 v1 challenges (0.5.0).** x402 v1 signals payment in the 402
+response *body*, as a `PaymentRequirementsResponse` with `x402Version: 1`
+([transports-v1/http.md](https://github.com/x402-foundation/x402/blob/02e80f3/specs/transports-v1/http.md)).
+v2 moved it into the `PAYMENT-REQUIRED` header
+([transports-v2/http.md](https://github.com/x402-foundation/x402/blob/02e80f3/specs/transports-v2/http.md)),
+and the `exact` scheme on Stellar is defined for v2 only, with CAIP-2 network
+identifiers ([scheme_exact_stellar.md](https://github.com/x402-foundation/x402/blob/02e80f3/specs/schemes/exact/scheme_exact_stellar.md):
+"❌ `v1` - we don't plan to support v1 for now"). So a v1 challenge from a
+Stellar service fails `X402-02`, and the failure says a v1 challenge was found
+in the body. Its terms are still worth reading, so `X402-03`–`05` inspect the
+body instead of being skipped: `X402-04` applies the v1 field names, and
+`X402-05` reports whether the network is a CAIP-2 identifier. `X402-06` and
+`X402-07` are **skipped**: Wasit pays through the v2 `exact` scheme, so no
+payment is built or sent, and neither check has a verdict. The same holds for
+any challenge the payment client cannot read. Before 0.5.0 both reported FAIL
+in that case, contradicting the `X402-07` row above, and a v1 challenge left
+`X402-03`–`05` skipped.
 
 ## MPP — Charge Mode
 
