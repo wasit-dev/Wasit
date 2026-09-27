@@ -11,7 +11,7 @@ it is not a schema validator: a response can have every field in the right place
 and still take money without settling it. Settlement is verified on-chain — from
 the token contract's own transfer event rather than the service's own response —
 for MPP charge mode today. Extending that to the x402 payment checks is tracked
-for 0.5.0; until then they exercise the real flow and judge the target on its
+for 0.6.0; until then they exercise the real flow and judge the target on its
 HTTP behaviour.
 
 [![CI](https://github.com/wasit-dev/wasit/actions/workflows/ci.yml/badge.svg)](https://github.com/wasit-dev/wasit/actions/workflows/ci.yml)

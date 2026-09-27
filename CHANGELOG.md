@@ -4,11 +4,11 @@ All notable changes to Wasit are recorded here. Versions follow [Semantic Versio
 
 ## Unreleased
 
-Planned for 0.5.0. Recorded here rather than in an issue because two of the
+Planned for 0.6.0. Recorded here rather than in an issue because two of the
 three change what a check *proves*, and anyone reading this file to decide
 whether to upgrade needs to see that before the version lands. These three were
-earmarked for 0.4.0 before 0.4.0 was spent on the two correctness fixes below;
-they are unchanged, only renumbered.
+earmarked for 0.4.0, then for 0.5.0, and both releases went to correctness
+fixes found in the field instead; they are unchanged, only renumbered.
 
 **Will change results — `X402-06` gains on-chain verification.** The check
 currently passes on any 2xx, which means it establishes that the target accepted
@@ -32,7 +32,19 @@ configuration error, so `wasit wallet status --role x402 && deploy` proceeds on
 a key that could not be read. `status` with no `--role` keeps exiting 0: there,
 one unreadable key is a row in a table, not a failed question.
 
-**Fixed in source — `MPP-12` and `MPP-14` no longer call a refused replay a
+## [0.5.0] — 2026-09-28
+
+All three packages, versioned together as usual. Two reporting fixes found by
+running Wasit against code it did not write, and one addition that brings the
+MCP server level with the CLI. No check was added or removed.
+
+**Results can change on upgrade**, in two situations only: a target that issues
+an x402 v1 challenge (see below), and an MPP channel target that refuses a
+replay with a status other than 402 and 2xx, whose FAIL no longer calls it a
+double-spend. Against a conformant v2 target nothing changes: Wasit's own x402
+fixture passes 7/7 with this build, as it did with 0.4.0.
+
+**Fixed — `MPP-12` and `MPP-14` no longer call a refused replay a
 double-spend.** Both reported any non-402 response as "accepted twice ... This
 is a double-spend." The official SDK's channel server on `main` refuses replays
 with HTTP 500, so the check claimed a double-spend while the server had in fact

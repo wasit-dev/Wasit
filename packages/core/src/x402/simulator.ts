@@ -535,7 +535,7 @@ async function checkInvalidSignatureRejected(
   // signature verification, which is weaker than this check should be: a target
   // that parsed the envelope and skipped verification entirely would still pass.
   // Corrupting only the signature bytes, preserving a decodable envelope, is a
-  // 0.4.0 item. See docs/CHECKS.md's X402-07 row.
+  // tracked for 0.6.0. See docs/CHECKS.md's X402-07 row.
   const corrupted = {
     ...paymentPayload,
     payload: {
