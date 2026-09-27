@@ -7,12 +7,12 @@ narrative, read the [completion summary](2026-09-20-completion-summary.md).
 **Builder:** Muhammad Dzakwan Najmi · **Program:** Stellar Chapter Ambassador
 Indonesia Instaward · **Repo:** [wasit-dev/wasit](https://github.com/wasit-dev/wasit)
 · **Site:** [usewasit.dev](https://usewasit.dev) · **Packages:** `@wasit-dev/core`,
-`@wasit-dev/cli`, `@wasit-dev/server` at 0.4.0 · **As of:** 2026-09-25
+`@wasit-dev/cli`, `@wasit-dev/server` at 0.5.0 · **As of:** 2026-09-28
 
 | Deliverable | Status |
 |---|---|
 | D1 — x402 CLI + CHECKS.md | Done |
-| D2 — MPP Charge + Channel Simulator | Built and tested; the operator-authorized third-party run, and the aggregate findings document that depends on it, are open |
+| D2 — MPP Charge + Channel Simulator | Done |
 | D3 — MCP Server wrapper (optional) | Done |
 | Overall — completion summary + walkthrough video | Done |
 
@@ -36,14 +36,13 @@ Supporting, not SOW rows:
 | Evidence the SOW asks for | Proof |
 |---|---|
 | Terminal output, including negative conformance results | [Full settlement run](2026-09-05-full-settlement-run.md) against Wasit's own SDK-backed fixtures, with real testnet settlement; [run against the official MPP SDK's own example servers](2026-09-24-official-sdk-reference-run.md) from the published 0.4.0 |
-| Written findings document | **Open.** The SOW asks for aggregate findings across at least three real projects: at least one third-party service tested with its operator's explicit authorization, the remainder self-hosted reference services built from the official SDKs. The two reference runs exist ([x402](2026-09-06-reference-implementation-run.md), [MPP](2026-09-24-official-sdk-reference-run.md)); the authorized third-party run does not yet, so the aggregate document cannot be written. Individual services are named only with their operator's written permission |
-| At least one third-party service tested with the operator's explicit authorization | **Open.** See [below](#what-is-still-open) |
+| Written findings document | [docs/findings/conformance-findings.md](../findings/conformance-findings.md): results across three implementations in aggregate (one third-party service with its operator's written authorization, anonymised; the official x402 and MPP references), three classes of divergence, and how each was disclosed |
+| At least one third-party service tested with the operator's explicit authorization | [2026-09-28-authorized-third-party-run.md](2026-09-28-authorized-third-party-run.md): written authorization from the operator on 2026-09-27; run from the published 0.5.0 against both paid routes. Anonymised as Service T until the operator agrees to be named. The hosted deployment had been retired, so it ran from the operator's published code at the operator's direction |
 
 The SOW allows the remainder of the three to be self-hosted reference services
 built from the official SDKs. Those runs exist for both protocols
 ([x402](2026-09-06-reference-implementation-run.md),
-[MPP](2026-09-24-official-sdk-reference-run.md)). They cover the remainder and
-do not stand in for the authorized third-party run.
+[MPP](2026-09-24-official-sdk-reference-run.md)).
 
 Separately from the SOW, defects found in the official `@stellar/mpp` SDK itself
 are written up in [docs/findings/upstream-sdk.md](../findings/upstream-sdk.md)
@@ -75,17 +74,16 @@ Supporting, not SOW rows:
 
 ## What is still open
 
-**Third-party service tested with the operator's authorization, and the aggregate findings document (D2).** No
-operator has said yes yet. Round one of outreach went unanswered. Round two,
-sent 2026-09-24 with a direct yes/no question, is open with
-[StellarSight](https://github.com/pedro-pelicioni/stellarsight/issues/13) and
-[CleverCon](https://github.com/clevercon-protocol/clevercon/issues/134), and a
-written request went on 2026-09-25 to a developer who had agreed verbally
-([defi-copilot#1](https://github.com/fxjrin/defi-copilot/issues/1)). The same
-day, requests went to the other prize winners of Stellar Hacks: Agents that
-operate an x402 or MPP service: [RenderGate](https://github.com/tantk/rendergate/issues/1), which runs on testnet, and [TollPay](https://github.com/rajkaria/toll/issues/1) and an [x402 middleware template](https://github.com/ffarinas/x402-mcp-stellar-template/issues/1), which run on mainnet and were asked whether a testnet instance exists. Wasit is testnet-only, so a
-mainnet-only service cannot be tested even with permission. The aggregate
-findings document follows from an authorized run.
+Nothing the SOW requires. Two notes for the reviewer:
+
+- **Where the third-party run ran.** Service T's operator had retired the hosted
+  deployment and directed that the run use their published code on testnet, on
+  our machine. The authorization is written; whether a run in that form meets
+  the SOW's third-party row is the Chapter Lead's call.
+- **Outreach.** Between 31 August and 25 September, outreach went to eleven
+  x402 or MPP projects, seven of them asked directly for written authorization.
+  One granted it. None is linked from this package, so that the one that did
+  stays anonymous.
 
 ## Index of runs
 
@@ -94,6 +92,7 @@ and what it does and does not establish. Newest first.
 
 | Date | File | What it shows | Deliverable |
 |---|---|---|---|
+| 2026-09-28 | [authorized-third-party-run](2026-09-28-authorized-third-party-run.md) | Published 0.5.0 against a third-party service, with its operator's written authorization (anonymised): 3 pass, 2 diverge from the Stellar spec (x402 v1, non-CAIP-2 network), 2 no verdict, nothing paid. Also 0.5.0 registry parity against Wasit's own fixtures | D2 |
 | 2026-09-24 | [official-sdk-reference-run](2026-09-24-official-sdk-reference-run.md) | Published 0.4.0 against `stellar/stellar-mpp-sdk`'s own example servers. Charge settles on-chain; an A/B across the SDK's `mppx` 0.10.1 bump shows rejected channel vouchers moving from 402 to 500 ([#82](https://github.com/stellar/stellar-mpp-sdk/issues/82)). Closes 0.4.0 registry parity | D2 |
 | 2026-09-20 | [completion-summary](2026-09-20-completion-summary.md) | One-page summary of every deliverable and what is still open | Overall |
 | 2026-09-17 | [cross-check-isolation-run](2026-09-17-cross-check-isolation-run.md) | Two defects in Wasit fixed in 0.4.0, and a Claude Code MCP session running charge then channel in one process | D2, D3 |

@@ -66,9 +66,7 @@ says nothing about the project.
   server mounts no payment middleware. That was wrong: the server entry file
   mounts none, but its route modules each mount x402 payment middleware on a
   paid endpoint. F does expose a paid endpoint; this pass missed it by reading
-  only the entry file. It uses x402 v1 and a package outside the `@x402/*`
-  line, and was later tested with its operator's written permission; that run
-  is reported separately.
+  only the entry file.
 - **G** — the public repository contains no x402 dependency and no payment
   middleware. The paid implementation is not public, so testing it would need
   the operator's participation.

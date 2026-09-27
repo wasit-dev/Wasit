@@ -99,3 +99,5 @@ Partial progress 2026-09-20: drafted the one-page completion summary at `docs/ev
 Partial progress 2026-09-24: filled the D1 and D3 recording rows, which had stayed `_pending_` after both recordings landed. Rows still pending: D2's written findings document and third-party authorization (both Job 02), and the walkthrough video (Job 03). Job 02 now has no candidate that could convert without a reply (see the local-only Job 02 notes), so those two D2 rows wait on the fallback decision.
 
 Partial progress 2026-09-24 (second session): ran the SOW fallback against `stellar/stellar-mpp-sdk`'s own example servers from the published 0.4.0 (D2 terminal-output row). That closes the 0.4.0 registry parity gap and produced upstream Finding 4. The third-party authorization row is still open; a rewritten second round of outreach is drafted.
+
+Done 2026-09-28: every SOW row now has its proof in the public evidence package `docs/evidence/README.md`, which supersedes this working file. The third-party row is the anonymised authorized run (`2026-09-28-authorized-third-party-run.md`); the written findings document is `docs/findings/conformance-findings.md`.
