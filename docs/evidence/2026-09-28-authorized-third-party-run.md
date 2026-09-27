@@ -6,22 +6,25 @@ checkout.
 **Network:** Stellar testnet.
 
 This is the SOW's "third-party ecosystem service tested with the operator's
-explicit authorization". The service is **anonymised as Service T**: the SOW
-and [`SECURITY.md`](../../SECURITY.md) allow a service to be named only with
-its operator's written permission, and that permission has been asked for but
-not yet given. The identity is available to the Chapter Lead on request.
+explicit authorization". The service is **[defi-copilot](https://github.com/fxjrin/defi-copilot)**, a
+pay-per-decision DeFi intelligence API for AI agents on Stellar. Its operator
+gave [written permission to name it](https://github.com/fxjrin/defi-copilot/issues/1#issuecomment-5860415354) on 2026-09-28, asking that the
+report say the run was against a local instance because the hosted backend is
+no longer live. It was published anonymised earlier the same day, before that
+permission arrived.
 
 ---
 
 ## Authorization
 
-- **Written, by the operator.** Given on 2026-09-27 by the owner of Service T's
-  repository, in reply to a request that described the checks: authorization
-  to run Wasit's x402 conformance checks against the service on Stellar
-  testnet.
+- **Written, by the operator.** [Given on 2026-09-27](https://github.com/fxjrin/defi-copilot/issues/1#issuecomment-5856332724) by the owner of
+  the repository, in reply to a request that described the checks:
+  authorization to run Wasit's x402 conformance checks against defi-copilot on
+  Stellar testnet.
 - **Where it ran.** The operator had retired the hosted backend and directed
-  that the service be run from their published code on testnet. It ran on our
-  machine, unmodified, at the repository's current head, set up with the
+  that the service be run from their published code on testnet. It ran as a
+  **local instance** on our machine, unmodified, at `e97879d` (the
+  repository's head, 2026-04-12), set up with the
   operator's own documented commands. The operator's code generated and
   funded its own fresh testnet wallet; none of our keys were given to it.
 - **What was not done.** No request of any kind was made to the service's live
@@ -55,9 +58,9 @@ call.
 
 ## What the results mean
 
-Service T implements **x402 v1**: its 402 challenge is a JSON body with
+defi-copilot implements **x402 v1**: its 402 challenge is a JSON body with
 `x402Version: 1`, as the v1 HTTP transport defines, built on a community
-package outside the official `@x402/*` line. The `exact` scheme on Stellar is
+package outside the official `@x402/*` line (`x402-stellar@0.2.0`). The `exact` scheme on Stellar is
 defined for **v2 only**
 ([scheme_exact_stellar.md](https://github.com/x402-foundation/x402/blob/02e80f3/specs/schemes/exact/scheme_exact_stellar.md):
 "❌ `v1` - we don't plan to support v1 for now"), with the challenge in the
@@ -68,9 +71,9 @@ defined for **v2 only**
   (`X402-03`, `X402-04`).
 - **`X402-06` and `X402-07` have no verdict.** Wasit pays through the v2
   scheme, so it cannot exercise a v1 payment flow. Nothing is claimed about how
-  Service T handles valid or corrupted payments.
-- Neither divergence is exploitable. The operator has been asked for a private
-  channel to receive the details.
+  defi-copilot handles valid or corrupted payments.
+- Neither divergence is exploitable. Both were sent to the operator privately,
+  by Telegram, on 2026-09-28, before this document named the service.
 
 ## What this run found in Wasit
 

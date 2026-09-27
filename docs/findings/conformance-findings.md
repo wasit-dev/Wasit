@@ -12,14 +12,15 @@ official SDKs.
 
 | # | Implementation | Kind | Protocol | Wasit | Evidence |
 |---|---|---|---|---|---|
-| 1 | Service T (anonymised) | Third-party, **operator's written authorization** | x402 | 0.5.0 from npm | [2026-09-28](../evidence/2026-09-28-authorized-third-party-run.md) |
+| 1 | [defi-copilot](https://github.com/fxjrin/defi-copilot), local instance at `e97879d` | Third-party, **operator's written authorization** ([run](https://github.com/fxjrin/defi-copilot/issues/1#issuecomment-5856332724), [naming](https://github.com/fxjrin/defi-copilot/issues/1#issuecomment-5860415354)) | x402 | 0.5.0 from npm | [2026-09-28](../evidence/2026-09-28-authorized-third-party-run.md) |
 | 2 | `stellar/x402-stellar`, `simple-paywall` example | Official reference, self-hosted | x402 v2 | 0.3.0 from npm | [2026-09-06](../evidence/2026-09-06-reference-implementation-run.md) |
 | 3 | `stellar/stellar-mpp-sdk`, `charge-server` and `channel-server` examples | Official reference, self-hosted | MPP charge and channel | 0.4.0 from npm | [2026-09-24](../evidence/2026-09-24-official-sdk-reference-run.md) |
 
-Service T is not named because its operator has not given written permission
-to be named. The two official references are open-source code published by
-Stellar and were run, unmodified, on our own machine. Everything ran on
-Stellar testnet.
+defi-copilot is named with its operator's written permission. Its hosted
+backend is no longer live, so at the operator's direction it ran as a local
+instance of their published code. The two official references are
+open-source code published by Stellar and were run, unmodified, on our own
+machine. Everything ran on Stellar testnet.
 
 ## Results in aggregate
 
@@ -63,9 +64,9 @@ upgrade returns 402. Not in any release yet. Reported upstream as
 - Class 3 is in open-source SDK code, not an operated service, and is not
   exploitable, so it went to the SDK's public issue tracker, as
   [`SECURITY.md`](../../SECURITY.md) describes for upstream conformance defects.
-- Classes 1 and 2 concern Service T. They are not exploitable. The operator has
-  been asked for a private channel to receive the details, and the service
-  stays anonymised unless they agree to be named.
+- Classes 1 and 2 concern defi-copilot. They are not exploitable. Both went
+  to its operator privately, by Telegram, on 2026-09-28, before the service was
+  named here.
 
 ## What the implementations found in Wasit
 
@@ -78,14 +79,14 @@ Each was fixed and is recorded in the [changelog](../../CHANGELOG.md):
   corruption is planned for 0.6.0.
 - The official MPP reference showed that `MPP-12` and `MPP-14` called a refused
   replay a double-spend whenever the status was not 402. Fixed in 0.5.0.
-- Service T showed that 0.4.0 misreported an x402 v1 challenge and failed
+- defi-copilot showed that 0.4.0 misreported an x402 v1 challenge and failed
   payment checks that never sent a payment. Fixed in 0.5.0.
 
 ## Limits
 
 - Three implementations, one of them third-party. That meets the SOW's minimum
   and is not a survey of the ecosystem.
-- Service T ran from its operator's published code on our machine, at the
+- defi-copilot ran as a local instance of its operator's published code, at the
   operator's direction, because its hosted deployment had been retired.
 - Each result describes one implementation, at one commit, at one moment. A
   pass is a statement about the published checks, not a security audit.
