@@ -4,7 +4,7 @@ Protocol-compliance testing for **x402** and **MPP** on Stellar, from your termi
 
 `wasit` runs the real payment flow against a live service, not a mock of it, and it is not a schema validator: a response can have every field in the right place and still take money without settling it.
 
-For MPP charge mode it verifies the settlement independently — via Stellar RPC and the token contract's own on-chain transfer event, rather than the response the service returns. The x402 checks exercise the same real flow but judge the target on its HTTP behaviour: `X402-06` passes on a 2xx. Giving it the same on-chain verification is tracked for 0.4.0.
+For MPP charge mode it verifies the settlement independently — via Stellar RPC and the token contract's own on-chain transfer event, rather than the response the service returns. The x402 checks exercise the same real flow but judge the target on its HTTP behaviour: `X402-06` passes on a 2xx. Giving it the same on-chain verification is tracked for 0.6.0.
 
 **Testnet only.** Several checks settle real transactions — do not point this at pubnet or use production keys.
 
