@@ -1,6 +1,6 @@
 # Job 04 — Evidence Submission Package
 
-Status: 🟡 **IN PROGRESS** (every row filled except D2's third-party authorization and aggregate findings rows) ·
+Status: ✅ **DONE** (2026-09-28) — superseded by the public evidence package `docs/evidence/README.md` ·
 Depends on: #1, #2, #3
 
 ## Goal

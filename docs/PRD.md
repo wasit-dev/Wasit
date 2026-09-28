@@ -125,14 +125,16 @@ security auditors looking at contract source — see Non-goals below.
   fixture servers built on the official SDKs, and reachable from both the CLI
   and the MCP server.
 - At least one third-party service tested **with the operator's explicit
-  authorization** — this is the one requirement not yet satisfied; see
-  README's Status table and the evidence package (`docs/evidence/README.md`)
-  for the current outreach log. An evidence run against public repos without
-  contacting the operator does not count toward this.
+  authorization** — done: defi-copilot, with written authorization, run as a
+  local instance at the operator's direction
+  (`docs/evidence/2026-09-28-authorized-third-party-run.md`), reported in
+  aggregate with the official references in
+  `docs/findings/conformance-findings.md`. An evidence run against public repos
+  without contacting the operator does not count toward this.
 - Packages published and installable (`npm install -g @wasit-dev/cli`,
   `npx @wasit-dev/server`) — done.
 - Upstream defects, where found, filed against the SDK maintainers with
-  reproduction steps — done (`stellar-mpp-sdk#66`, `#67`).
+  reproduction steps — done (`stellar-mpp-sdk#66`, `#67`, `#70`, `#82`).
 
 ## Constraints
 

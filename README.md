@@ -271,6 +271,18 @@ Start them all at once:
 ./scripts/fixtures.sh start     # start, then `status`, `logs`, `stop`
 ```
 
+Or start them, run every suite against them, print one summary and stop them
+again, in a single command:
+
+```bash
+./scripts/run-all.sh            # free checks only: X402-01..05, MPP-10..12/14
+./scripts/run-all.sh --full     # also X402-06/07 and MPP-01, which move testnet funds
+./scripts/run-all.sh --npm      # run the published CLI instead of this checkout
+```
+
+`MPP-13` never runs from this script: it closes a channel permanently. The exit
+code follows the CLI's.
+
 Or run any of them by hand, one terminal each:
 
 ```bash

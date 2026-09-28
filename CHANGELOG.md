@@ -10,6 +10,12 @@ whether to upgrade needs to see that before the version lands. These three were
 earmarked for 0.4.0, then for 0.5.0, and both releases went to correctness
 fixes found in the field instead; they are unchanged, only renumbered.
 
+**Added, repository only — `scripts/run-all.sh`.** Starts the fixtures if they
+are not already up, runs the x402, MPP charge and MPP channel suites, prints one
+summary and stops the fixtures it started. Free checks by default; `--full` adds
+the checks that move testnet funds, and `--npm` runs the published CLI. Not
+part of any npm package.
+
 **Will change results — `X402-06` gains on-chain verification.** The check
 currently passes on any 2xx, which means it establishes that the target accepted
 the payment, not that the payment landed. `MPP-01` already reads the token
