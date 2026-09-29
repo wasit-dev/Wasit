@@ -29,7 +29,7 @@ machine. Everything ran on Stellar testnet.
 | x402 challenge shape (`X402-01`–`05`) | 1 of 2 | 1 of 2 | — |
 | x402 payment flow (`X402-06`–`07`) | 1 of 2 | — | 1 of 2 |
 | MPP charge (`MPP-01`) | 1 of 1 | — | — |
-| MPP channel (`MPP-11`, `12`, `14`) | 0 of 1 on the SDK's current `main`; 1 of 1 on the commit before it | 1 of 1 on `main` | — |
+| MPP channel (`MPP-11`, `12`, `14`) | 1 of 1, before the regression and again after its fix | 1 of 1 at the regression commit, since fixed | — |
 
 **No security-relevant failure was observed.** Every rejection Wasit probed was
 enforced: a corrupted x402 payment was refused, and every stale or replayed MPP
@@ -56,8 +56,11 @@ example channel server, on the SDK's `main` branch after its `mppx` 0.10.1
 upgrade, refuses stale and replayed vouchers with HTTP 500 "internal payment
 error" instead of 402. The refusal is correct; the status tells a client its
 server is broken rather than that its payment was wrong. The commit before the
-upgrade returns 402. Not in any release yet. Reported upstream as
-[stellar/stellar-mpp-sdk#82](https://github.com/stellar/stellar-mpp-sdk/issues/82).
+upgrade returns 402. Reported upstream as
+[stellar/stellar-mpp-sdk#82](https://github.com/stellar/stellar-mpp-sdk/issues/82)
+and **fixed by the maintainers in [#83](https://github.com/stellar/stellar-mpp-sdk/pull/83)** on 2026-09-28, before any
+release carried it. Wasit 0.5.0 against the fixed commit passes all three
+checks, with every rejection back to 402.
 
 ## Disclosure
 

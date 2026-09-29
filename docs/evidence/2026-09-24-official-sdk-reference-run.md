@@ -95,9 +95,12 @@ hold for the channel server.
   class, so an invalid charge credential likely takes the same path, but no
   Wasit check submits one, and this was not probed.
 
-**Status.** Unreleased. `@stellar/mpp@latest` on npm is still `0.7.1`, which
-predates #78, so no consumer installing from the registry sees this today. It
-ships with the next release unless fixed first. Filed as
+**Status.** Fixed before it shipped. `@stellar/mpp@latest` on npm is still
+`0.7.1`, which predates #78, so no consumer installing from the registry ever
+saw this. **Update, 2026-09-29:** fixed upstream by [#83](https://github.com/stellar/stellar-mpp-sdk/pull/83) (merged
+2026-09-28, `88fa767`); Wasit 0.5.0 against the same example server at that
+commit passes `MPP-10`, `11`, `12` and `14`, with every rejection back to
+HTTP 402. Filed as
 [stellar/stellar-mpp-sdk#82](https://github.com/stellar/stellar-mpp-sdk/issues/82); canonical write-up is Finding 4 in
 `docs/findings/upstream-sdk.md`.
 

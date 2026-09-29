@@ -1,8 +1,8 @@
 # Upstream Findings
 
 Four findings in `@stellar/mpp`, all found while building Wasit. The first
-three reproduce against current, published versions; the fourth is on `main`
-and unreleased. This document
+three reproduce against current, published versions; the fourth was a
+regression on `main`, fixed by the maintainers before any release carried it. This document
 is the canonical write-up; the GitHub issues filed against
 [`stellar/stellar-mpp-sdk`](https://github.com/stellar/stellar-mpp-sdk) are
 summaries that link back here.
@@ -369,9 +369,11 @@ registry today. Treat this finding as fixed upstream, unreleased.
 
 ## Finding 4 — Rejected channel vouchers are reported as HTTP 500 since the mppx 0.10 bump
 
-**Status:** filed as [stellar/stellar-mpp-sdk#82](https://github.com/stellar/stellar-mpp-sdk/issues/82) on 2026-09-24. Present on `main` since
-[#78](https://github.com/stellar/stellar-mpp-sdk/pull/78) (merged 2026-09-22);
-not in any release, since `@stellar/mpp@latest` is still `0.7.1`
+**Status:** **fixed upstream and verified.** Filed as [stellar/stellar-mpp-sdk#82](https://github.com/stellar/stellar-mpp-sdk/issues/82) on 2026-09-24;
+fixed by [#83](https://github.com/stellar/stellar-mpp-sdk/pull/83), merged 2026-09-28 (`88fa767`), which closed the issue as
+completed. Present on `main` from [#78](https://github.com/stellar/stellar-mpp-sdk/pull/78)
+(2026-09-22) until the fix; never in a release, since `@stellar/mpp@latest` is
+still `0.7.1`
 **Severity:** moderate. Enforcement is intact and no voucher is honoured
 twice, but every refusal is reported to the client as a server fault
 **Evidence:** `docs/evidence/2026-09-24-official-sdk-reference-run.md`
@@ -404,6 +406,31 @@ deriving `ChannelVerificationError` and `PaymentVerificationError` from
 boundary. That restores 402, and lets the SDK's own message reach the client
 instead of the generic "An internal payment error occurred.". A regression test that asserts the status of a rejected
 voucher would have caught this, and would catch the next `mppx` bump.
+
+---
+
+### Update, 2026-09-29: fixed and verified
+
+[#83](https://github.com/stellar/stellar-mpp-sdk/pull/83) ("fix: return 402 for rejected credentials again") makes the SDK's
+errors extend `mppx`'s `PaymentError`, the fix suggested above, and keeps
+settlement failures as a generic 500. It also fixes the charge path, which this
+finding flagged as likely affected but unprobed, and adds live testnet
+integration tests to CI. Its description confirms the cause: "Since #78, mppx
+wraps non-`PaymentError`s in a 500, and CI only ran mocked tests, so the
+regression went unnoticed."
+
+Verified with the published `@wasit-dev/cli@0.5.0` against the SDK's
+unmodified `examples/channel-server.ts`, same channel and commitment key as the
+original A/B, still on `mppx` 0.10.1:
+
+| SDK commit | `MPP-10` | `MPP-11` | `MPP-12` | `MPP-14` | Rejection status |
+|---|---|---|---|---|---|
+| `1ee3f25`, before #78 | PASS | PASS | PASS | PASS | 402 |
+| `afd8fb5`, #78 | PASS | FAIL | FAIL | FAIL | 500 |
+| `88fa767`, #83 | PASS | PASS | PASS | PASS | 402 |
+
+The server logged no `internal verification error` at `88fa767`. The fix is on
+`main` and not yet released.
 
 ---
 
