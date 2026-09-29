@@ -6,9 +6,7 @@ All notable changes to Wasit are recorded here. Versions follow [Semantic Versio
 
 Planned for 0.6.0, and in progress on a release branch. Entries marked "Will
 change results" change what a check *proves*: anyone reading this file to
-decide whether to upgrade needs to see them before the version lands. The
-`wallet status` item below was earmarked for 0.4.0, then for 0.5.0, and both
-releases went to correctness fixes found in the field instead.
+decide whether to upgrade needs to see them before the version lands.
 
 **Fixed in source — `MPP-01` reads CAP-67 transfer events.** Since CAP-67,
 a SEP-41 `transfer` to a muxed address (`M...`) emits its data as a map
@@ -74,11 +72,14 @@ summary and stops the fixtures it started. Free checks by default; `--full` adds
 the checks that move testnet funds, and `--npm` runs the published CLI. Not
 part of any npm package.
 
-**`wasit wallet status --role <role>` will exit 2 on an unreadable key.** It
-exits 0 today while `--role mpp-channel` exits 2 for the same class of
-configuration error, so `wasit wallet status --role x402 && deploy` proceeds on
-a key that could not be read. `status` with no `--role` keeps exiting 0: there,
-one unreadable key is a row in a table, not a failed question.
+**Fixed in source — `wasit wallet status --role <role>` exits 2 when it could
+not check that role.** It exited 0 on an unreadable key, so
+`wasit wallet status --role x402 && deploy` went ahead on a key that was never
+checked, although `docs/guides/cli.md` already said a malformed key exits 2. With
+`--role` it now exits 2 whenever the role could not be checked: key not set,
+unreadable, or its balance lookup failed. An unfunded account is an answer and
+exits 0. Without `--role`, one unchecked role stays a row and the command exits
+0. Three offline tests, each mutation-checked.
 
 ## [0.5.0] — 2026-09-28
 

@@ -116,6 +116,32 @@ function formatBalance(balance: AssetBalance): string {
   return `    ${balance.code.padEnd(10)} ${balance.balance}${note}`;
 }
 
+/** One role's row in `wallet status`. */
+export interface WalletStatusRow {
+  readonly configured: boolean;
+  readonly status?: unknown;
+  readonly error?: string;
+}
+
+/**
+ * The exit code for `wallet status`.
+ *
+ * With `--role`, the command answers one question, so it exits 2 whenever it
+ * could not answer it: the key is not set, cannot be read, or its balance
+ * could not be looked up. Otherwise `wasit wallet status --role x402 && deploy`
+ * proceeds on a key that was never checked. An account that does not exist
+ * yet is an answer, and exits 0. Without `--role` it reports every role as a
+ * table, and one role it could not check is a row, not a failed command.
+ */
+export function walletStatusExitCode(
+  explicitRole: boolean,
+  rows: readonly WalletStatusRow[],
+): 0 | 2 {
+  if (!explicitRole) return 0;
+  // Only a role that was actually looked up has a status.
+  return rows.every((row) => row.status !== undefined) ? 0 : 2;
+}
+
 function printWalletStatus(role: WalletRole, publicKey: string, status: WalletStatus): void {
   console.log(`${role}  ${publicKey}`);
   if (!status.exists) {
@@ -143,6 +169,9 @@ export function registerWalletCommand(program: Command): void {
 Examples:
   $ wasit wallet status
   $ wasit wallet status --role mpp-charge --json
+
+With --role, exits 2 if that role could not be checked (key not set,
+unreadable, or lookup failed); without it, every role is a row and it exits 0.
 
 Testnet only — there is no --network flag. mpp-channel is not accepted here
 even when configured: COMMITMENT_SECRET_HEX only ever signs off-chain (see
@@ -192,9 +221,11 @@ docs/guides/configuration.md) and has no on-chain balance of its own.`,
         }
       }
 
+      const exitCode = walletStatusExitCode(opts.role !== undefined, rows);
+
       if (jsonMode) {
         console.log(JSON.stringify(rows, null, 2));
-        return;
+        process.exit(exitCode);
       }
 
       for (const row of rows) {
@@ -209,6 +240,7 @@ docs/guides/configuration.md) and has no on-chain balance of its own.`,
         }
         printWalletStatus(row.role, row.publicKey as string, row.status as WalletStatus);
       }
+      process.exit(exitCode);
     });
 
   wallet

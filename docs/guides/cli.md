@@ -92,7 +92,12 @@ inspect or fund.
 A key that is set but malformed — a truncated paste, a `G...` public key, or
 a hex commitment seed in a Stellar-secret slot — is reported by name ("`X` is
 not a valid Stellar secret key") and exits 2, rather than surfacing as an SDK
-error. `status` reports it against that one role and still checks the other.
+error. `status` with no `--role` reports it against that one role, still checks
+the other, and exits 0: one unchecked role is a row in a table. `status --role`
+answers one question, so it exits 2 whenever that role could not be checked —
+key not set, unreadable, or its balance lookup failed — and
+`wasit wallet status --role x402 && …` never goes ahead on an unchecked key. An
+account that has never been funded is an answer, and exits 0.
 
 `fund --asset xlm` calls Stellar's public Friendbot directly and is fully
 automatic. `fund --asset usdc` creates a trustline to Circle's official
