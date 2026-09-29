@@ -15,7 +15,7 @@
  * non-transfer authorization.
  */
 
-import { Address, rpc, scValToNative, xdr } from "@stellar/stellar-sdk";
+import { Address, MuxedAccount, StrKey, rpc, scValToNative, xdr } from "@stellar/stellar-sdk";
 import { Mppx, charge } from "@stellar/mpp/charge/client";
 import { Challenge, Receipt } from "mppx";
 import { Keypair } from "@stellar/stellar-sdk";
@@ -51,9 +51,16 @@ export interface ChargeChallenge {
 }
 
 /** What the token contract actually did, read from the settled transaction. */
-interface TransferEvent {
+export interface TransferEvent {
   readonly from: string;
+  /** The destination's base address. CAP-67 never puts a muxed address in a topic. */
   readonly to: string;
+  /**
+   * The destination's multiplexing id, when the transfer went to a muxed
+   * address (CAP-67). A `u64` id is kept as its decimal string; a memo-derived
+   * string or bytes value is kept as given (bytes as hex).
+   */
+  readonly toMuxedId?: string;
   readonly amount: bigint;
   readonly contract: string;
 }
@@ -149,6 +156,37 @@ export function parseChargeChallenge(
 }
 
 /**
+ * Reads the amount, and the destination's muxed id if any, from a `transfer`
+ * event's data.
+ *
+ * CAP-46 made the data a bare `i128` amount. CAP-67 keeps that when no muxed
+ * information is emitted, and otherwise makes it a map
+ * `{ amount: i128, to_muxed_id: u64 | bytes | string }`. Reading only the bare
+ * form would drop every payment to a muxed address, and report a settlement
+ * that happened as one that did not.
+ */
+function readTransferData(
+  data: xdr.ScVal,
+): { amount: bigint; toMuxedId?: string } | undefined {
+  const native: unknown = scValToNative(data);
+  if (typeof native === "bigint") return { amount: native };
+
+  const map = asRecord(native);
+  if (!map || typeof map["amount"] !== "bigint") return undefined;
+
+  const id = map["to_muxed_id"];
+  if (id === undefined) return { amount: map["amount"] };
+  if (typeof id === "bigint" || typeof id === "number") {
+    return { amount: map["amount"], toMuxedId: id.toString() };
+  }
+  if (typeof id === "string") return { amount: map["amount"], toMuxedId: id };
+  if (id instanceof Uint8Array) {
+    return { amount: map["amount"], toMuxedId: Buffer.from(id).toString("hex") };
+  }
+  return undefined;
+}
+
+/**
  * Extracts CAP-46 `transfer` events from a settled transaction.
  *
  * Adapted from @stellar/mpp's own `validateSimulationEvents`, with one
@@ -156,8 +194,10 @@ export function parseChargeChallenge(
  * simulation and unwraps each via `.event()`. RPC's `getTransaction` returns
  * `contractEventsXdr` as `xdr.ContractEvent[][]` — already unwrapped, and
  * nested per operation. Calling `.event()` on these would throw at runtime.
+ * Both the CAP-46 and the CAP-67 data formats are read; see
+ * {@link readTransferData}.
  */
-function collectTransferEvents(
+export function collectTransferEvents(
   contractEventsXdr: xdr.ContractEvent[][],
 ): TransferEvent[] {
   const transfers: TransferEvent[] = [];
@@ -173,8 +213,8 @@ function collectTransferEvents(
       // CAP-46: topic[0] = "transfer", topic[1] = from, topic[2] = to.
       if (topics[0]?.sym?.()?.toString() !== "transfer") continue;
 
-      const amount = scValToNative(body.data());
-      if (typeof amount !== "bigint") continue;
+      const data = readTransferData(body.data());
+      if (!data) continue;
 
       const contractId = contractEvent.contractId();
       if (!contractId) continue;
@@ -182,7 +222,8 @@ function collectTransferEvents(
       transfers.push({
         from: Address.fromScVal(topics[1]!).toString(),
         to: Address.fromScVal(topics[2]!).toString(),
-        amount,
+        ...(data.toMuxedId !== undefined ? { toMuxedId: data.toMuxedId } : {}),
+        amount: data.amount,
         contract: Address.fromScAddress(
           xdr.ScAddress.scAddressTypeContract(contractId),
         ).toString(),
@@ -191,6 +232,35 @@ function collectTransferEvents(
   }
 
   return transfers;
+}
+
+/**
+ * Whether a transfer reached the recipient the target advertised.
+ *
+ * A muxed recipient (`M...`) is one base account plus an id, and CAP-67
+ * reports it that way: the base address in the topic, the id in the data. So
+ * an advertised muxed recipient matches only when both parts do. Any other
+ * recipient is compared by address, as before.
+ */
+export function transferReachedRecipient(
+  advertised: string,
+  transfer: TransferEvent,
+): boolean {
+  if (StrKey.isValidMed25519PublicKey(advertised)) {
+    const muxed = MuxedAccount.fromAddress(advertised, "0");
+    return (
+      transfer.to === muxed.baseAccount().accountId() &&
+      transfer.toMuxedId === muxed.id()
+    );
+  }
+  return transfer.to === advertised;
+}
+
+/** How a transfer's destination reads in a report. */
+function describeDestination(transfer: TransferEvent): string {
+  return transfer.toMuxedId === undefined
+    ? transfer.to
+    : `${transfer.to} (muxed id ${transfer.toMuxedId})`;
 }
 
 const sleep = (ms: number): Promise<void> =>
@@ -259,8 +329,10 @@ export async function runMppChargeChecks(
 
   if (!paid.ok) {
     return fail(
-      `Paid the advertised ${advertised.amount} base units, but the target ` +
-        `answered HTTP ${paid.status} instead of serving the resource.`,
+      `Submitted a payment for the advertised ${advertised.amount} base ` +
+        `units, but the target answered HTTP ${paid.status} instead of ` +
+        `serving the resource. Nothing is claimed about settlement: a target ` +
+        `that refuses may never have broadcast the transaction.`,
     );
   }
 
@@ -331,9 +403,9 @@ export async function runMppChargeChecks(
       `amount: advertised ${advertised.amount} base units, moved ${actual.amount}`,
     );
   }
-  if (actual.to !== advertised.recipient) {
+  if (!transferReachedRecipient(advertised.recipient, actual)) {
     mismatches.push(
-      `recipient: advertised ${advertised.recipient}, paid ${actual.to}`,
+      `recipient: advertised ${advertised.recipient}, paid ${describeDestination(actual)}`,
     );
   }
   if (actual.contract !== advertised.currency) {

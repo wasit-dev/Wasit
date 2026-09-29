@@ -10,6 +10,25 @@ whether to upgrade needs to see that before the version lands. These three were
 earmarked for 0.4.0, then for 0.5.0, and both releases went to correctness
 fixes found in the field instead; they are unchanged, only renumbered.
 
+**Fixed in source — `MPP-01` reads CAP-67 transfer events.** Since CAP-67,
+a SEP-41 `transfer` to a muxed address (`M...`) emits its data as a map
+`{ amount, to_muxed_id }` instead of a bare `i128`, with the base address in
+the topic. `MPP-01` read only the bare form, so a settlement to a muxed
+recipient would have been reported as no transfer at all. It now reads both,
+and matches an advertised muxed recipient on the base account and the id.
+Verified against a real testnet transfer to a muxed address; seven offline
+tests, each mutation-checked. Checking this end to end also showed that the
+official `@stellar/mpp` charge server cannot verify a payment to a muxed
+recipient either (its verification throws on the same map), so no MPP service
+built on it can accept one today.
+
+**Fixed in source — `MPP-01` no longer says it paid when the target refused.**
+When the target answered with an error instead of the resource, the FAIL read
+"Paid the advertised … base units", although a target that refuses may never
+broadcast the transaction, and in the run that found this none was. The
+verdict is unchanged; the wording now claims only that a payment was
+submitted.
+
 **Added, repository only — `scripts/run-all.sh`.** Starts the fixtures if they
 are not already up, runs the x402, MPP charge and MPP channel suites, prints one
 summary and stops the fixtures it started. Free checks by default; `--full` adds
