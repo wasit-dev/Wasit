@@ -134,7 +134,7 @@ security auditors looking at contract source — see Non-goals below.
 - Packages published and installable (`npm install -g @wasit-dev/cli`,
   `npx @wasit-dev/server`) — done.
 - Upstream defects, where found, filed against the SDK maintainers with
-  reproduction steps — done (`stellar-mpp-sdk#66`, `#67`, `#70`, `#82`).
+  reproduction steps — done (`stellar-mpp-sdk#66`, `#67`, `#70`, `#82`, `#89`).
 
 ## Constraints
 

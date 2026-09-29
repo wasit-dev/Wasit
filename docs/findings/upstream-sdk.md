@@ -1,13 +1,14 @@
 # Upstream Findings
 
-Four findings in `@stellar/mpp`, all found while building Wasit. The first
+Five findings in `@stellar/mpp`, all found while building Wasit. The first
 three reproduce against current, published versions; the fourth was a
-regression on `main`, fixed by the maintainers before any release carried it. This document
+regression on `main`, fixed by the maintainers before any release carried it;
+the fifth reproduces on 0.7.1 and on current `main`. This document
 is the canonical write-up; the GitHub issues filed against
 [`stellar/stellar-mpp-sdk`](https://github.com/stellar/stellar-mpp-sdk) are
 summaries that link back here.
 
-None is a defect in any service under test. All four are in the official SDK
+None is a defect in any service under test. All five are in the official SDK
 or in the metadata it publishes.
 
 ## Versions
@@ -431,6 +432,48 @@ original A/B, still on `mppx` 0.10.1:
 
 The server logged no `internal verification error` at `88fa767`. The fix is on
 `main` and not yet released.
+
+---
+
+## Finding 5 — The charge server can't verify a payment to a muxed recipient
+
+**Status:** filed as [stellar/stellar-mpp-sdk#89](https://github.com/stellar/stellar-mpp-sdk/issues/89) on 2026-09-29. Reproduces on
+`@stellar/mpp` 0.7.1 and unchanged on `main` at `88fa767`
+**Severity:** low to moderate. Nothing is lost: the payment is refused. But an
+operator can configure a muxed recipient, see nothing wrong, and have every
+payment refused with a 402
+**Evidence:** a testnet transfer to a muxed address emitting CAP-67 map data,
+[`02f56c0a…cfe8`](https://stellar.expert/explorer/testnet/tx/02f56c0a9c1c702d504fc168013dbe4d4f1ce3bda52d7c1d432d60a6afcecfe8)
+
+### Summary
+
+A charge server configured with an `M...` recipient advertises it, the client
+builds and signs a transfer to it, and verification throws
+`StellarMppError: Cannot convert ScVal type 17 to BigInt` in `doVerify`. Type 17
+is `SCV_MAP`. No transaction is broadcast.
+
+### Cause
+
+Since [CAP-67](https://github.com/stellar/stellar-protocol/blob/master/core/cap-0067.md)
+(Final), a SEP-41 `transfer` to a muxed address emits its data as the map
+`{ amount: i128, to_muxed_id: u64 }` instead of a bare `i128`, and puts the
+**base** address in the `to` topic. `validateSimulationEvents` reads the data
+with `scValToBigInt(body.data())`, which throws on a map. With that parsed, the
+next check, `transfer.to !== expected.recipient`, would still fail, since the
+event carries the base `G...` address and `expected.recipient` is the `M...`
+address.
+
+### Suggested fix
+
+Either reject an `M...` recipient at configuration time with a clear error, or
+support it by reading the map form and matching the base account plus
+`to_muxed_id`. The spec (`draft-stellar-charge-00`) describes `recipient` as a
+"Stellar account address", with `G...` examples only, so whether muxed
+recipients are in scope is a spec question; rejecting them up front is worth
+doing either way.
+
+Found while checking Wasit's own `MPP-01` end to end: it had the same CAP-67
+gap in reading transfer events.
 
 ---
 
