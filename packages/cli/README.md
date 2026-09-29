@@ -19,7 +19,7 @@ npm install -g @wasit-dev/cli
 wasit test --target <your-service-url> --read-only
 ```
 
-Requires Node.js `>=24`.
+Requires Node.js `>=22`.
 
 Both lines carry `--read-only` deliberately: without it the payment checks
 `X402-06`/`07` run as soon as a `STELLAR_PRIVATE_KEY` is available, and the CLI

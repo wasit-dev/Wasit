@@ -14,7 +14,7 @@ Nothing to install ahead of time — an MCP client launches it on demand:
 npx -y @wasit-dev/server
 ```
 
-Transport is stdio. Requires Node.js `>=24`.
+Transport is stdio. Requires Node.js `>=22`.
 
 ## Claude Code
 

@@ -12,17 +12,20 @@ on:
 
 jobs:
   packages:
-    name: Build packages (cli, core, server)
+    name: Build packages (cli, core, server) on Node ${{ matrix.node }}
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # The packages declare "engines": { "node": ">=22" }. Both the floor
+        # and the current LTS are tested, so the floor stays true rather than
+        # being a claim checked once.
+        node: ["22", "24"]
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          # All three packages declare "engines": { "node": ">=24" } —
-          # keep this in sync with packages/*/package.json if that
-          # requirement ever changes.
-          node-version: "24"
+          node-version: ${{ matrix.node }}
           cache: npm
           cache-dependency-path: package-lock.json
 

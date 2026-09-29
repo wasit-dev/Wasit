@@ -30,12 +30,12 @@ compile, no native dependency, and no service to run.
 
 ## Runtime
 
-- **Node.js 24 or newer.** All three packages declare \`"node": ">=24"\`.
+- **Node.js 22 or newer.** All three packages declare \`"node": ">=22"\`.
 - **npm**, which ships with Node.
 - **macOS, Linux, or Windows.** Nothing in Wasit is platform-specific.
 
-Continuous integration builds and tests on Node 24. Node 26 works too —
-the full build, typecheck and test suite has been run on it.
+Continuous integration builds and tests on Node 22 and Node 24. Node 26
+works too — the full build, typecheck and test suite has been run on it.
 
 > **Note** — Wasit is testnet-only. Every check, and every key it reads,
 > targets Stellar testnet. There is no mainnet mode and no flag that

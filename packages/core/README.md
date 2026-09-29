@@ -14,7 +14,7 @@ Most people should reach for [`@wasit-dev/cli`](https://www.npmjs.com/package/@w
 npm install @wasit-dev/core
 ```
 
-Requires Node.js `>=24`. Ships ESM only (`"type": "module"`), with TypeScript types included (`dist/index.d.ts`).
+Requires Node.js `>=22`. Ships ESM only (`"type": "module"`), with TypeScript types included (`dist/index.d.ts`).
 
 ## Usage
 

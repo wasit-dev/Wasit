@@ -199,7 +199,7 @@ cannot be traced is out of scope by construction.
 
 ## Install
 
-Requires Node.js `>=24`.
+Requires Node.js `>=22`.
 
 ```bash
 # run it once, no install

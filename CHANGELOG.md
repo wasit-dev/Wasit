@@ -22,6 +22,13 @@ official `@stellar/mpp` charge server cannot verify a payment to a muxed
 recipient either (its verification throws on the same map), so no MPP service
 built on it can accept one today.
 
+**Changed — Node.js 22 is supported.** All three packages now declare
+`"node": ">=22"` instead of `>=24`. Nothing required 24: the full test suite,
+the CLI, the MCP server and a run against the fixtures all pass on Node 22,
+and no runtime dependency requires more. Node 22 is still a maintained LTS, and
+CI environments such as the official MPP SDK's run on it. CI now tests the
+packages on both Node 22 and Node 24.
+
 **Fixed in source — `MPP-01` no longer blames the target for a slow RPC.**
 It gave RPC twelve seconds to show the settled transaction, then reported it
 as never broadcast. On a lagging RPC that is a FAIL against a target that did

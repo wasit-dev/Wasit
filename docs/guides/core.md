@@ -19,7 +19,7 @@ different front end entirely.
 npm install @wasit-dev/core
 ```
 
-Requires Node.js 24 or newer. Ships ESM only (`"type": "module"`), with
+Requires Node.js 22 or newer. Ships ESM only (`"type": "module"`), with
 TypeScript types included.
 
 ```ts
