@@ -1,6 +1,7 @@
 import { errored, skipped, type CheckResult } from "../check.js";
 import {
   ConfigurationError,
+  MalformedResponseError,
   assertHttpUrl,
   fetchTarget,
 } from "../errors.js";
@@ -426,11 +427,17 @@ export async function runX402ReadChecks(
 import { x402Client, x402HTTPClient } from "@x402/fetch";
 import { createEd25519Signer } from "@x402/stellar";
 import { ExactStellarScheme as ExactStellarClientScheme } from "@x402/stellar/exact/client";
+import { Keypair } from "@stellar/stellar-sdk";
+
+import { resolveRpcUrl } from "../mpp/network.js";
+import { verifySettlement } from "../settlement.js";
 
 export interface X402PaymentCheckOptions extends RequestShape {
   readonly target: string;
   readonly network: string;
   readonly payerSecretKey: string;
+  /** Overrides the default RPC endpoint used to verify settlement. */
+  readonly rpcUrl?: string;
   /** See {@link X402SimulatorOptions.onResult} — same contract. */
   readonly onResult?: (result: CheckResult) => void;
 }
@@ -493,10 +500,68 @@ async function preparePayment(options: X402PaymentCheckOptions) {
   return { httpClient, paymentPayload };
 }
 
-/** X402-06: a valid payment must be accepted. Settles on-chain. */
+/** A Stellar transaction hash: 64 hex characters. */
+const TRANSACTION_HASH = /^[0-9a-f]{64}$/i;
+
+/**
+ * Reads the settlement a paid response reports, before anything is looked up.
+ *
+ * Takes the header decoder rather than the response so the rules can be
+ * exercised without a network. `readSettlement` throws when the response
+ * carries no `PAYMENT-RESPONSE` header, as `x402HTTPClient` does.
+ */
+export function readSettlementReference(
+  status: number,
+  readSettlement: () => {
+    readonly success: boolean;
+    readonly transaction?: string;
+    readonly errorReason?: string;
+  },
+): { readonly reference: string } | { readonly failure: string } {
+  let settlement;
+  try {
+    settlement = readSettlement();
+  } catch {
+    return {
+      failure:
+        `Valid payment accepted (HTTP ${status}), but the response carried no ` +
+        `PAYMENT-RESPONSE header, which the x402 v2 HTTP transport uses to ` +
+        `report settlement. Whether the payment settled cannot be verified.`,
+    };
+  }
+
+  const reference = settlement.transaction ?? "";
+  // `settlement_pending` means broadcast but unconfirmed; the x402 spec has the
+  // caller reconcile on chain, which is exactly what X402-06 goes on to do.
+  const pending = !settlement.success && settlement.errorReason === "settlement_pending";
+  if ((!settlement.success && !pending) || !TRANSACTION_HASH.test(reference)) {
+    return {
+      failure:
+        `Valid payment accepted (HTTP ${status}), but its PAYMENT-RESPONSE ` +
+        `reports ${settlement.success ? "success" : "failure"} with transaction ` +
+        `${JSON.stringify(reference)}, not a settled Stellar transaction hash.`,
+    };
+  }
+  return { reference };
+}
+
+/**
+ * X402-06: a valid payment must be accepted, and must settle on-chain.
+ *
+ * A 2xx proves only that the target served the resource. The x402 v2 HTTP
+ * transport reports settlement in the `PAYMENT-RESPONSE` header, whose
+ * `transaction` is, for the `exact` scheme on Stellar, the settlement's hash.
+ * That hash is looked up on RPC and the token contract's own transfer event is
+ * held to what the target advertised, as MPP-01 does: a target that serves
+ * the resource without settling, or settles something else, fails here.
+ */
 async function checkSignatureAccepted(
   options: X402PaymentCheckOptions,
 ): Promise<CheckResult> {
+  const id = "X402-06";
+  const name = "Signature Resubmit Accepted";
+  const fail = (detail: string): CheckResult => ({ id, name, pass: false, detail });
+
   const { httpClient, paymentPayload } = await preparePayment(options);
   const paymentHeaders = httpClient.encodePaymentSignatureHeader(paymentPayload);
   const paid = await fetchTarget(
@@ -504,15 +569,43 @@ async function checkSignatureAccepted(
     withPaymentHeaders(options, paymentHeaders),
   );
 
-  const pass = paid.status >= 200 && paid.status < 300;
-  return {
-    id: "X402-06",
-    name: "Signature Resubmit Accepted",
-    pass,
-    detail: pass
-      ? `Valid payment accepted (HTTP ${paid.status}).`
-      : `Expected 2xx after a valid payment, got ${paid.status}.`,
-  };
+  if (paid.status < 200 || paid.status >= 300) {
+    return fail(`Expected 2xx after a valid payment, got ${paid.status}.`);
+  }
+
+  const read = readSettlementReference(paid.status, () =>
+    httpClient.getPaymentSettleResponse((header) => paid.headers.get(header)),
+  );
+  if ("failure" in read) return fail(read.failure);
+  const reference = read.reference;
+
+  const accepted = paymentPayload.accepted;
+  let amount: bigint;
+  try {
+    amount = BigInt(accepted.amount);
+  } catch {
+    throw new MalformedResponseError(
+      `The accepted payment requirements carry a non-numeric amount ` +
+        `(${JSON.stringify(accepted.amount)}).`,
+    );
+  }
+
+  const rpcUrl = resolveRpcUrl(options.network, options.rpcUrl);
+  const verdict = await verifySettlement(rpcUrl, reference, {
+    amount,
+    token: accepted.asset,
+    recipient: accepted.payTo,
+    payer: Keypair.fromSecret(options.payerSecretKey).publicKey(),
+  });
+
+  return verdict.pass
+    ? {
+        id,
+        name,
+        pass: true,
+        detail: `Valid payment accepted (HTTP ${paid.status}) and ${verdict.detail}.`,
+      }
+    : fail(verdict.detail);
 }
 
 /**

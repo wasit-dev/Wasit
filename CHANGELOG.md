@@ -4,11 +4,11 @@ All notable changes to Wasit are recorded here. Versions follow [Semantic Versio
 
 ## Unreleased
 
-Planned for 0.6.0. Recorded here rather than in an issue because two of the
-three change what a check *proves*, and anyone reading this file to decide
-whether to upgrade needs to see that before the version lands. These three were
-earmarked for 0.4.0, then for 0.5.0, and both releases went to correctness
-fixes found in the field instead; they are unchanged, only renumbered.
+Planned for 0.6.0, and in progress on a release branch. Entries marked "Will
+change results" change what a check *proves*: anyone reading this file to
+decide whether to upgrade needs to see them before the version lands. The
+`X402-07` and `wallet status` items below were earmarked for 0.4.0, then for
+0.5.0, and both releases went to correctness fixes found in the field instead.
 
 **Fixed in source — `MPP-01` reads CAP-67 transfer events.** Since CAP-67,
 a SEP-41 `transfer` to a muxed address (`M...`) emits its data as a map
@@ -21,6 +21,19 @@ tests, each mutation-checked. Checking this end to end also showed that the
 official `@stellar/mpp` charge server cannot verify a payment to a muxed
 recipient either (its verification throws on the same map), so no MPP service
 built on it can accept one today.
+
+**Will change results — `X402-06` verifies settlement on-chain.** It passed
+on any 2xx, which established that the target served the resource, not that
+the payment landed. It now reads the settlement from the `PAYMENT-RESPONSE`
+header and holds the reported transaction to the advertised terms on Stellar
+RPC, as `MPP-01` does: one `transfer` from this run's payer to `payTo`, for
+`amount` of `asset`. A target that serves without settling, or reports a
+transaction that is not its settlement, now fails; against a server built to
+do exactly that, 0.5.0 passed and this build fails both variants. A
+`settlement_pending` response is reconciled on chain, as the spec directs.
+`wasit test` gains `--rpc-url`, and the MCP tool `rpcUrl`. Settlement
+verification moved to a shared module so both checks apply identical rules.
+If a run goes red on upgrade, the check got stronger, not the service worse.
 
 **Changed — Node.js 22 is supported.** All three packages now declare
 `"node": ">=22"` instead of `>=24`. Nothing required 24: the full test suite,
@@ -49,15 +62,6 @@ are not already up, runs the x402, MPP charge and MPP channel suites, prints one
 summary and stops the fixtures it started. Free checks by default; `--full` adds
 the checks that move testnet funds, and `--npm` runs the published CLI. Not
 part of any npm package.
-
-**Will change results — `X402-06` gains on-chain verification.** The check
-currently passes on any 2xx, which means it establishes that the target accepted
-the payment, not that the payment landed. `MPP-01` already reads the token
-contract's CAP-46 transfer event; the same verification belongs here. A service
-that answers 200 without settling passes today and will fail after this. If a
-run goes red on upgrade, the check got stronger — the service did not change.
-Found by running against `stellar/x402-stellar`'s reference implementation; see
-`docs/evidence/2026-09-06-reference-implementation-run.md`.
 
 **Will change results — `X402-07` will corrupt only the signature.** Today the
 corruption drops the base64 padding, so the decoded envelope grows by two bytes

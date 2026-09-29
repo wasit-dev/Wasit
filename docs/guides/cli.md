@@ -155,6 +155,7 @@ wasit test --target <url> [options]
 | `--target <url>` | required | Must include the scheme |
 | `--network <id>` | `stellar:testnet` | CAIP-2 |
 | `--payer-key <key>` | `STELLAR_PRIVATE_KEY` | Secret key, `S...` |
+| `--rpc-url <url>` | testnet default | Soroban RPC used to verify `X402-06`'s settlement; required for pubnet |
 | `--method <verb>` | `GET` | HTTP method the paid endpoint uses. Endpoints that compute something usually take `POST` |
 | `--body <json>` | — | Request body, sent verbatim; implies `Content-Type: application/json` |
 | `--header <name:value>` | — | Extra request header the endpoint needs before it will issue a challenge. Repeatable |

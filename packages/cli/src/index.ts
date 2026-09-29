@@ -184,6 +184,7 @@ program
   .description("Run x402 compliance checks against a target service")
   .requiredOption("--target <url>", "URL of the service to test")
   .option("--network <network>", "Network identifier", "stellar:testnet")
+  .option("--rpc-url <url>", "Override the Soroban RPC endpoint used to verify X402-06's settlement")
   .option(
     "--payer-key <key>",
     "Testnet payer secret key (overrides STELLAR_PRIVATE_KEY from .env)",
@@ -242,6 +243,7 @@ signature. See docs/CHECKS.md for what each check ID verifies.`,
           target: opts.target,
           network: opts.network,
           payerSecretKey: payerKey,
+          ...(opts.rpcUrl ? { rpcUrl: opts.rpcUrl as string } : {}),
           ...shape,
         })),
       );

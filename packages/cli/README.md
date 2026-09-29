@@ -4,7 +4,7 @@ Protocol-compliance testing for **x402** and **MPP** on Stellar, from your termi
 
 `wasit` runs the real payment flow against a live service, not a mock of it, and it is not a schema validator: a response can have every field in the right place and still take money without settling it.
 
-For MPP charge mode it verifies the settlement independently — via Stellar RPC and the token contract's own on-chain transfer event, rather than the response the service returns. The x402 checks exercise the same real flow but judge the target on its HTTP behaviour: `X402-06` passes on a 2xx. Giving it the same on-chain verification is tracked for 0.6.0.
+For both MPP charge payments and x402 payments it verifies the settlement independently — via Stellar RPC and the token contract's own on-chain transfer event, rather than the response the service returns.
 
 **Testnet only.** Several checks settle real transactions — do not point this at pubnet or use production keys.
 
@@ -50,6 +50,7 @@ wasit test --target <url> [options]
 | `--target <url>` | required | Must include the scheme |
 | `--network <id>` | `stellar:testnet` | CAIP-2 network id |
 | `--payer-key <key>` | `STELLAR_PRIVATE_KEY` | Testnet secret key, `S...` |
+| `--rpc-url <url>` | testnet default | Soroban RPC used to verify `X402-06`'s settlement |
 | `--method <verb>` | `GET` | HTTP method the paid endpoint uses |
 | `--body <json>` | — | Request body; implies `Content-Type: application/json` |
 | `--header <name:value>` | — | Extra request header, repeatable |

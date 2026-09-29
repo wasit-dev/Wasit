@@ -174,6 +174,10 @@ server.registerTool(
         .boolean()
         .optional()
         .describe("Skip the payment checks (X402-06/07) even if a payer key is set"),
+      rpcUrl: z
+        .string()
+        .optional()
+        .describe("Override the Soroban RPC endpoint used to verify X402-06's settlement"),
       method: z
         .string()
         .optional()
@@ -205,7 +209,7 @@ server.registerTool(
       openWorldHint: true,
     },
   },
-  async ({ target, network, readOnly, method, body, headers }) => {
+  async ({ target, network, readOnly, rpcUrl, method, body, headers }) => {
     // Same request shape for every probe, exactly as the CLI's --method,
     // --body and --header build it, so a POST endpoint is tested as a POST.
     const shape = {
@@ -222,6 +226,7 @@ server.registerTool(
           target,
           network: network ?? "stellar:testnet",
           payerSecretKey: payerKey,
+          ...(rpcUrl !== undefined ? { rpcUrl } : {}),
           ...shape,
         })),
       );
