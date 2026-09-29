@@ -22,6 +22,14 @@ official `@stellar/mpp` charge server cannot verify a payment to a muxed
 recipient either (its verification throws on the same map), so no MPP service
 built on it can accept one today.
 
+**Fixed in source — `MPP-01` no longer blames the target for a slow RPC.**
+It gave RPC twelve seconds to show the settled transaction, then reported it
+as never broadcast. On a lagging RPC that is a FAIL against a target that did
+nothing wrong. The wait is now measured in ledgers: the transaction is reported
+missing only once RPC has closed ten more ledgers without it, and an RPC that
+stops advancing gives no verdict (`ERROR (harness)`) instead of a FAIL. Four
+offline tests, each mutation-checked.
+
 **Fixed in source — `MPP-01` no longer says it paid when the target refused.**
 When the target answered with an error instead of the resource, the FAIL read
 "Paid the advertised … base units", although a target that refuses may never

@@ -32,8 +32,18 @@ import { assertMppNetwork, resolveRpcUrl } from "./network.js";
 const CHECK_ID = "MPP-01";
 const CHECK_NAME = "Charge Settlement On-Chain";
 
-/** How long to wait for the settled transaction to become visible to RPC. */
-const POLL_ATTEMPTS = 12;
+/**
+ * How long to look for the settled transaction.
+ *
+ * A fixed wall-clock wait cannot tell a transaction that does not exist from
+ * an RPC that is behind, and reporting the second as the first blames the
+ * target for our infrastructure. So the wait is measured in ledgers RPC has
+ * closed: once it has closed this many more without the transaction, the
+ * transaction is not coming. An RPC that stops advancing before then gives no
+ * verdict at all.
+ */
+const LEDGERS_BEFORE_MISSING = 10;
+const MAX_WAIT_MS = 120_000;
 const POLL_DELAY_MS = 1_000;
 
 export interface MppChargeCheckOptions {
@@ -266,6 +276,56 @@ function describeDestination(transfer: TransferEvent): string {
 const sleep = (ms: number): Promise<void> =>
   new Promise((done) => setTimeout(done, ms));
 
+/** What looking for a settled transaction on RPC established. */
+export type TransactionLookup =
+  | { readonly kind: "found"; readonly response: rpc.Api.GetTransactionResponse }
+  | { readonly kind: "missing"; readonly ledgersWatched: number }
+  | { readonly kind: "stalled"; readonly ledgersWatched: number; readonly waitedMs: number };
+
+/**
+ * Polls RPC for a transaction until it appears, until RPC has closed enough
+ * ledgers without it to say it is missing, or until RPC stops advancing.
+ *
+ * Takes the lookup, the clock and the sleep as parameters so the three
+ * outcomes can be exercised without a network.
+ */
+export async function waitForTransaction(
+  getTransaction: () => Promise<rpc.Api.GetTransactionResponse>,
+  options: {
+    readonly ledgers?: number;
+    readonly maxWaitMs?: number;
+    readonly delayMs?: number;
+    readonly now?: () => number;
+    readonly sleep?: (ms: number) => Promise<void>;
+  } = {},
+): Promise<TransactionLookup> {
+  const ledgers = options.ledgers ?? LEDGERS_BEFORE_MISSING;
+  const maxWaitMs = options.maxWaitMs ?? MAX_WAIT_MS;
+  const delayMs = options.delayMs ?? POLL_DELAY_MS;
+  const now = options.now ?? Date.now;
+  const pause = options.sleep ?? sleep;
+
+  const startedAt = now();
+  let firstLedger: number | undefined;
+
+  for (;;) {
+    // An RPC failure is a harness problem: it says nothing about the target.
+    const current = await getTransaction();
+    if (current.status !== rpc.Api.GetTransactionStatus.NOT_FOUND) {
+      return { kind: "found", response: current };
+    }
+
+    firstLedger ??= current.latestLedger;
+    const ledgersWatched = current.latestLedger - firstLedger;
+    if (ledgersWatched >= ledgers) return { kind: "missing", ledgersWatched };
+
+    const waitedMs = now() - startedAt;
+    if (waitedMs >= maxWaitMs) return { kind: "stalled", ledgersWatched, waitedMs };
+
+    await pause(delayMs);
+  }
+}
+
 function fail(detail: string): CheckResult[] {
   return [{ id: CHECK_ID, name: CHECK_NAME, pass: false, detail }];
 }
@@ -350,24 +410,27 @@ export async function runMppChargeChecks(
     allowHttp: endpoint.startsWith("http://"),
   });
 
-  let settled: rpc.Api.GetTransactionResponse | undefined;
-  for (let attempt = 0; attempt < POLL_ATTEMPTS; attempt += 1) {
-    // An RPC failure is a harness problem: it says nothing about the target.
-    const current = await server.getTransaction(reference);
-    if (current.status !== rpc.Api.GetTransactionStatus.NOT_FOUND) {
-      settled = current;
-      break;
-    }
-    await sleep(POLL_DELAY_MS);
+  const lookup = await waitForTransaction(() => server.getTransaction(reference));
+
+  if (lookup.kind === "stalled") {
+    // RPC not advancing says nothing about the target: no verdict.
+    throw new Error(
+      `RPC at ${endpoint} closed only ${lookup.ledgersWatched} ledgers in ` +
+        `${Math.round(lookup.waitedMs / 1000)} seconds while looking for tx ` +
+        `${reference}, so its absence says nothing about the target. Re-run, ` +
+        `or point --rpc-url at another endpoint.`,
+    );
   }
 
-  if (!settled || settled.status === rpc.Api.GetTransactionStatus.NOT_FOUND) {
+  if (lookup.kind === "missing") {
     return fail(
-      `Target reported settlement as tx ${reference}, but RPC still has no ` +
-        `such transaction after ${POLL_ATTEMPTS} seconds. Either it was never ` +
+      `Target reported settlement as tx ${reference}, but RPC closed ` +
+        `${lookup.ledgersWatched} more ledgers without it. Either it was never ` +
         `broadcast, or the receipt references a transaction that does not exist.`,
     );
   }
+
+  const settled = lookup.response;
 
   if (settled.status !== rpc.Api.GetTransactionStatus.SUCCESS) {
     return fail(
