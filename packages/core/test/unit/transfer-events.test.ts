@@ -17,7 +17,7 @@ import { Account, Address, Keypair, MuxedAccount, nativeToScVal, xdr } from "@st
 import {
   collectTransferEvents,
   transferReachedRecipient,
-} from "../../src/mpp/charge.js";
+} from "../../src/settlement.js";
 
 const TOKEN = "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA";
 const PAYER = Keypair.random().publicKey();

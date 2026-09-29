@@ -12,7 +12,7 @@ import { describe, it } from "node:test";
 
 import { rpc } from "@stellar/stellar-sdk";
 
-import { waitForTransaction } from "../../src/mpp/charge.js";
+import { waitForTransaction } from "../../src/settlement.js";
 
 const NOT_FOUND = rpc.Api.GetTransactionStatus.NOT_FOUND;
 const SUCCESS = rpc.Api.GetTransactionStatus.SUCCESS;
