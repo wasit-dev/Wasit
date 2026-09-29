@@ -1,5 +1,6 @@
 import { errored, skipped, type CheckResult } from "../check.js";
 import {
+  CheckSetupError,
   ConfigurationError,
   MalformedResponseError,
   assertHttpUrl,
@@ -427,7 +428,7 @@ export async function runX402ReadChecks(
 import { x402Client, x402HTTPClient } from "@x402/fetch";
 import { createEd25519Signer } from "@x402/stellar";
 import { ExactStellarScheme as ExactStellarClientScheme } from "@x402/stellar/exact/client";
-import { Keypair } from "@stellar/stellar-sdk";
+import { Keypair, xdr } from "@stellar/stellar-sdk";
 
 import { resolveRpcUrl } from "../mpp/network.js";
 import { verifySettlement } from "../settlement.js";
@@ -609,32 +610,78 @@ async function checkSignatureAccepted(
 }
 
 /**
+ * Corrupts the client's authorization signature, and nothing else.
+ *
+ * In the `exact` scheme on Stellar the client signs a Soroban authorization
+ * entry, not the envelope: the facilitator signs the envelope later. So the
+ * signature that proves the payer consented is the address credential's
+ * `signature`, a `Vec<{ public_key, signature }>`. Flipping one byte of it
+ * leaves a transaction that still decodes, carries the same amount, payer and
+ * recipient, and fails only signature verification. A target can refuse it
+ * only by verifying the signature.
+ *
+ * Throws {@link CheckSetupError} if the payload carries no such signature, so
+ * the check reports no verdict rather than one it did not establish.
+ */
+export function corruptAuthSignature(transaction: string): string {
+  const envelope = xdr.TransactionEnvelope.fromXDR(transaction, "base64");
+  const operations =
+    envelope.switch().name === "envelopeTypeTx" ? envelope.v1().tx().operations() : [];
+
+  let corrupted = false;
+  for (const operation of operations) {
+    if (operation.body().switch().name !== "invokeHostFunction") continue;
+    for (const entry of operation.body().invokeHostFunctionOp().auth()) {
+      const credentials = entry.credentials();
+      if (credentials.switch().name !== "sorobanCredentialsAddress") continue;
+      const signature = credentials.address().signature();
+      if (signature.switch().name !== "scvVec") continue;
+      for (const item of signature.vec() ?? []) {
+        if (item.switch().name !== "scvMap") continue;
+        for (const field of item.map() ?? []) {
+          if (field.key().switch().name !== "scvSymbol") continue;
+          if (field.key().sym().toString() !== "signature") continue;
+          const bytes = Buffer.from(field.val().bytes());
+          bytes[0] = bytes[0]! ^ 0xff;
+          field.val(xdr.ScVal.scvBytes(bytes));
+          corrupted = true;
+        }
+      }
+    }
+  }
+
+  if (!corrupted) {
+    throw new CheckSetupError(
+      "The payment payload carries no authorization-entry signature to " +
+        "corrupt, so a corrupted signature cannot be tested.",
+    );
+  }
+  return envelope.toXDR("base64");
+}
+
+/**
  * X402-07 (negative): a corrupted signature must be rejected.
  *
- * This check previously treated *any* thrown error as proof of rejection,
- * which meant an unreachable target made a security check pass. A rejection
- * is only established by the target answering non-200; anything that prevents
- * an answer produces no verdict and is reported as such.
+ * The payment is built exactly as for X402-06, then only the client's
+ * authorization signature is corrupted (see {@link corruptAuthSignature}), so
+ * the envelope still decodes and a target can refuse it only by verifying the
+ * signature. Before 0.6.0 the base64 envelope's tail was overwritten instead,
+ * which broke XDR decoding: a target that parsed the envelope and skipped
+ * signature verification entirely still passed.
+ *
+ * A rejection is any non-2xx answer. A rejection is only established by an
+ * answer: anything that prevents one produces no verdict.
  */
 async function checkInvalidSignatureRejected(
   options: X402PaymentCheckOptions,
 ): Promise<CheckResult> {
   const { httpClient, paymentPayload } = await preparePayment(options);
 
-  // Corrupt the signed transaction after signing. This overwrites the tail of
-  // the base64 envelope, which also drops its padding — so the decoded envelope
-  // gains two bytes and stops parsing as XDR. Against the reference facilitator
-  // in stellar/x402-stellar the rejection therefore happens at decoding, not at
-  // signature verification, which is weaker than this check should be: a target
-  // that parsed the envelope and skipped verification entirely would still pass.
-  // Corrupting only the signature bytes, preserving a decodable envelope, is a
-  // tracked for 0.6.0. See docs/CHECKS.md's X402-07 row.
   const corrupted = {
     ...paymentPayload,
     payload: {
       ...paymentPayload.payload,
-      transaction:
-        (paymentPayload.payload.transaction as string).slice(0, -8) + "AAAAAAAA",
+      transaction: corruptAuthSignature(paymentPayload.payload.transaction as string),
     },
   };
 
@@ -644,14 +691,16 @@ async function checkInvalidSignatureRejected(
     withPaymentHeaders(options, paymentHeaders),
   );
 
-  const pass = response.status !== 200;
+  const accepted = response.status >= 200 && response.status < 300;
   return {
     id: "X402-07",
     name: "Invalid Signature Rejected",
-    pass,
-    detail: pass
-      ? `Corrupted payment correctly rejected (HTTP ${response.status}).`
-      : `Corrupted payment was accepted with HTTP 200 — security-relevant failure.`,
+    pass: !accepted,
+    detail: accepted
+      ? `A payment with a corrupted authorization signature was accepted with ` +
+        `HTTP ${response.status} — security-relevant failure.`
+      : `Payment with a corrupted authorization signature correctly rejected ` +
+        `(HTTP ${response.status}).`,
   };
 }
 

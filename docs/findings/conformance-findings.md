@@ -77,9 +77,9 @@ Running Wasit against code it did not write found defects in Wasit itself.
 Each was fixed and is recorded in the [changelog](../../CHANGELOG.md):
 
 - The official x402 reference showed that `X402-07`'s corruption is caught at
-  XDR decoding rather than at signature verification, so the check proves less
-  than its description claimed. The description was corrected; a stronger
-  corruption is planned for 0.6.0.
+  XDR decoding rather than at signature verification, so the check proved less
+  than its description claimed. The description was corrected at once, and
+  from 0.6.0 the check corrupts only the authorization signature.
 - The official MPP reference showed that `MPP-12` and `MPP-14` called a refused
   replay a double-spend whenever the status was not 402. Fixed in 0.5.0.
 - defi-copilot showed that 0.4.0 misreported an x402 v1 challenge and failed

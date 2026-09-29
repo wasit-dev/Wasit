@@ -7,8 +7,8 @@ All notable changes to Wasit are recorded here. Versions follow [Semantic Versio
 Planned for 0.6.0, and in progress on a release branch. Entries marked "Will
 change results" change what a check *proves*: anyone reading this file to
 decide whether to upgrade needs to see them before the version lands. The
-`X402-07` and `wallet status` items below were earmarked for 0.4.0, then for
-0.5.0, and both releases went to correctness fixes found in the field instead.
+`wallet status` item below was earmarked for 0.4.0, then for 0.5.0, and both
+releases went to correctness fixes found in the field instead.
 
 **Fixed in source — `MPP-01` reads CAP-67 transfer events.** Since CAP-67,
 a SEP-41 `transfer` to a muxed address (`M...`) emits its data as a map
@@ -21,6 +21,17 @@ tests, each mutation-checked. Checking this end to end also showed that the
 official `@stellar/mpp` charge server cannot verify a payment to a muxed
 recipient either (its verification throws on the same map), so no MPP service
 built on it can accept one today.
+
+**Will change results — `X402-07` corrupts only the signature.** It
+overwrote the tail of the base64 envelope, which broke XDR decoding, so a
+target that decoded the envelope and never verified the signature still
+refused it and passed. It now flips one byte of the client's Soroban
+authorization-entry signature and leaves the rest of the transaction intact.
+Against a server that decodes but never verifies, 0.5.0 passed and this build
+fails; the `x402.org` facilitator now rejects at simulation
+(`…_simulation_failed`) rather than at decoding (`…_malformed`). Acceptance is
+now any 2xx, not only 200, so a target that answers 201 or 204 to a forged
+payment no longer passes. Two offline tests, each mutation-checked.
 
 **Will change results — `X402-06` verifies settlement on-chain.** It passed
 on any 2xx, which established that the target served the resource, not that
@@ -62,13 +73,6 @@ are not already up, runs the x402, MPP charge and MPP channel suites, prints one
 summary and stops the fixtures it started. Free checks by default; `--full` adds
 the checks that move testnet funds, and `--npm` runs the published CLI. Not
 part of any npm package.
-
-**Will change results — `X402-07` will corrupt only the signature.** Today the
-corruption drops the base64 padding, so the decoded envelope grows by two bytes
-and fails XDR decoding before signature verification is reached. A target that
-parsed the envelope and skipped verification entirely passes. Corrupting a
-signature byte while preserving a decodable envelope makes the rejection mean
-what `docs/CHECKS.md` says it means. Same evidence document.
 
 **`wasit wallet status --role <role>` will exit 2 on an unreadable key.** It
 exits 0 today while `--role mpp-channel` exits 2 for the same class of
