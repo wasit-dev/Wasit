@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import { Fira_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 
@@ -28,7 +29,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${firaMono.variable} ${plusJakartaSans.variable}`}>
-      <body>{children}</body>
+      <body>
+        {children}
+        {/* Cookieless page-view counts; see /legal/privacy. */}
+        <Analytics />
+      </body>
     </html>
   );
 }
