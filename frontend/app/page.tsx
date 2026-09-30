@@ -5,6 +5,7 @@ import { CopyButton } from "@/components/CopyButton";
 import { HowItWorksFlow } from "@/components/HowItWorksFlow";
 import { CliDemo } from "@/components/CliDemo";
 import { Crosshair } from "@/components/Crosshair";
+import { FaqList, type FaqEntry } from "@/components/FaqList";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { CHECK_COUNT, WASIT_VERSION } from "@/lib/site-facts";
 
@@ -81,9 +82,7 @@ const PACKAGES: PackageCard[] = [
   },
 ];
 
-type FaqItem = { q: string; a: string };
-
-const FAQ_ITEMS: FaqItem[] = [
+const FAQ_ITEMS: FaqEntry[] = [
   {
     q: "Does it cost anything to run?",
     a: "Read-only checks are free. Checks that spend or mutate state are opt-in and clearly flagged before they run.",
@@ -235,36 +234,56 @@ export default function Home() {
           <div className="frame">
             <SectionHead n="01" title="What changes" note="// same request, two verdicts" />
             <h2 className="display" data-reveal>
-              A 200 OK is <span className="display-outline">not a settlement.</span>
+              A 200 OK is <span className="display-hl">not a settlement.</span>
             </h2>
-            <div className="compare" role="table" aria-label="Without Wasit and with Wasit">
-              <div className="compare-row compare-row--head" role="row" data-reveal>
-                <span className="compare-n" role="columnheader" aria-label="Row" />
-                <span className="compare-cell" role="columnheader">Without Wasit</span>
-                <span className="compare-cell compare-cell--with" role="columnheader">
-                  <mark className="hl">With Wasit</mark>
-                </span>
+            {/* Two panels side by side: what a service's own response
+                leaves unproven, struck through, and what Wasit checks
+                instead, on the accent. Same rows, same order. */}
+            <div className="versus" data-reveal>
+              <div className="versus-panel versus-panel--without">
+                <div className="versus-head">
+                  <span>Without Wasit</span>
+                  <span>[ 0/{COMPARE_ROWS.length} ]</span>
+                </div>
+                <ul>
+                  {COMPARE_ROWS.map((row) => (
+                    <li key={row.without}>
+                      <span className="versus-mark" aria-hidden="true">–</span>
+                      <s>{row.without}</s>
+                    </li>
+                  ))}
+                </ul>
               </div>
-              {COMPARE_ROWS.map((row, i) => (
-                <div className="compare-row" role="row" key={row.with} data-reveal data-reveal-delay={String(90 * (i + 1))}>
-                  <span className="compare-n" role="cell">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <span className="compare-cell" role="cell">
-                    {row.without}
-                  </span>
-                  <span className="compare-cell compare-cell--with" role="cell">
-                    {row.with}
+              <div className="versus-panel versus-panel--with">
+                <div className="versus-head">
+                  <span>With Wasit</span>
+                  <span>
+                    [ {COMPARE_ROWS.length}/{COMPARE_ROWS.length} ]
                   </span>
                 </div>
-              ))}
+                <ul>
+                  {COMPARE_ROWS.map((row) => (
+                    <li key={row.with}>
+                      <span className="versus-mark" aria-hidden="true">+</span>
+                      <span>{row.with}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="versus-flow" aria-hidden="true">
+                <span>Request</span>
+                <span className="versus-arrow">→</span>
+                <span>Pay</span>
+                <span className="versus-arrow">→</span>
+                <span>Verify on-chain</span>
+              </div>
             </div>
           </div>
         </section>
 
         {/* The one band in the second colour: the section the tool exists
             for, set apart the way a poster sets apart its headline. */}
-        <section id="how-it-works" className="band band--signal" data-crosshair="light">
+        <section id="how-it-works" className="band band--signal">
           <div className="frame">
             <SectionHead n="02" title="How it works" note="// http + rpc" />
             <h2 className="display" data-reveal>
@@ -323,17 +342,7 @@ export default function Home() {
                 The things people usually ask <mark className="hl">before running it.</mark>
               </p>
             </div>
-            <div className="faq-list">
-              {FAQ_ITEMS.map((item, i) => (
-                <details className="faq-item" key={item.q} data-reveal data-reveal-delay={String(70 * i)}>
-                  <summary>
-                    <span className="faq-n">{String(i + 1).padStart(2, "0")}</span>
-                    <span className="faq-q">{item.q}</span>
-                  </summary>
-                  <p>{item.a}</p>
-                </details>
-              ))}
-            </div>
+            <FaqList items={FAQ_ITEMS} />
           </div>
         </section>
 
@@ -342,7 +351,7 @@ export default function Home() {
             <SectionHead n="05" title="Get started" note="// one command" />
             <div className="cta-grid">
               <h2 className="display display-xl" data-reveal>
-                Point it at <span className="display-outline">your service.</span>
+                Point it at <span className="display-hl">your service.</span>
               </h2>
               <div className="cta-side" data-reveal data-reveal-delay="120">
                 <p className="section-lead">

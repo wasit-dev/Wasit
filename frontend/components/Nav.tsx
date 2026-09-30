@@ -1,7 +1,6 @@
 import Image from "next/image"
 import Link from "next/link"
 import { DocsSearch } from "./DocsSearch"
-import { CHECK_COUNT, WASIT_VERSION } from "@/lib/site-facts"
 
 const GITHUB_URL = "https://github.com/wasit-dev/wasit"
 
@@ -18,9 +17,8 @@ function GitHubIcon() {
 }
 
 /**
- * The site-wide bar: the logo lockup, a strip of facts, the
- * landing page's section links, then search, GitHub and a full-height
- * Docs cell. Each group is its own bordered cell so the bar reads as one
+ * The site-wide bar: the logo lockup, the landing page's section links,
+ * then search, GitHub and a full-height Docs cell. Each group is its own bordered cell so the bar reads as one
  * row of a grid, the same hairline grid the rest of the site is drawn on.
  *
  * Link targets mirror the landing page's section ids (app/page.tsx) —
@@ -31,7 +29,7 @@ function GitHubIcon() {
  * (app/docs/layout.tsx passes it): the docs sidebar carries no brand of
  * its own, so this bar is the only place a reader landing mid-docs can
  * tell which surface they are on. A prop rather than usePathname() keeps
- * Nav a server component, which it has to be to read lib/site-facts.
+ * Nav a server component; the layout already knows the answer.
  */
 export function Nav({ variant = "site" }: { variant?: "site" | "docs" } = {}) {
   return (
@@ -42,13 +40,6 @@ export function Nav({ variant = "site" }: { variant?: "site" | "docs" } = {}) {
           <Image src="/logo-light.svg" alt="" width={1280} height={321} className="brand-logo" priority />
           {variant === "docs" && <span className="brand-tag">DOCS</span>}
         </Link>
-
-        <div className="nav-facts" aria-hidden="true">
-          <span>v{WASIT_VERSION}</span>
-          <span>x402 + MPP</span>
-          <span>{CHECK_COUNT} checks</span>
-          <span>verified on-chain</span>
-        </div>
 
         <nav className="navlinks" aria-label="Site">
           <Link href="/#comparison">Why</Link>

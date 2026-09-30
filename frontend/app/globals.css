@@ -23,7 +23,7 @@
 
    The second, --accent-2, is purple's complement: a warm yellow, the
    strongest contrast the purple can have while still reading as one
-   palette. It is used sparingly — one full band, a few highlighted words,
+   palette. It is used sparingly — one full band, a few words set in it,
    the crosshair over something clickable. Text on it is always --bg
    (15:1); purple on it would be 2.6:1, so the band uses --accent-ink,
    a deep purple, for its outlines instead.
@@ -44,7 +44,7 @@
   --accent: #9d6bff;
   --accent-deep: #7c3aed;
   --accent-ink: #4c1d95;
-  --accent-2: #fdda24;
+  --accent-2: #fdda25;
   --on-accent: #09090b;
   --radius: 0px;
 
@@ -149,8 +149,8 @@ a:hover { color: var(--accent); }
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
-.navbar > * { border-right: 1px solid var(--border); }
-.navbar > :last-child { border-right: none; }
+.navbar > .brand { border-right: 1px solid var(--border); }
+.navbar-right { border-left: 1px solid var(--border); }
 
 .brand {
   flex: none;
@@ -172,34 +172,7 @@ a:hover { color: var(--accent); }
   letter-spacing: 0.14em;
 }
 
-.nav-facts {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: stretch;
-  overflow: hidden;
-  color: var(--dim);
-  /* Printed as written: "x402" is lowercase by definition. */
-  text-transform: none;
-  letter-spacing: 0.06em;
-}
-.nav-facts span {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 18px;
-  border-right: 1px solid var(--border);
-  white-space: nowrap;
-}
-.nav-facts span::before {
-  content: "";
-  width: 5px;
-  height: 5px;
-  background: var(--accent);
-  opacity: 0.8;
-}
-
-.navlinks { display: flex; align-items: stretch; flex: none; }
+.navlinks { display: flex; align-items: stretch; justify-content: flex-end; flex: 1; min-width: 0; }
 .navlinks a {
   display: flex;
   align-items: center;
@@ -262,20 +235,13 @@ a:hover { color: var(--accent); }
 }
 .nav-cta:hover { background: color-mix(in oklab, var(--accent), white 14%); }
 
-@media (max-width: 1280px) {
-  .nav-facts span:nth-child(n + 3) { display: none; }
-}
-@media (max-width: 1100px) {
-  .nav-facts { visibility: hidden; }
-}
 @media (max-width: 860px) {
   /* No menu drawer: drop the section links and the search label, keep
      brand, search, GitHub and Docs reachable. */
   .navlinks { display: none; }
+  .brand { flex: 1; border-right: none; }
   .nav-search span,
   .nav-search kbd { display: none; }
-  .nav-facts { display: none; }
-  .brand { flex: 1; }
 }
 @media (max-width: 420px) {
   .nav-search, .nav-icon-link { padding: 0 12px; }
@@ -442,18 +408,30 @@ html[data-reveal="on"] [data-reveal]:not(.is-revealed) { opacity: 0; transform: 
   .hero-rise { animation: none; }
 }
 
-/* Highlighted words: a flat block of colour behind the text, like a
-   marker stroke on a printout. --accent on the dark ground, --accent-2 for
-   the few that should shout, --bg on the yellow band. */
+/* Highlighted words. .hl and .hl-ink are a flat block of colour behind
+   the text, like a marker stroke on a printout — --accent on the dark
+   ground, --bg on the yellow band. .hl-2 sets the words in --accent-2
+   with no block: yellow as a background is kept for the one band. */
 mark { color: inherit; background: none; }
-.hl, .hl-2, .hl-ink {
+.hl, .hl-ink {
   padding: 0 0.18em;
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
 }
 .hl { background: var(--accent); color: var(--on-accent); }
-.hl-2 { background: var(--accent-2); color: var(--on-accent); }
+.hl-2 { color: var(--accent-2); }
 .hl-ink { background: var(--on-accent); color: var(--accent-2); }
+
+/* The same block on a display heading's tail — used on a few headings,
+   not all, so the ones that carry it stand out. Each line gets its own
+   block (clone) and the blocks meet, the way a poster sets them. */
+.display-hl {
+  background: var(--accent);
+  color: var(--on-accent);
+  padding: 0 0.06em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
 
 .hero-top {
   display: flex;
@@ -757,54 +735,62 @@ mark { color: inherit; background: none; }
   color: var(--fg);
 }
 
-/* 01 — the before/after table. */
-.compare { border-top: 1px solid var(--border-strong); }
-.compare-row {
+/* 01 — the comparison as two panels: what is left unproven, struck
+   through on the dark ground; what Wasit checks, on the accent; a flow
+   bar underneath. */
+.versus {
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr) minmax(0, 1fr);
-  border-bottom: 1px solid var(--border-strong);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  border: 1px solid var(--border-strong);
 }
-.compare-n,
-.compare-cell { padding: 22px 20px; }
-.compare-n {
+.versus-panel { padding: clamp(24px, 3.2vw, 44px); }
+.versus-panel--with { background: var(--accent); color: var(--on-accent); }
+.versus-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 18px;
   font-family: var(--font-code);
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  color: var(--dim);
-  border-right: 1px solid var(--border);
-}
-.compare-cell { font-size: 15.5px; line-height: 1.55; color: var(--muted); }
-.compare-cell--with {
-  color: var(--fg);
-  border-left: 1px solid var(--border);
-  background: color-mix(in oklab, var(--accent), transparent 94%);
-}
-.compare-row--head .compare-cell {
-  padding-top: 14px;
-  padding-bottom: 14px;
-  font-family: var(--font-code);
-  font-size: 11px;
-  letter-spacing: 0.14em;
+  font-size: 12px;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--muted);
 }
-.compare-row--head .compare-cell--with { color: var(--accent); }
-@media (max-width: 720px) {
-  .compare-row { grid-template-columns: minmax(0, 1fr); }
-  .compare-n { border-right: none; padding-bottom: 0; }
-  .compare-cell--with { border-left: none; border-top: 1px solid var(--border); }
-  .compare-row--head { display: none; }
-  .compare-cell:not(.compare-cell--with)::before,
-  .compare-cell--with::before {
-    display: block;
-    margin-bottom: 6px;
-    font-family: var(--font-code);
-    font-size: 10.5px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-  }
-  .compare-cell:not(.compare-cell--with)::before { content: "Without Wasit"; color: var(--dim); }
-  .compare-cell--with::before { content: "With Wasit"; color: var(--accent); }
+.versus-panel--with .versus-head { color: var(--on-accent); font-weight: 700; }
+.versus-panel ul { list-style: none; margin: 0; padding: 0; }
+.versus-panel li {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 18px 0;
+  border-top: 1px solid var(--border-strong);
+  font-size: clamp(18px, 1.7vw, 24px);
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+.versus-panel--with li { border-top-color: color-mix(in oklab, var(--on-accent), transparent 78%); }
+.versus-panel--without li { color: var(--muted); }
+.versus-panel--without s { text-decoration-thickness: 1.5px; text-decoration-color: color-mix(in oklab, var(--muted), transparent 20%); }
+.versus-mark { flex: none; width: 14px; font-family: var(--font-code); font-size: 14px; font-weight: 700; }
+.versus-flow {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 12px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border-strong);
+  font-family: var(--font-code);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.versus-arrow { color: var(--accent); font-weight: 400; }
+@media (max-width: 860px) {
+  .versus { grid-template-columns: minmax(0, 1fr); }
+  .versus-flow { justify-content: space-between; font-size: 11px; letter-spacing: 0.1em; }
 }
 
 /* 03 — package cards. */
@@ -905,15 +891,32 @@ mark { color: inherit; background: none; }
   transition: color 140ms ease;
 }
 .faq-item summary::-webkit-details-marker { display: none; }
-.faq-item summary::after {
-  content: "+";
+/* A plus drawn from two bars; opening turns it a quarter and folds the
+   vertical bar flat, so it becomes a minus as the answer slides out. */
+.faq-mark {
+  position: relative;
+  flex: none;
+  width: 14px;
+  height: 14px;
   margin-left: auto;
-  font-family: var(--font-code);
-  font-size: 18px;
-  font-weight: 400;
-  color: var(--accent);
+  align-self: center;
+  transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
 }
-.faq-item[open] summary::after { content: "\2212"; }
+.faq-mark::before,
+.faq-mark::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  width: 14px;
+  height: 2px;
+  background: var(--accent);
+  transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.faq-mark::after { transform: rotate(90deg); }
+.faq-item[data-state="open"] .faq-mark { transform: rotate(180deg); }
+.faq-item[data-state="open"] .faq-mark::after { transform: rotate(0deg); }
+.faq-body { overflow: hidden; }
 .faq-item summary:hover { color: var(--accent); }
 .faq-n {
   flex: none;
@@ -924,7 +927,7 @@ mark { color: inherit; background: none; }
   color: var(--dim);
 }
 .faq-q { flex: 1; }
-.faq-item p { margin: 0 0 22px 0; padding-left: 42px; color: var(--muted); font-size: 15px; line-height: 1.65; max-width: 640px; }
+.faq-body p { margin: 0 0 22px 0; padding-left: 42px; color: var(--muted); font-size: 15px; line-height: 1.65; max-width: 640px; }
 @media (max-width: 900px) {
   .faq-grid { grid-template-columns: minmax(0, 1fr); }
 }
@@ -949,9 +952,9 @@ mark { color: inherit; background: none; }
    ------------------------------------------------------------------ */
 .site-footer {
   position: relative;
+  z-index: 1;
   overflow: hidden;
   border-top: 1px solid var(--border);
-  background: var(--bg);
 }
 .footer-top {
   display: flex;
@@ -992,17 +995,20 @@ mark { color: inherit; background: none; }
 .footer-col a span { color: var(--dim); }
 .footer-col a:hover, .footer-col a:hover span { color: var(--accent); }
 
-/* The dot-matrix wordmark (components/PixelWordmark.tsx), full frame
-   width. Lit cells are the accent; unlit ones stay faintly visible so the
-   matrix reads as a panel, not as letters. A hovered cell flashes
-   --accent-2 and fades back over a second, leaving a trail. */
-.footer-giant { padding-top: 24px; padding-bottom: 32px; }
-.pixel-wordmark { display: block; width: 100%; height: auto; }
-.pixel-off { fill: color-mix(in oklab, var(--fg), transparent 95%); }
-.pixel-on { fill: var(--accent); transition: fill 1.2s ease; }
-.pixel-on:hover { fill: var(--accent-2); transition: none; }
-@media (prefers-reduced-motion: reduce) {
-  .pixel-on { transition: none; }
+/* The ANSI Shadow wordmark (components/PixelWordmark.tsx): dim filled
+   cells with their seams showing, and thin double-line shadows a step
+   brighter — a terminal banner, kept quiet enough to be texture. */
+.footer-giant { padding-top: 32px; padding-bottom: 40px; }
+.pixel-wordmark { display: block; width: min(100%, 1040px); height: auto; }
+.pixel-block {
+  fill: color-mix(in oklab, var(--accent), var(--bg) 78%);
+  stroke: color-mix(in oklab, var(--accent), var(--bg) 88%);
+  stroke-width: 0.6;
+}
+.pixel-shadow {
+  fill: none;
+  stroke: color-mix(in oklab, var(--accent), var(--bg) 50%);
+  stroke-width: 0.6;
 }
 .footer-bottom {
   position: relative;
@@ -1013,7 +1019,6 @@ mark { color: inherit; background: none; }
   padding-top: 16px;
   padding-bottom: 16px;
   border-top: 1px solid var(--border);
-  background: var(--bg);
   font-family: var(--font-code);
   font-size: 11px;
   letter-spacing: 0.1em;
@@ -1059,31 +1064,49 @@ mark { color: inherit; background: none; }
 
 /* ------------------------------------------------------------------
    Crosshair (components/Crosshair.tsx) — two hairlines trailing the
-   pointer, turning --accent-2 over anything clickable.
+   pointer BEHIND the content (z-index 0 against the bands' 1), turning
+   --accent-2 over anything clickable, and a coordinate readout on top.
    ------------------------------------------------------------------ */
 .crosshair {
   position: fixed;
   inset: 0;
-  z-index: 70;
+  z-index: 0;
   pointer-events: none;
   opacity: 0;
   transition: opacity 200ms ease;
 }
-.crosshair[data-shown="true"] { opacity: 1; }
 .crosshair-line {
   position: absolute;
   top: 0;
   left: 0;
   background: var(--accent);
-  opacity: 0.55;
-  transition: background 160ms ease, opacity 160ms ease;
+  opacity: 0.7;
+  transition: background 160ms ease;
   will-change: transform;
 }
 .crosshair-h { width: 100%; height: 1px; }
 .crosshair-v { width: 1px; height: 100%; }
-.crosshair[data-active="true"] .crosshair-line { background: var(--accent-2); opacity: 0.9; }
-.crosshair[data-surface="light"] .crosshair-line { background: var(--accent-ink); opacity: 0.7; }
-.crosshair[data-surface="light"][data-active="true"] .crosshair-line { background: var(--on-accent); opacity: 0.9; }
+.crosshair[data-active="true"] .crosshair-line { background: var(--accent-2); }
+.crosshair-readout {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 70;
+  padding: 6px 10px;
+  border: 1px solid var(--accent);
+  background: var(--bg);
+  color: var(--accent-2);
+  font-family: var(--font-code);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 200ms ease;
+  will-change: transform;
+}
+.crosshair[data-shown="true"],
+.crosshair-readout[data-shown="true"] { opacity: 1; }
 @media (hover: none), (pointer: coarse) {
-  .crosshair { display: none; }
+  .crosshair, .crosshair-readout { display: none; }
 }
