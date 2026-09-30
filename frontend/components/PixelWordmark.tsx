@@ -7,8 +7,11 @@
  * every cell lands exactly on the grid whatever font is installed: a █
  * becomes a filled cell (its thin seam left visible, the way a terminal
  * shows its cells) and each box-drawing character becomes the two lines
- * it stands for. Decorative — the footer names the brand in its logo —
- * so the whole SVG is hidden from assistive tech.
+ * it stands for. Both are lit with one vertical gradient across the whole
+ * word — pale lavender at the top to the accent's deep purple at the
+ * bottom — so it reads as a bright banner rather than a texture.
+ * Decorative — the footer names the brand in its logo — so the whole SVG
+ * is hidden from assistive tech.
  */
 
 // Figlet "ANSI Shadow" for WASIT, 38 columns by 6 rows.
@@ -65,13 +68,26 @@ export function PixelWordmark() {
     });
   });
 
+  const height = ART.length * H;
   return (
     <svg
       className="pixel-wordmark"
-      viewBox={`-1 -1 ${cols * W + 2} ${ART.length * H + 2}`}
+      viewBox={`-1 -1 ${cols * W + 2} ${height + 2}`}
       aria-hidden="true"
       focusable="false"
     >
+      {/* userSpaceOnUse: one gradient across the whole word, not one per cell. */}
+      <defs>
+        <linearGradient id="wordmark-fill" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={height}>
+          <stop offset="0%" stopColor="#efe7ff" />
+          <stop offset="45%" stopColor="#b995ff" />
+          <stop offset="100%" stopColor="#7c3aed" />
+        </linearGradient>
+        <linearGradient id="wordmark-shadow" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={height}>
+          <stop offset="0%" stopColor="#d9c6ff" />
+          <stop offset="100%" stopColor="#9d6bff" />
+        </linearGradient>
+      </defs>
       <path className="pixel-shadow" d={shadow} />
       {blocks.map((b) => (
         <rect key={`${b.x}-${b.y}`} className="pixel-block" x={b.x} y={b.y} width={W} height={H} />

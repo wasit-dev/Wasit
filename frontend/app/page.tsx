@@ -270,12 +270,12 @@ export default function Home() {
                   ))}
                 </ul>
               </div>
+              {/* A box walks request → pay → verify and starts over (CSS
+                  only, see .versus-flow in globals.css). */}
               <div className="versus-flow" aria-hidden="true">
-                <span>Request</span>
-                <span className="versus-arrow">→</span>
-                <span>Pay</span>
-                <span className="versus-arrow">→</span>
-                <span>Verify on-chain</span>
+                <span className="versus-step">Request</span>
+                <span className="versus-step">Pay</span>
+                <span className="versus-step">Verify on-chain</span>
               </div>
             </div>
           </div>

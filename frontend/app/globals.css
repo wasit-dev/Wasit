@@ -773,13 +773,20 @@ mark { color: inherit; background: none; }
 .versus-panel--without li { color: var(--muted); }
 .versus-panel--without s { text-decoration-thickness: 1.5px; text-decoration-color: color-mix(in oklab, var(--muted), transparent 20%); }
 .versus-mark { flex: none; width: 14px; font-family: var(--font-code); font-size: 14px; font-weight: 700; }
+/* The flow bar: three equal cells with an arrow on each boundary, and a
+   box that walks from cell to cell — rests on each for a beat, slides to
+   the next, fades out at the end and comes back at the start. The box
+   is --step-gap narrower than a cell, so at rest it never covers an
+   arrow; a step's text turns --bg-coloured while the box is under it,
+   on the same 6s clock. */
 .versus-flow {
+  --step-gap: 40px;
+  --flow-pad: 10px;
   grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  gap: 12px;
-  padding: 16px 20px;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: var(--flow-pad);
   border-top: 1px solid var(--border-strong);
   font-family: var(--font-code);
   font-size: 12.5px;
@@ -787,10 +794,69 @@ mark { color: inherit; background: none; }
   letter-spacing: 0.16em;
   text-transform: uppercase;
 }
-.versus-arrow { color: var(--accent); font-weight: 400; }
+.versus-flow::before {
+  content: "";
+  position: absolute;
+  top: var(--flow-pad);
+  bottom: var(--flow-pad);
+  left: calc(var(--flow-pad) + var(--step-gap) / 2);
+  width: calc((100% - 2 * var(--flow-pad)) / 3 - var(--step-gap));
+  background: var(--accent);
+  animation: flow-walk 6s cubic-bezier(0.7, 0, 0.3, 1) infinite;
+}
+.versus-step {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 8px;
+  text-align: center;
+  color: var(--fg);
+}
+.versus-step:nth-child(1) { animation: flow-ink-1 6s linear infinite; }
+.versus-step:nth-child(2) { animation: flow-ink-2 6s linear infinite; }
+.versus-step:nth-child(3) { animation: flow-ink-3 6s linear infinite; }
+.versus-step:not(:last-child)::after {
+  content: "→";
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translate(50%, -50%);
+  color: var(--accent);
+  font-weight: 400;
+}
+@keyframes flow-walk {
+  0%, 26% { transform: translateX(0); opacity: 1; }
+  33%, 59% { transform: translateX(calc(100% + var(--step-gap))); }
+  66%, 92% { transform: translateX(calc(200% + 2 * var(--step-gap))); opacity: 1; }
+  96% { transform: translateX(calc(200% + 2 * var(--step-gap))); opacity: 0; }
+  96.5% { transform: translateX(0); opacity: 0; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+@keyframes flow-ink-1 {
+  0%, 29% { color: var(--on-accent); }
+  30%, 97% { color: var(--fg); }
+  98%, 100% { color: var(--on-accent); }
+}
+@keyframes flow-ink-2 {
+  0%, 29% { color: var(--fg); }
+  30%, 62% { color: var(--on-accent); }
+  63%, 100% { color: var(--fg); }
+}
+@keyframes flow-ink-3 {
+  0%, 62% { color: var(--fg); }
+  63%, 94% { color: var(--on-accent); }
+  95%, 100% { color: var(--fg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Still: the box rests on the step the whole tool is about. */
+  .versus-flow::before { animation: none; transform: translateX(calc(200% + 2 * var(--step-gap))); }
+  .versus-step { animation: none !important; }
+  .versus-step:nth-child(3) { color: var(--on-accent); }
+}
 @media (max-width: 860px) {
   .versus { grid-template-columns: minmax(0, 1fr); }
-  .versus-flow { justify-content: space-between; font-size: 11px; letter-spacing: 0.1em; }
+  .versus-flow { --step-gap: 22px; font-size: 10.5px; letter-spacing: 0.08em; }
 }
 
 /* 03 — package cards. */
@@ -995,20 +1061,26 @@ mark { color: inherit; background: none; }
 .footer-col a span { color: var(--dim); }
 .footer-col a:hover, .footer-col a:hover span { color: var(--accent); }
 
-/* The ANSI Shadow wordmark (components/PixelWordmark.tsx): dim filled
-   cells with their seams showing, and thin double-line shadows a step
-   brighter — a terminal banner, kept quiet enough to be texture. */
-.footer-giant { padding-top: 32px; padding-bottom: 40px; }
-.pixel-wordmark { display: block; width: min(100%, 1040px); height: auto; }
+/* The ANSI Shadow wordmark (components/PixelWordmark.tsx), centred: cells
+   lit with a lavender-to-purple gradient, their seams left dark so the
+   grid shows, bright double-line shadows, and a soft glow behind. */
+.footer-giant { padding-top: 32px; padding-bottom: 48px; }
+.pixel-wordmark {
+  display: block;
+  width: min(100%, 1040px);
+  height: auto;
+  margin: 0 auto;
+  filter: drop-shadow(0 0 28px color-mix(in oklab, var(--accent), transparent 72%));
+}
 .pixel-block {
-  fill: color-mix(in oklab, var(--accent), var(--bg) 78%);
-  stroke: color-mix(in oklab, var(--accent), var(--bg) 88%);
-  stroke-width: 0.6;
+  fill: url(#wordmark-fill);
+  stroke: var(--bg);
+  stroke-width: 0.7;
 }
 .pixel-shadow {
   fill: none;
-  stroke: color-mix(in oklab, var(--accent), var(--bg) 50%);
-  stroke-width: 0.6;
+  stroke: url(#wordmark-shadow);
+  stroke-width: 0.8;
 }
 .footer-bottom {
   position: relative;
