@@ -8,6 +8,7 @@ import { FaqList, type FaqEntry } from "@/components/FaqList";
 import { McpSession } from "@/components/McpSession";
 import { SequenceFlow } from "@/components/SequenceFlow";
 import { StrokeText } from "@/components/StrokeText";
+import { TechText } from "@/components/TechText";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { CHECK_COUNT, WASIT_VERSION } from "@/lib/site-facts";
 
@@ -195,7 +196,7 @@ export default function Home() {
           {/* Decorative: the h1 below carries the same statement in words. */}
           <div className="frame hero-word" aria-hidden="true">
             <span className="hero-word-solid hero-rise" style={{ "--rise-delay": "80ms" } as React.CSSProperties}>
-              WASIT
+              <TechText text="WASIT" />
             </span>
             <span className="hero-word-outline hero-rise" style={{ "--rise-delay": "200ms" } as React.CSSProperties}>
               <StrokeText trigger="load">x402 / MPP</StrokeText>

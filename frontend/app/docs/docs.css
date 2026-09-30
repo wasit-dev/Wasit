@@ -200,12 +200,6 @@
    paragraphs inside it still pick up .typeset's normal type scale for
    free since that's a descendant selector, not a direct-child one. Left
    unlayered for the same cascade-order reason as the table rules above. */
-.docs-cards-lead {
-  color: var(--muted);
-  font-size: 1.05em;
-  line-height: 1.6;
-  max-width: 56ch;
-}
 .docs-cards-cta {
   display: flex;
   flex-wrap: wrap;

@@ -530,6 +530,62 @@ mark { color: inherit; background: none; }
 @media (max-width: 960px) {
   .hero-bottom { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Tech text on the hero word (components/TechText.tsx): a selection box
+   with corner handles and a size label moving letter to letter, and the
+   selected letter as a dashed outline. The label resets the hero word's
+   heavy display type back to the mono labels the rest of the page uses. */
+.tech-text { position: relative; display: inline-block; }
+.tt-letter { position: relative; }
+.tt-letter.is-selected { color: transparent; }
+.tt-svg { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.tt-svg text { fill: none; stroke: var(--fg); }
+.tt-box {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border: 1px solid var(--accent-2);
+  pointer-events: none;
+  opacity: 0;
+  transition:
+    transform 520ms cubic-bezier(0.65, 0, 0.35, 1),
+    width 520ms cubic-bezier(0.65, 0, 0.35, 1),
+    height 520ms cubic-bezier(0.65, 0, 0.35, 1),
+    opacity 300ms ease;
+}
+.tech-text[data-active="true"] .tt-box { opacity: 1; }
+.tt-label {
+  position: absolute;
+  left: -1px;
+  bottom: calc(100% + 10px);
+  font-family: var(--font-code);
+  font-size: 12px;
+  font-weight: 400;
+  font-stretch: 100%;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  color: var(--accent-2);
+  white-space: nowrap;
+}
+.tt-handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: var(--bg);
+  border: 1px solid var(--accent-2);
+}
+.tt-handle--tl { left: -4.5px; top: -4.5px; }
+.tt-handle--tr { right: -4.5px; top: -4.5px; }
+.tt-handle--bl { left: -4.5px; bottom: -4.5px; }
+.tt-handle--br { right: -4.5px; bottom: -4.5px; }
+@media (max-width: 640px) {
+  .tt-label { font-size: 10px; bottom: calc(100% + 6px); }
+  .tt-handle { width: 6px; height: 6px; }
+  .tt-handle--tl, .tt-handle--bl { left: -3.5px; }
+  .tt-handle--tr, .tt-handle--br { right: -3.5px; }
+  .tt-handle--tl, .tt-handle--tr { top: -3.5px; }
+  .tt-handle--bl, .tt-handle--br { bottom: -3.5px; }
+}
 @media (max-width: 640px) {
   .hero-meta { display: none; }
   .hero-word-outline { -webkit-text-stroke-width: 1px; }
