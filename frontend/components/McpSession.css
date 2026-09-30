@@ -1,0 +1,109 @@
+/* Agent session panel (McpSession.tsx): the site's terminal frame, a
+   prompt, a "Thinking…" line with its steps, a tool call card, and the
+   answer. */
+
+.mcp-session {
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  box-shadow: 0 30px 80px -40px rgb(0 0 0 / 0.9);
+  font-size: 14.5px;
+}
+.mcp-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 360px;
+  padding: 20px 20px 24px;
+}
+.mcp-prompt {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  line-height: 1.5;
+}
+.mcp-prompt span { margin-right: 6px; font-family: var(--font-code); color: var(--accent); }
+
+/* The thought line: glyph, label and a live timer; the label shimmers
+   and the glyph breathes while thinking. */
+.thought-head { display: flex; align-items: baseline; gap: 8px; margin: 0; color: var(--muted); }
+.thought-glyph { color: var(--accent); }
+.thought-label { font-weight: 600; color: var(--fg); }
+.thought-time { font-family: var(--font-code); font-size: 12.5px; color: var(--muted); }
+.thought--live .thought-glyph { animation: thought-breathe 1.6s ease-in-out infinite; }
+.thought--live .thought-label {
+  color: transparent;
+  background: linear-gradient(90deg, var(--muted) 0%, var(--fg) 45%, var(--accent) 50%, var(--fg) 55%, var(--muted) 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: thought-shimmer 1.8s linear infinite;
+}
+@keyframes thought-breathe { 50% { opacity: 0.35; transform: scale(0.82); } }
+@keyframes thought-shimmer { from { background-position: 100% 0; } to { background-position: -150% 0; } }
+
+.thought-steps { list-style: none; margin: 8px 0 0; padding: 0 0 0 22px; display: flex; flex-direction: column; gap: 6px; }
+.thought-steps li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  animation: thought-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.thought-steps li.is-live { color: var(--fg); }
+.thought-tick { position: relative; width: 12px; height: 12px; flex: none; }
+.thought-tick::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  background: var(--accent);
+}
+.is-live .thought-tick::before { animation: thought-breathe 1.2s ease-in-out infinite; }
+/* Ticked: the square becomes a check drawn from two borders. */
+.is-done .thought-tick::before {
+  inset: 0 3px 3px 3px;
+  width: 5px;
+  height: 9px;
+  background: none;
+  border-right: 2px solid var(--accent);
+  border-bottom: 2px solid var(--accent);
+  transform: rotate(40deg);
+}
+@keyframes thought-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.mcp-call {
+  border: 1px solid color-mix(in oklab, var(--accent), transparent 45%);
+  animation: thought-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.mcp-call-head {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 8px 12px;
+  background: color-mix(in oklab, var(--accent), transparent 86%);
+  font-family: var(--font-code);
+  font-size: 12px;
+}
+.mcp-call-head span { letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); font-size: 10.5px; }
+.mcp-call-head b { color: var(--accent); }
+.mcp-call pre {
+  margin: 0;
+  padding: 10px 12px;
+  font-family: var(--font-code);
+  font-size: 12.5px;
+  color: var(--fg);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.mcp-answer { margin: 0; line-height: 1.6; color: var(--fg); animation: thought-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.mcp-ok { font-family: var(--font-code); font-weight: 700; color: #28c840; margin-right: 4px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .thought--live .thought-glyph,
+  .thought--live .thought-label,
+  .is-live .thought-tick::before,
+  .thought-steps li,
+  .mcp-call,
+  .mcp-answer { animation: none; }
+}

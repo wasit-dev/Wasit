@@ -44,6 +44,7 @@ export function Nav({ variant = "site" }: { variant?: "site" | "docs" } = {}) {
         <nav className="navlinks" aria-label="Site">
           <Link href="/#comparison">Why</Link>
           <Link href="/#how-it-works">How it works</Link>
+          <Link href="/#mcp">MCP</Link>
           <Link href="/#faq">FAQ</Link>
           <Link href="/docs/start/try-it">Quick start</Link>
         </nav>

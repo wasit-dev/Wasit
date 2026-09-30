@@ -1,0 +1,183 @@
+/* "How it works" sequence diagram (SequenceFlow.tsx). Three lifelines at
+   the centres of three equal columns — 1/6, 1/2 and 5/6 of the width —
+   with each row's arrow drawn between two of them. */
+
+.seq {
+  margin: 8px 0 28px;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--on-accent);
+  box-shadow: 10px 10px 0 var(--accent-ink);
+}
+
+.seq-cols {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-bottom: 1px solid var(--border-strong);
+}
+.seq-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 18px 12px;
+  border-right: 1px solid var(--border-strong);
+  text-align: center;
+}
+.seq-col:last-child { border-right: none; }
+.seq-col-name {
+  font-family: var(--font-code);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.seq-col small { font-family: var(--font-code); font-size: 11px; color: var(--muted); letter-spacing: 0.04em; }
+.seq-col--wasit { background: var(--accent); color: var(--on-accent); }
+.seq-col--wasit small { color: var(--on-accent); }
+.seq-logo { display: block; height: 26px; width: auto; margin-bottom: 4px; }
+.seq-col--wasit .seq-logo { filter: invert(1); }
+.seq-logo--stellar { fill: var(--fg); }
+
+/* The lifelines: a 1px line at each column's centre, the middle one
+   (Wasit) in the accent. */
+.seq-rows {
+  --life: color-mix(in oklab, var(--accent), transparent 60%);
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 10px 0 18px;
+  background-image:
+    linear-gradient(var(--life), var(--life)),
+    linear-gradient(var(--accent), var(--accent)),
+    linear-gradient(var(--life), var(--life));
+  background-size: 1px 100%;
+  background-repeat: no-repeat;
+  background-position: calc(100% / 6) 0, 50% 0, calc(500% / 6) 0;
+}
+
+.seq-row { position: relative; height: 64px; }
+
+.seq-arrow {
+  position: absolute;
+  top: 38px;
+  height: 1px;
+  background: var(--fg);
+}
+.seq-row--left .seq-arrow { left: calc(100% / 6); right: 50%; }
+.seq-row--right .seq-arrow { left: 50%; right: calc(100% / 6); }
+.seq-arrow::after {
+  content: "";
+  position: absolute;
+  top: -4px;
+  border-top: 4.5px solid transparent;
+  border-bottom: 4.5px solid transparent;
+}
+.seq-row[data-head="right"] .seq-arrow::after { right: -1px; border-left: 8px solid var(--fg); }
+.seq-row[data-head="left"] .seq-arrow::after { left: -1px; border-right: 8px solid var(--fg); }
+
+/* The RPC rows: the part the tool exists for, in the accent. */
+.seq-row--rpc .seq-arrow { height: 2px; background: var(--accent); }
+.seq-row--rpc[data-head="right"] .seq-arrow::after { border-left-color: var(--accent); }
+.seq-row--rpc[data-head="left"] .seq-arrow::after { border-right-color: var(--accent); }
+
+/* A packet running tail to head, then resting at the head. */
+.seq-packet {
+  position: absolute;
+  top: -4px;
+  width: 9px;
+  height: 9px;
+  background: var(--accent-2);
+  animation: seq-run 2.4s cubic-bezier(0.6, 0, 0.4, 1) infinite;
+}
+.seq-row[data-head="right"] .seq-packet { left: 0; }
+.seq-row[data-head="left"] .seq-packet { right: 0; animation-name: seq-run-back; }
+@keyframes seq-run { 0% { left: 0; } 70%, 100% { left: calc(100% - 9px); } }
+@keyframes seq-run-back { 0% { right: 0; } 70%, 100% { right: calc(100% - 9px); } }
+
+.seq-label {
+  position: absolute;
+  top: 12px;
+  font-family: var(--font-code);
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+.seq-row--left .seq-label { right: 50%; margin-right: 18px; }
+.seq-row--right .seq-label { left: 50%; margin-left: 18px; }
+.seq-label b { margin-right: 8px; color: var(--accent); }
+.seq-label em {
+  margin-left: 10px;
+  font-style: normal;
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.seq-row--rpc .seq-label { color: var(--accent-2); }
+
+/* The route in words: read out on desktop, shown on phones. */
+.seq-route {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.seq-foot {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid var(--border-strong);
+  font-family: var(--font-code);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.seq-foot div { padding: 14px 20px; color: var(--muted); }
+.seq-foot div + div { border-left: 1px solid var(--border-strong); color: var(--accent-2); }
+
+@media (prefers-reduced-motion: reduce) {
+  .seq-packet { animation: none; }
+}
+
+/* Phones: no room for three lifelines and a label between two of them,
+   so the steps become a plain list with the route spelled out. */
+@media (max-width: 760px) {
+  .seq-col { padding: 14px 6px; }
+  .seq-col small { display: none; }
+  .seq-col-name { font-size: 10.5px; letter-spacing: 0.1em; }
+  .seq-rows { background: none; padding: 0; }
+  .seq-row {
+    height: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .seq-row:last-child { border-bottom: none; }
+  .seq-label, .seq-row--left .seq-label, .seq-row--right .seq-label {
+    position: static;
+    margin: 0;
+    white-space: normal;
+  }
+  .seq-label em { display: block; margin: 4px 0 0; }
+  .seq-route {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+    font-family: var(--font-code);
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .seq-arrow { display: none; }
+  .seq-foot { grid-template-columns: minmax(0, 1fr); }
+  .seq-foot div + div { border-left: none; border-top: 1px solid var(--border-strong); }
+}

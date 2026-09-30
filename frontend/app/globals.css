@@ -677,7 +677,7 @@ mark { color: inherit; background: none; }
 .band--signal .section-body { color: var(--on-accent); }
 .band--signal .section-lead a,
 .band--signal .section-body a { color: var(--accent-ink); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
-.band--signal .flow-canvas { box-shadow: 10px 10px 0 var(--accent-ink); border-color: var(--on-accent); }
+
 
 .section-head {
   display: flex;
@@ -734,6 +734,36 @@ mark { color: inherit; background: none; }
   padding: 1px 6px;
   color: var(--fg);
 }
+
+/* Stroke text (components/StrokeText.tsx). While it runs, each word's
+   HTML glyphs are hidden and an SVG copy laid over them draws its
+   outline; a block's accent then wipes in behind and the letters fill
+   dark. Before a "view" trigger fires, the words (and a block's accent)
+   stay hidden so they can draw in. */
+.st-word { position: relative; }
+.st-svg { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.st-svg text {
+  fill: transparent;
+  stroke-linejoin: round;
+  stroke-dasharray: var(--st-len);
+  stroke-dashoffset: var(--st-len);
+  animation: st-draw 1.8s cubic-bezier(0.45, 0, 0.25, 1) forwards;
+  transition: fill 320ms ease, stroke 320ms ease;
+}
+@keyframes st-draw { to { stroke-dashoffset: 0; } }
+.stroke-text.st-pending .st-word,
+.stroke-text.st-drawing .st-word {
+  color: transparent !important;
+  -webkit-text-stroke-color: transparent !important;
+}
+.stroke-text--block.st-pending,
+.stroke-text--block.st-drawing { background: transparent; }
+.stroke-text--block.st-drawing.st-filling {
+  background: linear-gradient(var(--accent), var(--accent)) no-repeat left / 100% 100%;
+  animation: st-wipe 520ms cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+.stroke-text--block.st-filling .st-svg text { fill: var(--on-accent); stroke: transparent; }
+@keyframes st-wipe { from { background-size: 0% 100%; } to { background-size: 100% 100%; } }
 
 /* 01 — the comparison as two panels: what is left unproven, struck
    through on the dark ground; what Wasit checks, on the accent; a flow
@@ -935,7 +965,33 @@ mark { color: inherit; background: none; }
   .package:last-child { border-bottom: none; }
 }
 
-/* 04 — FAQ: native <details>, no JS, keyboard-operable by default. */
+/* 04 — MCP tools: the tool list and install command beside an agent
+   session (components/McpSession.tsx). */
+.mcp-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  gap: clamp(28px, 4vw, 64px);
+  align-items: start;
+}
+.mcp-side { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.mcp-side .section-lead { margin: 0; }
+.mcp-tools { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border-strong); }
+.mcp-tools li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border-strong);
+}
+.mcp-tools code { font-family: var(--font-code); font-size: 13.5px; color: var(--accent); overflow-wrap: anywhere; }
+.mcp-tools-checks { font-family: var(--font-code); font-size: 12px; letter-spacing: 0.06em; color: var(--fg); text-align: right; }
+.mcp-tools-cost { grid-column: 1 / -1; font-size: 13.5px; color: var(--muted); }
+.mcp-tools .is-warn .mcp-tools-cost { color: var(--accent-2); }
+@media (max-width: 960px) {
+  .mcp-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* 05 — FAQ: native <details>, no JS, keyboard-operable by default. */
 .faq-grid {
   display: grid;
   grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
@@ -998,7 +1054,7 @@ mark { color: inherit; background: none; }
   .faq-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* 05 — closing call to action. */
+/* 06 — closing call to action. */
 .cta { border-bottom: none; }
 .cta-grid {
   display: grid;

@@ -2,10 +2,12 @@ import Link from "next/link";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { CopyButton } from "@/components/CopyButton";
-import { HowItWorksFlow } from "@/components/HowItWorksFlow";
 import { CliDemo } from "@/components/CliDemo";
 import { Crosshair } from "@/components/Crosshair";
 import { FaqList, type FaqEntry } from "@/components/FaqList";
+import { McpSession } from "@/components/McpSession";
+import { SequenceFlow } from "@/components/SequenceFlow";
+import { StrokeText } from "@/components/StrokeText";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { CHECK_COUNT, WASIT_VERSION } from "@/lib/site-facts";
 
@@ -82,6 +84,21 @@ const PACKAGES: PackageCard[] = [
   },
 ];
 
+type McpTool = { name: string; checks: string; cost: string; warn?: boolean };
+
+// The MCP server's tools, as packages/server/README.md lists them. The
+// fourth is registered only with an explicit opt-in.
+const MCP_TOOLS: McpTool[] = [
+  { name: "wasit_x402_test", checks: "X402-01–07", cost: "06/07 settle real testnet payments" },
+  { name: "wasit_mpp_charge_test", checks: "MPP-01", cost: "Settles a testnet payment every call" },
+  { name: "wasit_mpp_channel_test", checks: "MPP-10–12, 14", cost: "Free" },
+  { name: "wasit_mpp_channel_test_with_close", checks: "+ MPP-13", cost: "Opt-in only · closes a channel for good", warn: true },
+];
+
+// Registers the server with Claude Code; nothing else is needed for the
+// read-only x402 checks (docs/guides/mcp.md covers the keys for the rest).
+const MCP_CMD = "claude mcp add --transport stdio wasit -- npx -y @wasit-dev/server";
+
 const FAQ_ITEMS: FaqEntry[] = [
   {
     q: "Does it cost anything to run?",
@@ -126,7 +143,15 @@ function SectionHead({ n, title, note }: { n: string; title: string; note: strin
  * it. The three squares are the window controls every terminal on the
  * site carries (docs code blocks too, components/code-block.tsx).
  */
-function InstallTerminal({ children }: { children?: React.ReactNode }) {
+function InstallTerminal({
+  cmd = INSTALL_CMD,
+  title = "~/your-service",
+  children,
+}: {
+  cmd?: string;
+  title?: string;
+  children?: React.ReactNode;
+}) {
   return (
     <div className="terminal">
       <div className="terminal-bar">
@@ -135,12 +160,12 @@ function InstallTerminal({ children }: { children?: React.ReactNode }) {
           <span className="terminal-dot terminal-dot-yellow" />
           <span className="terminal-dot terminal-dot-green" />
         </span>
-        <span className="terminal-title">~/your-service</span>
+        <span className="terminal-title">{title}</span>
         <span>zsh</span>
       </div>
       <div className="cmdbox">
-        <code className="mono">$ {INSTALL_CMD}</code>
-        <CopyButton text={INSTALL_CMD} />
+        <code className="mono">$ {cmd}</code>
+        <CopyButton text={cmd} />
       </div>
       {children}
     </div>
@@ -173,7 +198,7 @@ export default function Home() {
               WASIT
             </span>
             <span className="hero-word-outline hero-rise" style={{ "--rise-delay": "200ms" } as React.CSSProperties}>
-              x402 / MPP
+              <StrokeText trigger="load">x402 / MPP</StrokeText>
             </span>
           </div>
 
@@ -234,7 +259,10 @@ export default function Home() {
           <div className="frame">
             <SectionHead n="01" title="What changes" note="// same request, two verdicts" />
             <h2 className="display" data-reveal>
-              A 200 OK is <span className="display-hl">not a settlement.</span>
+              A 200 OK is{" "}
+              <StrokeText mode="block" className="display-hl">
+                not a settlement.
+              </StrokeText>
             </h2>
             {/* Two panels side by side: what a service's own response
                 leaves unproven, struck through, and what Wasit checks
@@ -287,16 +315,14 @@ export default function Home() {
           <div className="frame">
             <SectionHead n="02" title="How it works" note="// http + rpc" />
             <h2 className="display" data-reveal>
-              It never trusts <span className="display-outline">the receipt.</span>
+              It never trusts <StrokeText className="display-outline">the receipt.</StrokeText>
             </h2>
             <p className="section-lead" data-reveal>
               Wasit talks to two things: your service, over HTTP, and Stellar,
               over RPC. It <mark className="hl-ink">never trusts the first</mark> about
               what happened on the second.
             </p>
-            <div data-reveal>
-              <HowItWorksFlow />
-            </div>
+            <SequenceFlow />
             <p className="section-body" data-reveal>
               Steps 5 and 6 are the point of the tool: Wasit calls Stellar RPC
               directly and checks the transfer event itself, instead of
@@ -310,7 +336,7 @@ export default function Home() {
           <div className="frame">
             <SectionHead n="03" title="Three packages" note="// one core" />
             <h2 className="display" data-reveal>
-              One suite. <span className="display-outline">Three ways in.</span>
+              One suite. <StrokeText className="display-outline">Three ways in.</StrokeText>
             </h2>
             <div className="packages">
               {PACKAGES.map((pkg, i) => (
@@ -331,12 +357,43 @@ export default function Home() {
           </div>
         </section>
 
+        <section id="mcp" className="band">
+          <div className="frame">
+            <SectionHead n="04" title="MCP tools" note="// for agents" />
+            <h2 className="display" data-reveal>
+              Your agent <StrokeText className="display-outline">runs the checks.</StrokeText>
+            </h2>
+            <div className="mcp-grid">
+              <div className="mcp-side" data-reveal>
+                <p className="section-lead">
+                  The MCP server puts the same checks in front of Claude Code, Claude Desktop and any other MCP
+                  client — as <mark className="hl">tools it can call</mark>, with the check catalogue as a resource
+                  it can read first.
+                </p>
+                <ul className="mcp-tools">
+                  {MCP_TOOLS.map((tool) => (
+                    <li key={tool.name} className={tool.warn ? "is-warn" : undefined}>
+                      <code>{tool.name}</code>
+                      <span className="mcp-tools-checks">{tool.checks}</span>
+                      <span className="mcp-tools-cost">{tool.cost}</span>
+                    </li>
+                  ))}
+                </ul>
+                <InstallTerminal cmd={MCP_CMD} title="~" />
+              </div>
+              <div data-reveal data-reveal-delay="120">
+                <McpSession />
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section id="faq" className="band">
           <div className="frame faq-grid">
             <div>
-              <SectionHead n="04" title="FAQ" note="// before you run it" />
+              <SectionHead n="05" title="FAQ" note="// before you run it" />
               <h2 className="display" data-reveal>
-                Questions<span className="display-outline">.</span>
+                Questions<StrokeText className="display-outline">.</StrokeText>
               </h2>
               <p className="section-lead" data-reveal>
                 The things people usually ask <mark className="hl">before running it.</mark>
@@ -348,10 +405,13 @@ export default function Home() {
 
         <section id="get-started" className="band cta">
           <div className="frame">
-            <SectionHead n="05" title="Get started" note="// one command" />
+            <SectionHead n="06" title="Get started" note="// one command" />
             <div className="cta-grid">
               <h2 className="display display-xl" data-reveal>
-                Point it at <span className="display-hl">your service.</span>
+                Point it at{" "}
+                <StrokeText mode="block" className="display-hl">
+                  your service.
+                </StrokeText>
               </h2>
               <div className="cta-side" data-reveal data-reveal-delay="120">
                 <p className="section-lead">
