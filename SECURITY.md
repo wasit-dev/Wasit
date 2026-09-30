@@ -167,21 +167,32 @@ would not appear in that file until it was resolved.
 
 ## Known advisories in a clean install
 
-`npm audit` on a fresh install of all three published packages currently
-reports seven high-severity findings; installing `@wasit-dev/cli` alone reports
-six, since it pulls a smaller slice of the same graph. None originate in
-Wasit's own code or declared dependencies. All of them trace to a single nested
-copy of `@stellar/stellar-sdk@15.1.0`, which npm materialises because
-`@stellar/mpp@0.7.1` peers on `^15.1.0` while this project declares `^16.1.0`.
-That copy brings `axios@1.15.0` and `toml@3.0.0`; the version Wasit itself
-declares resolves `axios@1.18.0`, which no current advisory matches.
+`npm audit` on a fresh install of all three published packages (0.6.0,
+measured 2026-09-30) reports eight packages: four high, four moderate.
+Installing `@wasit-dev/cli` alone reports seven (four high, three moderate),
+since it pulls a smaller slice of the same graph. None originate in Wasit's own
+code or declared dependencies. All of them trace to `@stellar/mpp@0.7.1`, which
+brings older copies of two packages alongside the ones Wasit declares:
 
-There is no downstream fix — the only lever is a peer range we do not control.
-It is reported upstream as
+- `@stellar/stellar-sdk@15.1.0`, because `@stellar/mpp` peers on `^15.1.0`
+  while this project declares `^16.1.0`. That copy brings `axios@1.15.0` and
+  `toml@3.0.0` (high). The SDK Wasit itself declares resolves `axios@1.18.0`,
+  which no current advisory matches.
+- `mppx@0.6.31`, because `@stellar/mpp` peers on `^0.6.29`. The "gas draining"
+  advisories (moderate) affect `mppx` before 0.8.1; the `mppx` Wasit declares
+  resolves 0.8.19.
+
+The three `@wasit-dev/*` packages appear in that count only because npm marks
+a package that depends on an affected one; there is no advisory against Wasit.
+
+There is no downstream fix — the only lever is those two peer ranges, which we
+do not control. They are reported upstream as
 [stellar-mpp-sdk#70](https://github.com/stellar/stellar-mpp-sdk/issues/70) and
-written up in [findings/upstream-sdk.md](docs/findings/upstream-sdk.md).
-`npm run verify:clean-install` installs all three packages and measures it on
-every CI run, so the seven is checked rather than remembered.
+written up in [findings/upstream-sdk.md](docs/findings/upstream-sdk.md); the
+fix has merged upstream, but `@stellar/mpp@0.7.1` is still the latest on npm
+(checked 2026-09-30).
+`npm run verify:clean-install` installs all three packages and prints the
+audit on every CI run, so the count is measured rather than remembered.
 
 This is stated here rather than left to be discovered: a tool that checks other
 people's compliance should be legible about its own supply chain.

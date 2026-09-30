@@ -2,36 +2,25 @@
 
 All notable changes to Wasit are recorded here. Versions follow [Semantic Versioning](https://semver.org/): patch releases are fixes, minor releases add checks or features without breaking existing usage, major releases break something.
 
-## Unreleased
+## [0.6.0] — 2026-09-30
 
-Planned for 0.6.0, and in progress on a release branch. Entries marked "Will
-change results" change what a check *proves*: anyone reading this file to
-decide whether to upgrade needs to see them before the version lands.
+All three packages, versioned together as usual. The two x402 payment checks
+now prove what their names say: `X402-06` verifies the settlement on-chain, and
+`X402-07` forges only the signature. `MPP-01` reads the newer form of the
+transfer event and stops blaming a target for a slow RPC. Node.js 22 is
+supported. No check was added or removed.
 
-**Fixed in source — `MPP-01` reads CAP-67 transfer events.** Since CAP-67,
-a SEP-41 `transfer` to a muxed address (`M...`) emits its data as a map
-`{ amount, to_muxed_id }` instead of a bare `i128`, with the base address in
-the topic. `MPP-01` read only the bare form, so a settlement to a muxed
-recipient would have been reported as no transfer at all. It now reads both,
-and matches an advertised muxed recipient on the base account and the id.
-Verified against a real testnet transfer to a muxed address; seven offline
-tests, each mutation-checked. Checking this end to end also showed that the
-official `@stellar/mpp` charge server cannot verify a payment to a muxed
-recipient either (its verification throws on the same map), so no MPP service
-built on it can accept one today.
+**Results can change on upgrade.** A target that serves without settling,
+reports a transaction that is not its settlement, or answers without a
+`PAYMENT-RESPONSE` header now fails `X402-06`. A target that decodes a payment
+without verifying its signature, or accepts a forged one with 201 or 204, now
+fails `X402-07`. In the other direction, an MPP payment to a muxed recipient no
+longer fails `MPP-01`, and an RPC that stops advancing now gives no verdict
+instead of a FAIL. Against Stellar's official reference paywall
+(`stellar/x402-stellar`), this build passes 7/7, with `X402-06` verified
+on-chain.
 
-**Will change results — `X402-07` corrupts only the signature.** It
-overwrote the tail of the base64 envelope, which broke XDR decoding, so a
-target that decoded the envelope and never verified the signature still
-refused it and passed. It now flips one byte of the client's Soroban
-authorization-entry signature and leaves the rest of the transaction intact.
-Against a server that decodes but never verifies, 0.5.0 passed and this build
-fails; the `x402.org` facilitator now rejects at simulation
-(`…_simulation_failed`) rather than at decoding (`…_malformed`). Acceptance is
-now any 2xx, not only 200, so a target that answers 201 or 204 to a forged
-payment no longer passes. Two offline tests, each mutation-checked.
-
-**Will change results — `X402-06` verifies settlement on-chain.** It passed
+**Changed — `X402-06` verifies settlement on-chain.** It passed
 on any 2xx, which established that the target served the resource, not that
 the payment landed. It now reads the settlement from the `PAYMENT-RESPONSE`
 header and holds the reported transaction to the advertised terms on Stellar
@@ -44,14 +33,30 @@ do exactly that, 0.5.0 passed and this build fails both variants. A
 verification moved to a shared module so both checks apply identical rules.
 If a run goes red on upgrade, the check got stronger, not the service worse.
 
-**Changed — Node.js 22 is supported.** All three packages now declare
-`"node": ">=22"` instead of `>=24`. Nothing required 24: the full test suite,
-the CLI, the MCP server and a run against the fixtures all pass on Node 22,
-and no runtime dependency requires more. Node 22 is still a maintained LTS, and
-CI environments such as the official MPP SDK's run on it. CI now tests the
-packages on both Node 22 and Node 24.
+**Fixed — `X402-07` corrupts only the signature.** It
+overwrote the tail of the base64 envelope, which broke XDR decoding, so a
+target that decoded the envelope and never verified the signature still
+refused it and passed. It now flips one byte of the client's Soroban
+authorization-entry signature and leaves the rest of the transaction intact.
+Against a server that decodes but never verifies, 0.5.0 passed and this build
+fails; the `x402.org` facilitator now rejects at simulation
+(`…_simulation_failed`) rather than at decoding (`…_malformed`). Acceptance is
+now any 2xx, not only 200, so a target that answers 201 or 204 to a forged
+payment no longer passes. Two offline tests, each mutation-checked.
 
-**Fixed in source — `MPP-01` no longer blames the target for a slow RPC.**
+**Fixed — `MPP-01` reads CAP-67 transfer events.** Since CAP-67,
+a SEP-41 `transfer` to a muxed address (`M...`) emits its data as a map
+`{ amount, to_muxed_id }` instead of a bare `i128`, with the base address in
+the topic. `MPP-01` read only the bare form, so a settlement to a muxed
+recipient would have been reported as no transfer at all. It now reads both,
+and matches an advertised muxed recipient on the base account and the id.
+Verified against a real testnet transfer to a muxed address; seven offline
+tests, each mutation-checked. Checking this end to end also showed that the
+official `@stellar/mpp` charge server cannot verify a payment to a muxed
+recipient either (its verification throws on the same map), so no MPP service
+built on it can accept one today.
+
+**Fixed — `MPP-01` no longer blames the target for a slow RPC.**
 It gave RPC twelve seconds to show the settled transaction, then reported it
 as never broadcast. On a lagging RPC that is a FAIL against a target that did
 nothing wrong. The wait is now measured in ledgers: the transaction is reported
@@ -59,20 +64,21 @@ missing only once RPC has closed ten more ledgers without it, and an RPC that
 stops advancing gives no verdict (`ERROR (harness)`) instead of a FAIL. Four
 offline tests, each mutation-checked.
 
-**Fixed in source — `MPP-01` no longer says it paid when the target refused.**
+**Fixed — `MPP-01` no longer says it paid when the target refused.**
 When the target answered with an error instead of the resource, the FAIL read
 "Paid the advertised … base units", although a target that refuses may never
 broadcast the transaction, and in the run that found this none was. The
 verdict is unchanged; the wording now claims only that a payment was
 submitted.
 
-**Added, repository only — `scripts/run-all.sh`.** Starts the fixtures if they
-are not already up, runs the x402, MPP charge and MPP channel suites, prints one
-summary and stops the fixtures it started. Free checks by default; `--full` adds
-the checks that move testnet funds, and `--npm` runs the published CLI. Not
-part of any npm package.
+**Changed — Node.js 22 is supported.** All three packages now declare
+`"node": ">=22"` instead of `>=24`. Nothing required 24: the full test suite,
+the CLI, the MCP server and a run against the fixtures all pass on Node 22,
+and no runtime dependency requires more. Node 22 is still a maintained LTS, and
+CI environments such as the official MPP SDK's run on it. CI now tests the
+packages on both Node 22 and Node 24.
 
-**Fixed in source — `wasit wallet status --role <role>` exits 2 when it could
+**Fixed — `wasit wallet status --role <role>` exits 2 when it could
 not check that role.** It exited 0 on an unreadable key, so
 `wasit wallet status --role x402 && deploy` went ahead on a key that was never
 checked, although `docs/guides/cli.md` already said a malformed key exits 2. With
@@ -80,6 +86,12 @@ checked, although `docs/guides/cli.md` already said a malformed key exits 2. Wit
 unreadable, or its balance lookup failed. An unfunded account is an answer and
 exits 0. Without `--role`, one unchecked role stays a row and the command exits
 0. Three offline tests, each mutation-checked.
+
+**Added, repository only — `scripts/run-all.sh`.** Starts the fixtures if they
+are not already up, runs the x402, MPP charge and MPP channel suites, prints one
+summary and stops the fixtures it started. Free checks by default; `--full` adds
+the checks that move testnet funds, and `--npm` runs the published CLI. Not
+part of any npm package.
 
 ## [0.5.0] — 2026-09-28
 
