@@ -70,7 +70,7 @@ const nodes: Node<ActorData>[] = [
       label: "WASIT",
       sublabel: "the checker",
       variant: "actor",
-      logo: <Image src="/W-White1.png" alt="" width={54} height={36} className="flow-actor-logo" />,
+      logo: <Image src="/mark.png" alt="" width={316} height={256} className="flow-actor-logo" />,
       handles: [
         lane("lane-1", "source", Position.Right, LANE_TOP[0]),
         lane("lane-2", "target", Position.Right, LANE_TOP[1]),

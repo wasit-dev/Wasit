@@ -1,6 +1,9 @@
 <div align="center">
 
-<img src="frontend/public/Colorful.png" alt="Wasit logo" width="150" />
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="frontend/public/logo-light.svg" />
+  <img src="frontend/public/logo-dark.svg" alt="Wasit" width="360" />
+</picture>
 
 # Wasit
 

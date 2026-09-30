@@ -15,11 +15,18 @@
 /* ------------------------------------------------------------------
    Tokens
 
-   A technical, grid-drawn look: near-black ground, hairline rules, one
-   neon accent, square corners everywhere. The accent stays Wasit's
-   purple, lifted so it reads as light on black rather than ink on it:
-   #9d6bff on --bg is 5.6:1, enough for body-size text, and the filled
-   buttons put --bg-coloured text on it for the same ratio.
+   A technical, grid-drawn look: near-black ground, hairline rules, two
+   accents, square corners everywhere. The first stays Wasit's purple,
+   lifted so it reads as light on black rather than ink on it: #9d6bff on
+   --bg is 5.6:1, enough for body-size text, and the filled buttons put
+   --bg-coloured text on it for the same ratio.
+
+   The second, --accent-2, is purple's complement: a warm yellow, the
+   strongest contrast the purple can have while still reading as one
+   palette. It is used sparingly — one full band, a few highlighted words,
+   the crosshair over something clickable. Text on it is always --bg
+   (15:1); purple on it would be 2.6:1, so the band uses --accent-ink,
+   a deep purple, for its outlines instead.
    ------------------------------------------------------------------ */
 :root {
   /* The site is dark-only regardless of the visitor's OS setting, so
@@ -36,6 +43,8 @@
   --grid-line: rgb(239 238 243 / 0.045);
   --accent: #9d6bff;
   --accent-deep: #7c3aed;
+  --accent-ink: #4c1d95;
+  --accent-2: #fdda24;
   --on-accent: #09090b;
   --radius: 0px;
 
@@ -46,7 +55,7 @@
      it — .navbar itself, section scroll-margin, and the /docs sidebar's
      fixed offset in app/docs/docs.css — so changing the bar's height
      means changing this line only. */
-  --nav-h: 56px;
+  --nav-h: 64px;
 
   /* Side gutter and max width of the page frame. Every band's content
      sits in .frame, so the hairline grid and the content line up. */
@@ -147,14 +156,14 @@ a:hover { color: var(--accent); }
   flex: none;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 20px 0 var(--gutter);
+  gap: 12px;
+  padding: 0 24px 0 var(--gutter);
   color: var(--fg);
 }
 .brand:hover { color: var(--fg); }
-/* Width follows the asset's own 1924x1284 ratio; only height is set. */
-.brand-mark { display: block; height: 26px; width: auto; }
-.brand-word { font-weight: 700; font-size: 13px; letter-spacing: 0.22em; }
+/* The logo lockup (public/logo-light.svg). Only height is set; width
+   follows the asset's own 1280x321 ratio. */
+.brand-logo { display: block; height: 34px; width: auto; }
 .brand-tag {
   padding: 2px 6px;
   border: 1px solid var(--accent);
@@ -272,6 +281,7 @@ a:hover { color: var(--accent); }
   .nav-search, .nav-icon-link { padding: 0 12px; }
   .nav-cta { padding: 0 16px; }
   .brand { padding-right: 12px; }
+  .brand-logo { height: 28px; }
 }
 
 /* ------------------------------------------------------------------
@@ -365,15 +375,31 @@ a:hover { color: var(--accent); }
 /* ------------------------------------------------------------------
    Landing page
    ------------------------------------------------------------------ */
-/* The whole landing page sits on a faint square grid, the same one the
-   hero's giant type is set against. */
-.landing {
+/* The whole landing page sits on a grid of large squares: the frame split
+   into six columns, and rows the same height as a column is wide. Drawn
+   on a pseudo-element pinned to the frame (not the viewport) so the lines
+   meet the content's own edges. --col needs the frame's width, which a
+   background cannot know; container units on .landing give it. Every band
+   is lifted above the grid, and the opaque ones (ticker, the signal band)
+   simply cover it. */
+.landing { position: relative; container-type: inline-size; }
+.landing::before {
+  --frame-w: calc(min(100cqw, var(--frame-max)) - 2 * var(--gutter));
+  --col: calc(var(--frame-w) / 6);
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc((100cqw - var(--frame-w)) / 2);
+  width: var(--frame-w);
   background-image:
-    linear-gradient(var(--grid-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
-  background-size: 64px 64px;
-  background-position: -1px -1px;
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(var(--grid-line) 1px, transparent 1px);
+  background-size: var(--col) var(--col);
+  border-right: 1px solid var(--grid-line);
+  pointer-events: none;
 }
+.landing > * { position: relative; z-index: 1; }
 
 /* Anchor targets clear the sticky bar. */
 .landing section { scroll-margin-top: var(--nav-h); }
@@ -393,6 +419,41 @@ a:hover { color: var(--accent); }
   pointer-events: none;
 }
 .hero > * { position: relative; }
+
+/* The hero rises in on load with CSS alone — it is on screen before any
+   script runs, so it cannot wait for ScrollReveal. --rise-delay staggers
+   the pieces. */
+.hero-rise { animation: rise 900ms cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: var(--rise-delay, 0ms); }
+.hero-word .hero-rise { display: block; }
+@keyframes rise {
+  from { opacity: 0; transform: translateY(28px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Scroll reveal (components/ScrollReveal.tsx). Hidden only once the
+   script has switched it on, so content never depends on it to show. */
+html[data-reveal="on"] [data-reveal] {
+  transition: opacity 800ms cubic-bezier(0.22, 1, 0.36, 1), transform 900ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+html[data-reveal="on"] [data-reveal]:not(.is-revealed) { opacity: 0; transform: translateY(36px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-rise { animation: none; }
+}
+
+/* Highlighted words: a flat block of colour behind the text, like a
+   marker stroke on a printout. --accent on the dark ground, --accent-2 for
+   the few that should shout, --bg on the yellow band. */
+mark { color: inherit; background: none; }
+.hl, .hl-2, .hl-ink {
+  padding: 0 0.18em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+.hl { background: var(--accent); color: var(--on-accent); }
+.hl-2 { background: var(--accent-2); color: var(--on-accent); }
+.hl-ink { background: var(--on-accent); color: var(--accent-2); }
 
 .hero-top {
   display: flex;
@@ -474,7 +535,7 @@ a:hover { color: var(--accent); }
   margin: 0 0 18px;
   text-wrap: balance;
 }
-.hero-heading b { color: var(--accent); font-weight: 800; }
+.hero-heading .hl { font-weight: 800; }
 .tagline { max-width: 540px; color: var(--muted); font-size: 16.5px; line-height: 1.6; margin: 0 0 28px; }
 .hero-visual { min-width: 0; }
 .hero-trust {
@@ -526,8 +587,7 @@ a:hover { color: var(--accent); }
 .terminal-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 14px;
   padding: 9px 14px;
   border-bottom: 1px solid var(--border);
   background: var(--surface-2);
@@ -537,8 +597,15 @@ a:hover { color: var(--accent); }
   text-transform: uppercase;
   color: var(--dim);
 }
-.terminal-title { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); }
-.terminal-square { width: 6px; height: 6px; background: var(--accent); }
+.terminal-title { flex: 1; color: var(--muted); }
+
+/* Window controls: the familiar red / yellow / green, as squares. Shared
+   by every terminal on the site, the docs code blocks included. */
+.terminal-controls { display: inline-flex; gap: 6px; flex: none; }
+.terminal-dot { width: 10px; height: 10px; }
+.terminal-dot-red { background: #ff5f57; }
+.terminal-dot-yellow { background: #febc2e; }
+.terminal-dot-green { background: #28c840; }
 
 .cmdbox {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -613,6 +680,26 @@ a:hover { color: var(--accent); }
   padding: clamp(64px, 9vw, 120px) 0;
   border-bottom: 1px solid var(--border);
 }
+
+/* The one band in --accent-2: dark type, deep-purple outlines, and the
+   dark panels inside it (the flow diagram) thrown forward on a hard
+   purple shadow. */
+.band--signal {
+  background: var(--accent-2);
+  color: var(--on-accent);
+  border-bottom: none;
+}
+.band--signal .section-head,
+.band--signal .section-head-n,
+.band--signal .section-head-title { color: var(--on-accent); }
+.band--signal .section-head-n::before { background: var(--accent-ink); }
+.band--signal .section-head-rule { background: color-mix(in oklab, var(--on-accent), transparent 70%); }
+.band--signal .display-outline { -webkit-text-stroke-color: var(--accent-ink); }
+.band--signal .section-lead,
+.band--signal .section-body { color: var(--on-accent); }
+.band--signal .section-lead a,
+.band--signal .section-body a { color: var(--accent-ink); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.band--signal .flow-canvas { box-shadow: 10px 10px 0 var(--accent-ink); border-color: var(--on-accent); }
 
 .section-head {
   display: flex;
@@ -738,7 +825,7 @@ a:hover { color: var(--accent); }
   transition: background 160ms ease;
 }
 .package:last-child { border-right: none; }
-.package:hover { color: var(--fg); background: color-mix(in oklab, var(--accent), var(--bg) 92%); }
+.package:hover { color: var(--on-accent); background: var(--accent); }
 .package-top {
   display: flex;
   justify-content: space-between;
@@ -779,6 +866,17 @@ a:hover { color: var(--accent); }
 }
 .package-more span { display: inline-block; transition: transform 160ms ease; }
 .package:hover .package-more span { transform: translateX(4px); }
+/* Hovered, the whole card fills with the accent and everything on it
+   turns to --bg-coloured ink. */
+.package:hover .package-top span,
+.package:hover .package-body,
+.package:hover .package-more { color: var(--on-accent); }
+.package:hover .package-cmd {
+  color: var(--on-accent);
+  background: color-mix(in oklab, var(--on-accent), transparent 90%);
+  border-color: color-mix(in oklab, var(--on-accent), transparent 70%);
+}
+.package-top span, .package-body, .package-more, .package-cmd { transition: color 160ms ease, background 160ms ease, border-color 160ms ease; }
 @media (max-width: 900px) {
   .packages { grid-template-columns: minmax(0, 1fr); }
   .package { border-right: none; border-bottom: 1px solid var(--border-strong); }
@@ -863,9 +961,8 @@ a:hover { color: var(--accent); }
   padding-top: 64px;
   padding-bottom: 40px;
 }
-.footer-brand-row { display: flex; align-items: center; gap: 12px; }
-.footer-mark { display: block; height: 34px; width: auto; }
-.footer-word { font-family: var(--font-code); font-weight: 700; font-size: 16px; letter-spacing: 0.24em; }
+/* Only height is set; width follows the lockup's 1280x321 ratio. */
+.footer-logo { display: block; height: clamp(52px, 6vw, 80px); width: auto; }
 .footer-statement {
   margin: 14px 0 0;
   font-family: var(--font-code);
@@ -895,21 +992,17 @@ a:hover { color: var(--accent); }
 .footer-col a span { color: var(--dim); }
 .footer-col a:hover, .footer-col a:hover span { color: var(--accent); }
 
-/* The wordmark across the full width, outlined, cropped by the bar. */
-.footer-giant {
-  padding: 0 var(--gutter);
-  margin-bottom: -0.1em;
-  font-family: var(--font-body);
-  font-weight: 900;
-  font-stretch: 125%;
-  font-size: min(22vw, 316px);
-  line-height: 0.9;
-  letter-spacing: -0.02em;
-  text-align: center;
-  color: transparent;
-  -webkit-text-stroke: max(1px, 0.1vw) color-mix(in oklab, var(--accent), transparent 35%);
-  white-space: nowrap;
-  user-select: none;
+/* The dot-matrix wordmark (components/PixelWordmark.tsx), full frame
+   width. Lit cells are the accent; unlit ones stay faintly visible so the
+   matrix reads as a panel, not as letters. A hovered cell flashes
+   --accent-2 and fades back over a second, leaving a trail. */
+.footer-giant { padding-top: 24px; padding-bottom: 32px; }
+.pixel-wordmark { display: block; width: 100%; height: auto; }
+.pixel-off { fill: color-mix(in oklab, var(--fg), transparent 95%); }
+.pixel-on { fill: var(--accent); transition: fill 1.2s ease; }
+.pixel-on:hover { fill: var(--accent-2); transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .pixel-on { transition: none; }
 }
 .footer-bottom {
   position: relative;
@@ -962,4 +1055,35 @@ a:hover { color: var(--accent); }
 
 @media (max-width: 1180px) {
   .legal-toc { display: none; }
+}
+
+/* ------------------------------------------------------------------
+   Crosshair (components/Crosshair.tsx) — two hairlines trailing the
+   pointer, turning --accent-2 over anything clickable.
+   ------------------------------------------------------------------ */
+.crosshair {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+.crosshair[data-shown="true"] { opacity: 1; }
+.crosshair-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: var(--accent);
+  opacity: 0.55;
+  transition: background 160ms ease, opacity 160ms ease;
+  will-change: transform;
+}
+.crosshair-h { width: 100%; height: 1px; }
+.crosshair-v { width: 1px; height: 100%; }
+.crosshair[data-active="true"] .crosshair-line { background: var(--accent-2); opacity: 0.9; }
+.crosshair[data-surface="light"] .crosshair-line { background: var(--accent-ink); opacity: 0.7; }
+.crosshair[data-surface="light"][data-active="true"] .crosshair-line { background: var(--on-accent); opacity: 0.9; }
+@media (hover: none), (pointer: coarse) {
+  .crosshair { display: none; }
 }

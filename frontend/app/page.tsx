@@ -4,6 +4,8 @@ import { Footer } from "@/components/Footer";
 import { CopyButton } from "@/components/CopyButton";
 import { HowItWorksFlow } from "@/components/HowItWorksFlow";
 import { CliDemo } from "@/components/CliDemo";
+import { Crosshair } from "@/components/Crosshair";
+import { ScrollReveal } from "@/components/ScrollReveal";
 import { CHECK_COUNT, WASIT_VERSION } from "@/lib/site-facts";
 
 // The one command on the page with a copy button, so it has to be the
@@ -111,7 +113,7 @@ const FAQ_ITEMS: FaqItem[] = [
 /** The numbered rule that opens every section: "■ 01  TITLE ──── // NOTE". */
 function SectionHead({ n, title, note }: { n: string; title: string; note: string }) {
   return (
-    <div className="section-head">
+    <div className="section-head" data-reveal>
       <span className="section-head-n">{n}</span>
       <span className="section-head-title">{title}</span>
       <span className="section-head-rule" aria-hidden="true" />
@@ -120,15 +122,21 @@ function SectionHead({ n, title, note }: { n: string; title: string; note: strin
   );
 }
 
-/** A terminal frame around the install command; the hero adds CliDemo under it. */
+/**
+ * A terminal frame around the install command; the hero adds CliDemo under
+ * it. The three squares are the window controls every terminal on the
+ * site carries (docs code blocks too, components/code-block.tsx).
+ */
 function InstallTerminal({ children }: { children?: React.ReactNode }) {
   return (
     <div className="terminal">
       <div className="terminal-bar">
-        <span className="terminal-title">
-          <span className="terminal-square" aria-hidden="true" />
-          ~/your-service
+        <span className="terminal-controls" aria-hidden="true">
+          <span className="terminal-dot terminal-dot-red" />
+          <span className="terminal-dot terminal-dot-yellow" />
+          <span className="terminal-dot terminal-dot-green" />
         </span>
+        <span className="terminal-title">~/your-service</span>
         <span>zsh</span>
       </div>
       <div className="cmdbox">
@@ -144,10 +152,12 @@ export default function Home() {
   return (
     <>
       <Nav />
+      <Crosshair />
+      <ScrollReveal />
 
       <main className="landing">
         <section className="hero" aria-labelledby="hero-title">
-          <div className="frame hero-top">
+          <div className="frame hero-top hero-rise">
             <div className="chip">
               <span className="chip-square" aria-hidden="true" />v{WASIT_VERSION} — {CHECK_COUNT} checks / 3 packages
             </div>
@@ -160,19 +170,25 @@ export default function Home() {
 
           {/* Decorative: the h1 below carries the same statement in words. */}
           <div className="frame hero-word" aria-hidden="true">
-            <span className="hero-word-solid">WASIT</span>
-            <span className="hero-word-outline">x402 / MPP</span>
+            <span className="hero-word-solid hero-rise" style={{ "--rise-delay": "80ms" } as React.CSSProperties}>
+              WASIT
+            </span>
+            <span className="hero-word-outline hero-rise" style={{ "--rise-delay": "200ms" } as React.CSSProperties}>
+              x402 / MPP
+            </span>
           </div>
 
           <div className="frame hero-bottom">
-            <div className="hero-copy">
+            <div className="hero-copy hero-rise" style={{ "--rise-delay": "320ms" } as React.CSSProperties}>
               <h1 id="hero-title" className="hero-heading">
-                Independent protocol-compliance testing for <b>x402</b> and <b>MPP</b> on Stellar.
+                Independent protocol-compliance testing for <mark className="hl">x402</mark> and{" "}
+                <mark className="hl">MPP</mark> on Stellar.
               </h1>
               <p className="tagline">
                 Wasit runs the real payment flow against your service, not a
-                schema check against its response — and verifies settlement
-                on-chain, from the token contract&rsquo;s own transfer event.
+                schema check against its response — and verifies settlement{" "}
+                <mark className="hl-2">on-chain</mark>, from the token
+                contract&rsquo;s own transfer event.
               </p>
               <div className="btn-row">
                 <Link href="/docs/start/try-it" className="btn btn-primary">
@@ -192,7 +208,7 @@ export default function Home() {
                 CliDemo.tsx for why its text comes from the checks
                 themselves. The closing section's terminal stays the plain
                 copy-paste command only. */}
-            <div className="hero-visual">
+            <div className="hero-visual hero-rise" style={{ "--rise-delay": "440ms" } as React.CSSProperties}>
               <InstallTerminal>
                 <CliDemo />
               </InstallTerminal>
@@ -218,17 +234,19 @@ export default function Home() {
         <section id="comparison" className="band">
           <div className="frame">
             <SectionHead n="01" title="What changes" note="// same request, two verdicts" />
-            <h2 className="display">
+            <h2 className="display" data-reveal>
               A 200 OK is <span className="display-outline">not a settlement.</span>
             </h2>
             <div className="compare" role="table" aria-label="Without Wasit and with Wasit">
-              <div className="compare-row compare-row--head" role="row">
+              <div className="compare-row compare-row--head" role="row" data-reveal>
                 <span className="compare-n" role="columnheader" aria-label="Row" />
                 <span className="compare-cell" role="columnheader">Without Wasit</span>
-                <span className="compare-cell compare-cell--with" role="columnheader">With Wasit</span>
+                <span className="compare-cell compare-cell--with" role="columnheader">
+                  <mark className="hl">With Wasit</mark>
+                </span>
               </div>
               {COMPARE_ROWS.map((row, i) => (
-                <div className="compare-row" role="row" key={row.with}>
+                <div className="compare-row" role="row" key={row.with} data-reveal data-reveal-delay={String(90 * (i + 1))}>
                   <span className="compare-n" role="cell">
                     {String(i + 1).padStart(2, "0")}
                   </span>
@@ -244,19 +262,23 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="how-it-works" className="band">
+        {/* The one band in the second colour: the section the tool exists
+            for, set apart the way a poster sets apart its headline. */}
+        <section id="how-it-works" className="band band--signal" data-crosshair="light">
           <div className="frame">
             <SectionHead n="02" title="How it works" note="// http + rpc" />
-            <h2 className="display">
+            <h2 className="display" data-reveal>
               It never trusts <span className="display-outline">the receipt.</span>
             </h2>
-            <p className="section-lead">
+            <p className="section-lead" data-reveal>
               Wasit talks to two things: your service, over HTTP, and Stellar,
-              over RPC. It never trusts the first about what happened on the
-              second.
+              over RPC. It <mark className="hl-ink">never trusts the first</mark> about
+              what happened on the second.
             </p>
-            <HowItWorksFlow />
-            <p className="section-body">
+            <div data-reveal>
+              <HowItWorksFlow />
+            </div>
+            <p className="section-body" data-reveal>
               Steps 5 and 6 are the point of the tool: Wasit calls Stellar RPC
               directly and checks the transfer event itself, instead of
               trusting your service&apos;s receipt about what happened on chain.{" "}
@@ -268,12 +290,12 @@ export default function Home() {
         <section id="packages" className="band">
           <div className="frame">
             <SectionHead n="03" title="Three packages" note="// one core" />
-            <h2 className="display">
+            <h2 className="display" data-reveal>
               One suite. <span className="display-outline">Three ways in.</span>
             </h2>
             <div className="packages">
               {PACKAGES.map((pkg, i) => (
-                <Link href={pkg.href} className="package" key={pkg.name}>
+                <Link href={pkg.href} className="package" key={pkg.name} data-reveal data-reveal-delay={String(110 * i)}>
                   <div className="package-top">
                     <span>{String(i + 1).padStart(2, "0")}</span>
                     <span>{pkg.tag}</span>
@@ -294,14 +316,16 @@ export default function Home() {
           <div className="frame faq-grid">
             <div>
               <SectionHead n="04" title="FAQ" note="// before you run it" />
-              <h2 className="display">
+              <h2 className="display" data-reveal>
                 Questions<span className="display-outline">.</span>
               </h2>
-              <p className="section-lead">The things people usually ask before running it.</p>
+              <p className="section-lead" data-reveal>
+                The things people usually ask <mark className="hl">before running it.</mark>
+              </p>
             </div>
             <div className="faq-list">
               {FAQ_ITEMS.map((item, i) => (
-                <details className="faq-item" key={item.q}>
+                <details className="faq-item" key={item.q} data-reveal data-reveal-delay={String(70 * i)}>
                   <summary>
                     <span className="faq-n">{String(i + 1).padStart(2, "0")}</span>
                     <span className="faq-q">{item.q}</span>
@@ -317,13 +341,13 @@ export default function Home() {
           <div className="frame">
             <SectionHead n="05" title="Get started" note="// one command" />
             <div className="cta-grid">
-              <h2 className="display display-xl">
+              <h2 className="display display-xl" data-reveal>
                 Point it at <span className="display-outline">your service.</span>
               </h2>
-              <div className="cta-side">
+              <div className="cta-side" data-reveal data-reveal-delay="120">
                 <p className="section-lead">
-                  Get a pass/fail report backed by on-chain verification. No
-                  signup, no config file required to start.
+                  Get a pass/fail report backed by on-chain verification.{" "}
+                  <mark className="hl-2">No signup, no config file</mark> required to start.
                 </p>
                 <InstallTerminal />
                 <div className="btn-row">

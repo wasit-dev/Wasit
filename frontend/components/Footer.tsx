@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { PixelWordmark } from "./PixelWordmark";
 
 const GITHUB_URL = "https://github.com/wasit-dev/wasit";
 const X_URL = "https://x.com/wasithq";
@@ -31,10 +32,9 @@ const FOOTER_COLUMNS: { title: string; links: { label: string; href: string; ext
 ];
 
 /**
- * Brand block and link columns on the site grid, then the wordmark set
- * across the full width in outline — the footer's one large gesture,
- * decorative and hidden from assistive tech since the brand is already
- * named above it — and a thin utility bar.
+ * The logo lockup and link columns on the site grid, then the wordmark
+ * across the full width as a dot-matrix (components/PixelWordmark.tsx),
+ * then a thin utility bar.
  */
 export function Footer() {
   const year = new Date().getFullYear();
@@ -43,10 +43,8 @@ export function Footer() {
     <footer className="site-footer">
       <div className="frame footer-top">
         <div className="footer-brand">
-          <div className="footer-brand-row">
-            <Image src="/Wolf.png" alt="" width={1924} height={1284} className="footer-mark" />
-            <span className="footer-word">WASIT</span>
-          </div>
+          {/* width/height carry the lockup's 1280x321 ratio only; CSS sets the height. */}
+          <Image src="/logo-light.svg" alt="Wasit" width={1280} height={321} className="footer-logo" />
           <p className="footer-statement">Verify the settlement, not the receipt.</p>
         </div>
 
@@ -72,12 +70,12 @@ export function Footer() {
         </div>
       </div>
 
-      <div className="footer-giant" aria-hidden="true">
-        WASIT
+      <div className="frame footer-giant">
+        <PixelWordmark />
       </div>
 
       <div className="frame footer-bottom">
-        <span>© {year} Wasit</span>
+        <span>© {year} Wasit. All rights reserved.</span>
         <span>Apache-2.0 · Open source · Built on Stellar</span>
       </div>
     </footer>

@@ -119,15 +119,15 @@
 }
 
 /* The wordmark at the top of Overview -> Wasit reads as a masthead, so
-   it is centred and capped well short of the 68ch column: the asset is
-   5480px wide at roughly 4.3:1, and at full column width it would tower
-   over the h1 directly beneath it. Sized in rem rather than a
+   it is centred and capped well short of the 68ch column: the lockup is
+   roughly 4:1, and at full column width it would tower over the h1
+   directly beneath it. Sized in rem rather than a
    percentage so it stays the same physical size as the column reflows.
 
    Keyed on the file rather than a class because the image comes from
    markdown, which carries no class — rename the asset and this rule
    stops applying, which is the failure mode everyone notices at once. */
-.typeset-docs img[src$="W-White.png"] {
+.typeset-docs img[src$="logo-light.svg"] {
   width: min(24rem, 85%);
   margin: 0.6em auto 1.8em;
 }
@@ -435,12 +435,6 @@
   padding: 8px 12px;
   background: var(--surface-2);
   border-bottom: 1px solid var(--border);
-}
-.doc-code-square {
-  flex: none;
-  width: 6px;
-  height: 6px;
-  background: var(--accent);
 }
 .doc-code-lang {
   margin-left: 2px;

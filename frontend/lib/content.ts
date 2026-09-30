@@ -457,7 +457,7 @@ export function getAboutMarkdown(): string {
     .replace(/\n+---\s*$/, "")
     .trim();
 
-  return `![Wasit](/W-White.png)
+  return `![Wasit](/logo-light.svg)
 
 # Wasit
 

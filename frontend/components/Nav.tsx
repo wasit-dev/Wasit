@@ -18,7 +18,7 @@ function GitHubIcon() {
 }
 
 /**
- * The site-wide bar: wolf mark and mono wordmark, a strip of facts, the
+ * The site-wide bar: the logo lockup, a strip of facts, the
  * landing page's section links, then search, GitHub and a full-height
  * Docs cell. Each group is its own bordered cell so the bar reads as one
  * row of a grid, the same hairline grid the rest of the site is drawn on.
@@ -38,8 +38,8 @@ export function Nav({ variant = "site" }: { variant?: "site" | "docs" } = {}) {
     <header className="site-header">
       <div className="navbar">
         <Link href="/" className="brand" aria-label={variant === "docs" ? "Wasit Docs" : "Wasit"}>
-          <Image src="/Wolf.png" alt="" width={1924} height={1284} className="brand-mark" priority />
-          <span className="brand-word">WASIT</span>
+          {/* width/height carry the lockup's 1280x321 ratio only; CSS sets the height. */}
+          <Image src="/logo-light.svg" alt="" width={1280} height={321} className="brand-logo" priority />
           {variant === "docs" && <span className="brand-tag">DOCS</span>}
         </Link>
 
