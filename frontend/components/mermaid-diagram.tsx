@@ -40,7 +40,7 @@ export function MermaidDiagram({ source }: { source: string }) {
           tertiaryColor: "#0a0a0a",
           lineColor: "#a0a0a0",
           textColor: "#ededed",
-          fontFamily: "var(--font-jakarta), system-ui, sans-serif",
+          fontFamily: "var(--font-archivo), system-ui, sans-serif",
           fontSize: "14px",
         },
       })

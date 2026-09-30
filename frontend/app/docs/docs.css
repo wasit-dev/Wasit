@@ -26,7 +26,7 @@
   --secondary: var(--surface);
   --secondary-foreground: var(--fg);
   --muted-bg: var(--surface);
-  --accent-bg: #161616;
+  --accent-bg: var(--surface-2);
   --accent-foreground: var(--fg);
   --destructive: #b91c1c;
   --input: var(--border);
@@ -71,13 +71,16 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  /* Square corners across every shadcn primitive, matching the rest of
+     the site. Set outright rather than derived from --radius: at 0 the
+     old `calc(var(--radius) - 4px)` goes negative. */
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
 
-  --font-sans: var(--font-jakarta);
-  --font-mono: var(--font-fira-mono);
+  --font-sans: var(--font-archivo);
+  --font-mono: var(--font-jbmono);
 }
 
 @layer base {
@@ -165,7 +168,6 @@
 .typeset-docs td code {
   background: var(--border);
   border: 1px solid var(--border-strong);
-  border-radius: 0.4em;
   padding: 0.15em 0.55em;
 }
 
@@ -178,7 +180,6 @@
   overflow-x: auto;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 0.5em;
 }
 .mermaid-diagram svg {
   display: block;
@@ -191,7 +192,6 @@
   color: var(--muted);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 0.5em;
   font-size: 0.875em;
 }
 
@@ -212,34 +212,41 @@
   gap: 0.75em;
   margin-top: 1.5em;
 }
+/* Same square mono buttons as the landing page's .btn. */
 .docs-cards-cta-primary,
 .docs-cards-cta-secondary {
   display: inline-flex;
   align-items: center;
-  font-size: 0.875em;
-  font-weight: 500;
-  padding: 0.65em 1.15em;
-  border-radius: var(--radius);
+  font-family: var(--font-code);
+  font-size: 0.75em;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 0.95em 1.4em;
+  border: 1px solid var(--accent);
   text-decoration: none;
 }
 .docs-cards-cta-primary {
-  background: var(--fg);
-  color: var(--bg);
-  border: 1px solid var(--fg);
+  background: var(--accent);
+  color: var(--on-accent);
 }
 .docs-cards-cta-primary:hover {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+  background: color-mix(in oklab, var(--accent), white 14%);
+  color: var(--on-accent);
 }
 .docs-cards-cta-secondary {
-  border: 1px solid var(--border-strong);
-  color: var(--fg);
-}
-.docs-cards-cta-secondary:hover {
-  border-color: var(--accent);
   color: var(--accent);
 }
+.docs-cards-cta-secondary:hover {
+  background: color-mix(in oklab, var(--accent), transparent 88%);
+  color: var(--accent);
+}
+/* Each group of cards is its own band, ruled off from the next. */
+.docs-cards-section {
+  padding: 1.6em 0;
+  border-bottom: 1px solid var(--border);
+}
+.docs-cards-section:last-child { border-bottom: none; }
 .docs-cards-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -367,9 +374,10 @@
   min-width: 0;
 }
 .docs-pager-label {
-  font-size: 0.75em;
-  font-weight: 500;
-  letter-spacing: 0.04em;
+  font-family: var(--font-code);
+  font-size: 0.7em;
+  font-weight: 400;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--muted);
 }
@@ -417,25 +425,29 @@
 .doc-code {
   margin: 1.3em 0;
   border: 1px solid var(--border-strong);
-  border-radius: 10px;
   background: var(--surface);
-  box-shadow: 0 30px 70px -35px rgba(0, 0, 0, 0.8);
   overflow: hidden;
 }
 .doc-code-bar {
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 10px 14px;
-  background: color-mix(in oklab, var(--surface) 85%, white 6%);
+  padding: 8px 12px;
+  background: var(--surface-2);
   border-bottom: 1px solid var(--border);
 }
+.doc-code-square {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  background: var(--accent);
+}
 .doc-code-lang {
-  margin-left: 4px;
-  font-size: 11px;
+  margin-left: 2px;
+  font-size: 10.5px;
   color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.14em;
 }
 .doc-code-copy {
   margin-left: auto;
@@ -445,9 +457,11 @@
   background: transparent;
   border: 1px solid var(--border-strong);
   color: var(--muted);
-  font-size: 11px;
+  font-family: var(--font-code);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   padding: 4px 9px;
-  border-radius: 5px;
   cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease;
 }
@@ -486,21 +500,24 @@
    layering race. h2/h3 go to a true bold (700, up from typeset's 600)
    so a sub-heading reads clearly as one at a glance. */
 .typeset-docs :is(h1, h2, h3, h4, h5, h6) {
-  font-family: var(--font-jakarta), system-ui, -apple-system, sans-serif;
+  font-family: var(--font-archivo), system-ui, -apple-system, sans-serif;
   color: var(--fg);
   text-transform: none;
   letter-spacing: normal;
   margin: 0;
 }
 .typeset-docs h1 {
-  font-size: 1.75em;
-  font-weight: 600;
-  line-height: 1.3;
+  font-size: 2.1em;
+  font-weight: 800;
+  font-stretch: 112%;
+  letter-spacing: -0.015em;
+  line-height: 1.1;
   margin-top: var(--typeset-flow);
 }
 .typeset-docs h2 {
-  font-size: 1.25em;
+  font-size: 1.3em;
   font-weight: 700;
+  font-stretch: 106%;
   line-height: 1.4;
   margin-top: calc(var(--typeset-flow) * 1.4);
 }
@@ -564,4 +581,36 @@
    that utility class regardless of import order. */
 [data-slot="breadcrumb-link"]:hover {
   color: var(--accent);
+}
+
+/* ------------------------------------------------------------------
+   The docs chrome in the site's mono-label language. Unlayered, like
+   every override in this file, so these beat shadcn's utility classes
+   whatever order the stylesheets load in.
+   ------------------------------------------------------------------ */
+[data-slot="breadcrumb-list"] {
+  font-family: var(--font-code);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+[data-slot="sidebar-group-label"] {
+  font-family: var(--font-code);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+[data-slot="sidebar-menu-button"],
+[data-slot="sidebar-menu-sub-button"] {
+  font-size: 13.5px;
+}
+/* The active page gets an accent edge as well as the accent text, so
+   the reader's place in a long nav is visible at a glance. */
+[data-slot="sidebar-menu-sub-button"][data-active="true"] {
+  box-shadow: inset 2px 0 0 var(--accent);
+  color: var(--accent);
+}
+[data-slot="sidebar-menu-sub"] {
+  border-color: var(--border-strong);
 }

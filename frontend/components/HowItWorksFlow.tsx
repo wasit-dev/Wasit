@@ -254,7 +254,7 @@ export function HowItWorksFlow() {
         minZoom={0.6}
         maxZoom={1.4}
       >
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#2a2a2a" />
+        <Background variant={BackgroundVariant.Lines} gap={32} color="#18171d" />
         <Controls showInteractive={false} />
       </ReactFlow>
     </div>

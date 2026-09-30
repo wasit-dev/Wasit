@@ -12,30 +12,46 @@
 
 @import "./typeset.css";
 
+/* ------------------------------------------------------------------
+   Tokens
+
+   A technical, grid-drawn look: near-black ground, hairline rules, one
+   neon accent, square corners everywhere. The accent stays Wasit's
+   purple, lifted so it reads as light on black rather than ink on it:
+   #9d6bff on --bg is 5.6:1, enough for body-size text, and the filled
+   buttons put --bg-coloured text on it for the same ratio.
+   ------------------------------------------------------------------ */
 :root {
   /* The site is dark-only regardless of the visitor's OS setting, so
      pin color-scheme rather than leaving it to the default "light". */
   color-scheme: dark;
-  --bg: #000000;
-  --fg: #ededed;
-  --muted: #a0a0a0;
-  --border: #1f1f1f;
-  --border-strong: #2e2e2e;
-  --surface: #0a0a0a;
-  --radius: 0.35em;
-  /* Stellar's own purple (matches the badge color already used in
-     README.md) — the one spot of color on an otherwise monochrome
-     page, used sparingly: the hero's bolded protocol names, the final
-     step of the "How it works" flow, and inline links in prose. */
-  --accent: #7c3aed;
+  --bg: #09090b;
+  --surface: #0f0f12;
+  --surface-2: #15151a;
+  --fg: #efeef3;
+  --muted: #8f8d9a;
+  --dim: #55535f;
+  --border: #1f1e25;
+  --border-strong: #2e2c36;
+  --grid-line: rgb(239 238 243 / 0.045);
+  --accent: #9d6bff;
+  --accent-deep: #7c3aed;
+  --on-accent: #09090b;
+  --radius: 0px;
 
-  /* Height of the sticky top bar. Four separate rules across two
-     stylesheets are derived from it — .navbar itself, .landing-scroll's
-     viewport maths, section scroll-margin, and the /docs sidebar's fixed
-     offset in app/docs/docs.css. They were four hardcoded 64px values
-     that had to be edited together and gave no sign when they were not;
-     changing the bar's height now means changing this line only. */
-  --nav-h: 72px;
+  --font-body: var(--font-archivo), system-ui, -apple-system, sans-serif;
+  --font-code: var(--font-jbmono), ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+
+  /* Height of the sticky top bar. Rules in two stylesheets derive from
+     it — .navbar itself, section scroll-margin, and the /docs sidebar's
+     fixed offset in app/docs/docs.css — so changing the bar's height
+     means changing this line only. */
+  --nav-h: 56px;
+
+  /* Side gutter and max width of the page frame. Every band's content
+     sits in .frame, so the hairline grid and the content line up. */
+  --gutter: clamp(16px, 3.2vw, 48px);
+  --frame-max: 1440px;
 
   /* Typeset reads these theme tokens directly (see app/typeset.css) —
      map them onto our own palette instead of letting it fall back to
@@ -48,97 +64,145 @@
 }
 
 /* The docs reading rhythm — fonts + size/leading/flow per shadcn/typeset's
-   preset pattern (https://ui.shadcn.com/docs/typeset). */
+   preset pattern (https://ui.shadcn.com/docs/typeset). Legal pages use
+   plain .typeset and get the same fonts. */
+.typeset,
 .typeset-docs {
-  --typeset-font-body: var(--font-jakarta);
-  --typeset-font-heading: var(--font-jakarta);
-  --typeset-font-mono: var(--font-fira-mono);
-  --typeset-size: 15px;
+  --typeset-font-body: var(--font-body);
+  --typeset-font-heading: var(--font-body);
+  --typeset-font-mono: var(--font-code);
+}
+.typeset-docs {
+  --typeset-size: 15.5px;
   --typeset-leading: 1.7;
   --typeset-flow: 1.3em;
 }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
 
 body {
   background: var(--bg);
   color: var(--fg);
-  font-family: var(--font-jakarta), system-ui, -apple-system, sans-serif;
+  font-family: var(--font-body);
   font-size: 16px;
-  line-height: 1.5;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
 }
 
-.mono { font-family: var(--font-fira-mono), ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; }
+::selection { background: var(--accent); color: var(--on-accent); }
+
+.mono { font-family: var(--font-code); }
 
 a { color: var(--fg); text-decoration: none; }
 a:hover { color: var(--accent); }
 
-.wrap { max-width: 880px; margin: 0 auto; padding: 0 24px; }
+:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
 
-/* Nav — a flush full-width bar (react flow docs-style layout) rather
-   than the earlier floating glass pill: solid surface color, a hairline
-   bottom border, sticky at the very top of the viewport. */
-/* .site-header, not a bare `header` selector — the /docs layout
-   (app/docs/layout.tsx) also has its own plain <header> for the
-   sidebar-trigger/breadcrumb bar, and a bare element selector here
-   was styling THAT one identically (position: sticky; top: 0) too —
-   both headers then fought over the same sticky top:0 slot and
-   rendered on top of each other. Scoped so only the site-wide Nav
-   gets this. */
+/* The page frame: full-bleed bands, content held to one max width with
+   one gutter. */
+.frame {
+  max-width: var(--frame-max);
+  margin: 0 auto;
+  padding-left: var(--gutter);
+  padding-right: var(--gutter);
+}
+
+/* Kept for the legal pages, which still centre a reading column. */
+.wrap { max-width: 880px; margin: 0 auto; padding: 0 var(--gutter); }
+
+/* ------------------------------------------------------------------
+   Nav
+   ------------------------------------------------------------------ */
+/* .site-header, not a bare `header` selector — the /docs layout also
+   has its own plain <header> for the sidebar-trigger/breadcrumb bar,
+   and a bare element selector would style that one too, so both would
+   fight over the same sticky slot. */
 .site-header {
   position: sticky;
   top: 0;
   z-index: 50;
-  background: var(--surface);
+  /* Opaque: the fact strip is dim mono text, and anything scrolling
+     behind a translucent bar reads as a second line of it. */
+  background: var(--bg);
   border-bottom: 1px solid var(--border);
 }
-/* max-width wider than the page's own 880px .wrap column, and its own
-   padding rather than borrowing .wrap — a nav sharing the narrow
-   content column reads as cramped/centered on anything wider than a
-   laptop; this spreads brand/links/actions out to the edges instead,
-   matching the reference layout. */
 .navbar {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
+  align-items: stretch;
   height: var(--nav-h);
-  max-width: 1360px;
-  margin: 0 auto;
-  padding: 0;
+  font-family: var(--font-code);
+  font-size: 11.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
-/* Bigger gap than a typical navbar — the brand mark is now an image
-   lockup (icon + wordmark), not a short text label, so it reads as its
-   own section of the bar rather than a word sitting inline with the
-   nav links. */
-.navbar-left { display: flex; align-items: center; gap: 48px; min-width: 0; }
-.brand { flex: none; display: flex; align-items: center; }
-/* Height is pinned and width left to follow, never both: the two brand
-   assets do not share an aspect ratio — W-White.png is 4972x1284
-   (3.87) and docs.png 5980x1484 (4.03), the difference being the DOCS
-   badge stacked above the wordmark. Giving width a fixed value
-   would stretch one or both horizontally rather than scale them.
+.navbar > * { border-right: 1px solid var(--border); }
+.navbar > :last-child { border-right: none; }
 
-   At 44px they render 170px and 177px wide respectively — 61% of the
-   72px bar, which still leaves 14px clear above and below. The height also matters for the /docs lockup specifically:
-   its DOCS badge is a small fraction of the asset, and that badge is
-   the only thing distinguishing the two marks, so every pixel of
-   overall height makes it more legible. */
-.brand-logo { display: block; height: 44px; width: auto; }
-.navlinks {
+.brand {
+  flex: none;
   display: flex;
   align-items: center;
-  gap: 24px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--muted);
+  gap: 10px;
+  padding: 0 20px 0 var(--gutter);
+  color: var(--fg);
 }
-.navlinks a { color: var(--muted); }
-.navlinks a:hover { color: var(--accent); }
+.brand:hover { color: var(--fg); }
+/* Width follows the asset's own 1924x1284 ratio; only height is set. */
+.brand-mark { display: block; height: 26px; width: auto; }
+.brand-word { font-weight: 700; font-size: 13px; letter-spacing: 0.22em; }
+.brand-tag {
+  padding: 2px 6px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+}
 
-.navbar-right { display: flex; align-items: center; gap: 14px; flex: none; }
+.nav-facts {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  color: var(--dim);
+  /* Printed as written: "x402" is lowercase by definition. */
+  text-transform: none;
+  letter-spacing: 0.06em;
+}
+.nav-facts span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 18px;
+  border-right: 1px solid var(--border);
+  white-space: nowrap;
+}
+.nav-facts span::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  background: var(--accent);
+  opacity: 0.8;
+}
+
+.navlinks { display: flex; align-items: stretch; flex: none; }
+.navlinks a {
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  color: var(--muted);
+  transition: color 140ms ease, background 140ms ease;
+}
+.navlinks a:hover { color: var(--fg); background: var(--surface); }
+
+.navbar-right { display: flex; align-items: stretch; flex: none; }
+.navbar-right > * { border-left: 1px solid var(--border); }
+.navbar-right > :first-child { border-left: none; }
 
 /* The trigger button that opens DocsSearch's modal — the modal itself
    (search-overlay / search-panel / ...) is styled further down. */
@@ -146,79 +210,91 @@ a:hover { color: var(--accent); }
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 10px;
-  border: 1px solid var(--border-strong);
-  border-radius: 8px;
-  background: var(--bg);
+  padding: 0 16px;
+  border: none;
+  background: transparent;
   color: var(--muted);
   font: inherit;
-  font-size: 13px;
+  letter-spacing: inherit;
+  text-transform: inherit;
   cursor: pointer;
-  transition: border-color 160ms ease, color 160ms ease;
+  transition: color 140ms ease, background 140ms ease;
 }
-.nav-search:hover { border-color: var(--accent); color: var(--accent); }
+.nav-search:hover { color: var(--fg); background: var(--surface); }
 .nav-search svg { width: 14px; height: 14px; flex: none; }
 .nav-search kbd {
-  margin-left: 8px;
-  padding: 1px 6px;
+  margin-left: 4px;
+  padding: 1px 5px;
   border: 1px solid var(--border-strong);
-  border-radius: 4px;
   font-family: inherit;
-  font-size: 11px;
+  font-size: 10px;
+  color: var(--dim);
+}
+
+.nav-icon-link {
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
   color: var(--muted);
+  transition: color 140ms ease, background 140ms ease;
 }
+.nav-icon-link:hover { color: var(--fg); background: var(--surface); }
+.nav-icon-link svg { width: 16px; height: 16px; }
 
-.nav-icon-link { display: flex; color: var(--muted); transition: color 160ms ease; }
-.nav-icon-link:hover { color: var(--accent); }
-.nav-icon-link svg { width: 18px; height: 18px; }
-
-/* The one CTA-styled link in the nav — a solid accent pill rather than
-   just bolder text, so it reads as the primary destination the way the
-   plain anchor links (which just jump to a section on this same page)
-   don't need to. */
-.navlinks-docs {
-  color: #fff !important;
+/* The one filled cell in the bar: the way into the docs. */
+.nav-cta {
+  display: flex;
+  align-items: center;
+  padding: 0 28px;
   background: var(--accent);
-  padding: 8px 18px;
-  border-radius: 999px;
-  font-size: 14px;
-  font-weight: 600;
-  transition: background 160ms ease;
+  color: var(--on-accent) !important;
+  font-weight: 700;
+  transition: background 140ms ease;
 }
-.navlinks-docs:hover { background: color-mix(in oklab, var(--accent), white 12%); color: #fff !important; }
+.nav-cta:hover { background: color-mix(in oklab, var(--accent), white 14%); }
 
-@media (max-width: 720px) {
-  /* No hamburger menu yet — just drop the section links and the
-     search box's text/shortcut, keeping brand, search icon, GitHub,
-     and Docs reachable. */
-  .navbar { padding: 0 20px; }
+@media (max-width: 1280px) {
+  .nav-facts span:nth-child(n + 3) { display: none; }
+}
+@media (max-width: 1100px) {
+  .nav-facts { visibility: hidden; }
+}
+@media (max-width: 860px) {
+  /* No menu drawer: drop the section links and the search label, keep
+     brand, search, GitHub and Docs reachable. */
   .navlinks { display: none; }
   .nav-search span,
   .nav-search kbd { display: none; }
+  .nav-facts { display: none; }
+  .brand { flex: 1; }
+}
+@media (max-width: 420px) {
+  .nav-search, .nav-icon-link { padding: 0 12px; }
+  .nav-cta { padding: 0 16px; }
+  .brand { padding-right: 12px; }
 }
 
-/* Docs search modal (components/DocsSearch.tsx) — a lightweight
-   command-palette: dark backdrop, a single panel anchored a bit above
-   center so it doesn't fight the navbar it opens from. */
+/* ------------------------------------------------------------------
+   Docs search modal (components/DocsSearch.tsx)
+   ------------------------------------------------------------------ */
 .search-overlay {
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgb(0 0 0 / 0.7);
   display: flex;
   justify-content: center;
   padding: 12vh 16px 16px;
 }
 .search-panel {
   width: 100%;
-  max-width: 600px;
+  max-width: 620px;
   max-height: 70vh;
   display: flex;
   flex-direction: column;
   background: var(--surface);
   border: 1px solid var(--border-strong);
-  border-radius: 12px;
-  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.85);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent), transparent 80%), 0 24px 60px -20px rgb(0 0 0 / 0.9);
   overflow: hidden;
 }
 .search-input-row {
@@ -246,26 +322,25 @@ a:hover { color: var(--accent); }
   flex: none;
   padding: 2px 6px;
   border: 1px solid var(--border-strong);
-  border-radius: 4px;
-  font-family: inherit;
-  font-size: 11px;
+  font-family: var(--font-code);
+  font-size: 10.5px;
   color: var(--muted);
 }
-.search-results { overflow-y: auto; padding: 8px; }
+.search-results { overflow-y: auto; padding: 6px; }
 .search-empty { padding: 20px 12px; color: var(--muted); font-size: 14px; text-align: center; }
 .search-result {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   padding: 10px 12px;
-  border-radius: 8px;
+  border-left: 2px solid transparent;
   color: var(--fg);
   text-decoration: none;
 }
 .search-result-group {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-family: var(--font-code);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--accent);
 }
@@ -278,162 +353,199 @@ a:hover { color: var(--accent); }
   white-space: nowrap;
 }
 .search-result:hover,
-.search-result.is-active { background: color-mix(in oklab, var(--accent) 18%, var(--surface)); }
+.search-result.is-active {
+  background: var(--surface-2);
+  border-left-color: var(--accent);
+}
 
 @media (max-width: 640px) {
   .search-overlay { padding: 8vh 10px 10px; }
 }
 
-/* The landing page's own scroll region — everything below Nav
-   (hero, the four <section>s, Footer) lives inside this div instead of
-   the normal document/body scroll, so scroll-snap-type can apply here
-   without also snapping /docs or /why, which never render this class.
-   height is exactly the viewport minus Nav's height, so Nav (left in
-   normal flow above this div, still position: sticky from its own
-   rule) never overlaps it — no scroll-margin-top compensation needed
-   for anchor links inside it either, see the reset below. */
-.landing-scroll {
-  height: calc(100vh - var(--nav-h));
-  height: calc(100dvh - var(--nav-h));
-  overflow-y: auto;
-  scroll-snap-type: y mandatory;
-  scroll-behavior: smooth;
-}
-@media (prefers-reduced-motion: reduce) {
-  .landing-scroll { scroll-behavior: auto; }
-}
-/* Every direct child is one snap stop — scrolling (wheel, trackpad,
-   touch, or a Nav anchor link) always comes to rest at one of these,
-   never somewhere in between. A section taller than the viewport (e.g.
-   "How it works" with the flow diagram) still scrolls through normally
-   while the gesture is active; snapping only decides where it settles
-   once you stop. scroll-margin-top is reset to 0 here specifically —
-   the site-wide `section` rule further down sets 84px to clear Nav
-   when Nav overlaps scrolled content (every other page), but inside
-   this container Nav sits outside the scroll region entirely, so that
-   compensation would just offset the snap point for no reason. */
-.landing-scroll > .hero,
-.landing-scroll > section,
-.landing-scroll > footer {
-  scroll-snap-align: start;
-  scroll-margin-top: 0;
+/* ------------------------------------------------------------------
+   Landing page
+   ------------------------------------------------------------------ */
+/* The whole landing page sits on a faint square grid, the same one the
+   hero's giant type is set against. */
+.landing {
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 64px 64px;
+  background-position: -1px -1px;
 }
 
-/* Hero — fills the first snap stop (see .landing-scroll) instead of
-   just its own content height, so it reads as a proper full-screen
-   intro and every other section is only ever revealed by scrolling,
-   never visible at the same time as the hero on first paint.
-   min-height: 100% resolves against .landing-scroll's own explicit
-   height (calc(100vh - var(--nav-h))), not the viewport directly — this rule
-   alone would do nothing without that ancestor. */
+/* Anchor targets clear the sticky bar. */
+.landing section { scroll-margin-top: var(--nav-h); }
+
 .hero {
   position: relative;
   overflow: hidden;
-  min-height: 100%;
-  display: flex;
-  align-items: center;
-  padding: 56px 0;
   border-bottom: 1px solid var(--border);
 }
-/* Dot-grid backdrop, faded out toward the edges via mask-image rather
-   than a hard-edged tile — centered on the terminal card (the right
-   column of .hero-grid) instead of the old single-column text block,
-   so it reads as texture behind the product visual, not noise
-   competing with the copy. Same dot motif HowItWorksFlow already draws
-   on its own canvas further down the page, so the two read as one
-   deliberate choice rather than two unrelated decorations. */
+/* A soft accent glow behind the wordmark, so the page is not flat black
+   under the type. */
 .hero::before {
   content: "";
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(
-    color-mix(in oklab, var(--accent) 55%, white 10%) 1.4px,
-    transparent 1.4px
-  );
-  background-size: 26px 26px;
-  opacity: 0.55;
-  mask-image: radial-gradient(ellipse 70% 70% at 66% 48%, black 42%, transparent 92%);
-  -webkit-mask-image: radial-gradient(ellipse 70% 70% at 66% 48%, black 42%, transparent 92%);
+  background: radial-gradient(ellipse 60% 55% at 22% 42%, color-mix(in oklab, var(--accent), transparent 86%), transparent 70%);
   pointer-events: none;
 }
-/* Hero gets its own wider container than the site's normal 880px
-   reading column (used for every other section's .wrap) — a two-column
-   copy/terminal split needs more room than a single text block did. */
-.hero .wrap { position: relative; z-index: 1; max-width: 1120px; }
+.hero > * { position: relative; }
 
-/* Developer-tool-style hero: value-prop headline + CTAs on the left,
-   the terminal mockup as its own product-visual column on the right,
-   instead of the previous single centered text block stacked above
-   the terminal. .terminal/.cmdbox below are unchanged from before —
-   only where they sit in the layout changed. */
-.hero-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(380px, 480px);
-  align-items: center;
-  gap: 56px;
+.hero-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  padding-top: 32px;
 }
-.hero-kicker { margin-bottom: 16px; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  border: 1px solid color-mix(in oklab, var(--accent), transparent 35%);
+  background: color-mix(in oklab, var(--accent), transparent 92%);
+  color: color-mix(in oklab, var(--accent), white 25%);
+  font-family: var(--font-code);
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+}
+.chip-square { width: 6px; height: 6px; background: var(--accent); }
+.hero-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  font-family: var(--font-code);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.hero-meta-accent { color: var(--accent); }
+
+/* The wordmark: a heavy expanded solid line over an outlined one. Each
+   line's size is in vw, measured so it spans about 93% of the viewport —
+   the frame's width once the gutters are taken off — and capped where the
+   frame stops growing (--frame-max). */
+.hero-word {
+  display: flex;
+  flex-direction: column;
+  padding-top: clamp(28px, 5vw, 64px);
+  padding-bottom: clamp(28px, 4vw, 48px);
+  font-family: var(--font-body);
+  font-weight: 900;
+  line-height: 0.84;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  user-select: none;
+}
+.hero-word-solid {
+  font-size: min(22vw, 316px);
+  font-stretch: 125%;
+  color: var(--fg);
+}
+.hero-word-outline {
+  font-size: min(14.4vw, 207px);
+  font-stretch: 112%;
+  color: transparent;
+  -webkit-text-stroke: max(1px, 0.12vw) var(--accent);
+  margin-top: 0.08em;
+}
+
+.hero-bottom {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 560px);
+  gap: clamp(28px, 5vw, 72px);
+  align-items: start;
+  padding-top: 40px;
+  padding-bottom: 64px;
+  border-top: 1px solid var(--border);
+}
 .hero-heading {
   font-weight: 700;
-  font-size: clamp(30px, 3.2vw, 42px);
-  letter-spacing: -0.7px;
-  line-height: 1.18;
+  font-size: clamp(26px, 2.6vw, 38px);
+  font-stretch: 105%;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
   margin: 0 0 18px;
   text-wrap: balance;
 }
-.hero-heading b { color: var(--accent); font-weight: 700; }
-.tagline { max-width: 520px; color: var(--muted); font-size: 16px; line-height: 1.6; margin: 0 0 28px; }
-.tagline b { color: var(--accent); font-weight: 600; }
-.hero-cta-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 22px; }
+.hero-heading b { color: var(--accent); font-weight: 800; }
+.tagline { max-width: 540px; color: var(--muted); font-size: 16.5px; line-height: 1.6; margin: 0 0 28px; }
 .hero-visual { min-width: 0; }
-
-.label {
+.hero-trust {
+  margin: 20px 0 0;
+  font-family: var(--font-code);
   font-size: 11px;
-  letter-spacing: 1.5px;
-  color: var(--muted);
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  margin-bottom: 10px;
+  color: var(--dim);
+}
+.hero-trust a { color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
+.hero-trust a:hover { color: var(--accent); }
+
+@media (max-width: 960px) {
+  .hero-bottom { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .hero-meta { display: none; }
+  .hero-word-outline { -webkit-text-stroke-width: 1px; }
 }
 
-@media (max-width: 900px) {
-  .hero-grid { grid-template-columns: 1fr; gap: 40px; }
+/* Buttons: square, mono, uppercase. */
+.btn-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 20px;
+  border: 1px solid var(--accent);
+  font-family: var(--font-code);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
 }
+.btn-primary { background: var(--accent); color: var(--on-accent) !important; }
+.btn-primary:hover { background: color-mix(in oklab, var(--accent), white 14%); border-color: color-mix(in oklab, var(--accent), white 14%); }
+.btn-ghost { background: transparent; color: var(--accent); }
+.btn-ghost:hover { background: color-mix(in oklab, var(--accent), transparent 88%); color: var(--accent); }
 
-/* Terminal window mockup around the install command — Wasit is a CLI
-   first, so "here's the actual command, in an actual terminal" reads
-   truer here than an abstract illustration would. .cmdbox keeps its
-   own name/role (the command line itself, still used standalone
-   nowhere else needs it) but gives up its border/background/max-width
-   to .terminal, which now owns the frame. */
+/* Terminal: a square frame with a mono title bar. */
 .terminal {
-  max-width: 560px;
   border: 1px solid var(--border-strong);
-  border-radius: 10px;
   background: var(--surface);
-  box-shadow: 0 30px 70px -35px rgba(0, 0, 0, 0.8);
+  box-shadow: 0 30px 80px -40px rgb(0 0 0 / 0.9);
   overflow: hidden;
 }
 .terminal-bar {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 10px 14px;
-  background: color-mix(in oklab, var(--surface) 85%, white 6%);
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 14px;
   border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  font-family: var(--font-code);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dim);
 }
-.terminal-dot { width: 11px; height: 11px; border-radius: 50%; flex: none; }
-.terminal-dot-red { background: #ff5f57; }
-.terminal-dot-yellow { background: #febc2e; }
-.terminal-dot-green { background: #28c840; }
+.terminal-title { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); }
+.terminal-square { width: 6px; height: 6px; background: var(--accent); }
 
 .cmdbox {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 16px;
 }
-.cmdbox code { font-family: var(--font-fira-mono), monospace; font-size: 14px; color: var(--fg); white-space: pre; overflow-x: auto; }
-/* A live-looking blinking cursor after the command, like a real
-   terminal prompt waiting for input — small enough to not distract
-   from the actual text, off entirely for reduced-motion. */
+.cmdbox code { font-family: var(--font-code); font-size: 13.5px; color: var(--fg); white-space: pre; overflow-x: auto; scrollbar-width: none; }
+/* A blinking block cursor after the command, off for reduced motion. */
 .cmdbox code::after {
   content: "";
   display: inline-block;
@@ -451,47 +563,390 @@ a:hover { color: var(--accent); }
   50% { opacity: 0; }
 }
 .copy-btn {
-  flex: none; background: transparent; border: 1px solid var(--border-strong); color: var(--muted);
-  font-size: 11px; padding: 6px 10px; cursor: pointer; border-radius: 3px;
+  flex: none;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  color: var(--muted);
+  font-family: var(--font-code);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 6px 10px;
+  cursor: pointer;
 }
 .copy-btn:hover { color: var(--accent); border-color: var(--accent); }
 
-/* Sections */
-/* scroll-margin-top keeps an anchor-linked section's own heading clear
-   of the sticky bar header (see --nav-h) instead of landing right
-   underneath it, plus 20px so it does not sit flush against it. */
-section {
-  padding: 48px 0;
+/* Ticker band: the accent, full bleed, one line of facts scrolling. */
+.ticker {
+  overflow: hidden;
+  background: var(--accent);
+  color: var(--on-accent);
   border-bottom: 1px solid var(--border);
-  scroll-margin-top: calc(var(--nav-h) + 20px);
 }
-section:last-of-type { border-bottom: none; }
-h2 {
-  font-size: 24px;
+.ticker-track {
+  display: flex;
+  width: max-content;
+  animation: ticker 38s linear infinite;
+}
+.ticker-group { display: flex; flex: none; }
+.ticker-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 22px;
+  padding: 11px 0 11px 22px;
+  font-family: var(--font-code);
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: -0.3px;
-  color: var(--fg);
-  margin: 0 0 20px;
+  letter-spacing: 0.14em;
+  white-space: nowrap;
 }
-/* Hero trust line — three honest, checkable facts under the install
-   command; not a marketing badge row. */
-.hero-trust { margin-top: 16px; color: var(--muted); font-size: 12px; letter-spacing: 0.2px; }
-.hero-trust a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
-.hero-trust a:hover { color: var(--accent); }
+.ticker-square { width: 7px; height: 7px; background: var(--on-accent); }
+@keyframes ticker {
+  to { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ticker-track { animation: none; }
+}
 
-/* Standalone typeset article column (shadcn's typeset article layout:
- * no docs sidebar, just a centered reading column). Used by the two
- * legal pages; the padding here is plain spacing, unrelated to --nav-h. */
+/* Bands: every section below the hero. */
+.band {
+  padding: clamp(64px, 9vw, 120px) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: clamp(28px, 4vw, 44px);
+  font-family: var(--font-code);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.section-head-n { display: inline-flex; align-items: center; gap: 8px; color: var(--fg); }
+.section-head-n::before { content: ""; width: 7px; height: 7px; background: var(--accent); }
+.section-head-title { color: var(--fg); white-space: nowrap; }
+.section-head-rule { flex: 1; height: 1px; background: var(--border-strong); }
+.section-head-note { white-space: nowrap; }
+@media (max-width: 560px) {
+  .section-head-rule, .section-head-note { display: none; }
+}
+
+/* Display headings: heavy, expanded, uppercase, with an outlined tail. */
+.display {
+  margin: 0 0 clamp(28px, 4vw, 48px);
+  font-family: var(--font-body);
+  font-weight: 900;
+  font-stretch: 118%;
+  font-size: clamp(30px, 6.4vw, 96px);
+  line-height: 0.92;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+.display-xl { font-size: clamp(34px, 7.6vw, 120px); }
+/* The FAQ heading shares its row with the list, so it gets a column's
+   worth of size, not the page's. */
+.faq-grid .display { font-size: clamp(30px, 4.2vw, 64px); }
+.display-outline {
+  color: transparent;
+  -webkit-text-stroke: max(1px, 0.09vw) var(--accent);
+}
+
+/* Section intros and body copy. */
+.section-lead { font-size: 17px; line-height: 1.6; color: var(--fg); max-width: 640px; margin: 0 0 20px; }
+.section-body { font-size: 15px; line-height: 1.7; color: var(--muted); max-width: 680px; margin: 0 0 14px; }
+.section-body:last-child { margin-bottom: 0; }
+.section-lead a, .section-body a { color: var(--accent); }
+.section-lead a:hover, .section-body a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.section-lead code, .section-body code {
+  font-family: var(--font-code);
+  font-size: 0.85em;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 1px 6px;
+  color: var(--fg);
+}
+
+/* 01 — the before/after table. */
+.compare { border-top: 1px solid var(--border-strong); }
+.compare-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) minmax(0, 1fr);
+  border-bottom: 1px solid var(--border-strong);
+}
+.compare-n,
+.compare-cell { padding: 22px 20px; }
+.compare-n {
+  font-family: var(--font-code);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--dim);
+  border-right: 1px solid var(--border);
+}
+.compare-cell { font-size: 15.5px; line-height: 1.55; color: var(--muted); }
+.compare-cell--with {
+  color: var(--fg);
+  border-left: 1px solid var(--border);
+  background: color-mix(in oklab, var(--accent), transparent 94%);
+}
+.compare-row--head .compare-cell {
+  padding-top: 14px;
+  padding-bottom: 14px;
+  font-family: var(--font-code);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.compare-row--head .compare-cell--with { color: var(--accent); }
+@media (max-width: 720px) {
+  .compare-row { grid-template-columns: minmax(0, 1fr); }
+  .compare-n { border-right: none; padding-bottom: 0; }
+  .compare-cell--with { border-left: none; border-top: 1px solid var(--border); }
+  .compare-row--head { display: none; }
+  .compare-cell:not(.compare-cell--with)::before,
+  .compare-cell--with::before {
+    display: block;
+    margin-bottom: 6px;
+    font-family: var(--font-code);
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .compare-cell:not(.compare-cell--with)::before { content: "Without Wasit"; color: var(--dim); }
+  .compare-cell--with::before { content: "With Wasit"; color: var(--accent); }
+}
+
+/* 03 — package cards. */
+.packages {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid var(--border-strong);
+}
+.package {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px;
+  min-width: 0;
+  color: var(--fg);
+  border-right: 1px solid var(--border-strong);
+  background: color-mix(in oklab, var(--bg), transparent 30%);
+  transition: background 160ms ease;
+}
+.package:last-child { border-right: none; }
+.package:hover { color: var(--fg); background: color-mix(in oklab, var(--accent), var(--bg) 92%); }
+.package-top {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-code);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+}
+.package-top span:last-child { color: var(--accent); }
+.package-name {
+  margin: 18px 0 0;
+  font-weight: 800;
+  font-stretch: 110%;
+  font-size: clamp(20px, 1.9vw, 26px);
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.package-body { margin: 0; flex: 1; font-size: 14.5px; line-height: 1.6; color: var(--muted); }
+.package-cmd {
+  display: block;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-family: var(--font-code);
+  font-size: 12px;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.package-more {
+  font-family: var(--font-code);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.package-more span { display: inline-block; transition: transform 160ms ease; }
+.package:hover .package-more span { transform: translateX(4px); }
+@media (max-width: 900px) {
+  .packages { grid-template-columns: minmax(0, 1fr); }
+  .package { border-right: none; border-bottom: 1px solid var(--border-strong); }
+  .package:last-child { border-bottom: none; }
+}
+
+/* 04 — FAQ: native <details>, no JS, keyboard-operable by default. */
+.faq-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  gap: clamp(28px, 5vw, 80px);
+  align-items: start;
+}
+.faq-list { border-top: 1px solid var(--border-strong); }
+.faq-item { border-bottom: 1px solid var(--border-strong); }
+.faq-item summary {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  padding: 20px 4px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 16.5px;
+  font-weight: 600;
+  color: var(--fg);
+  transition: color 140ms ease;
+}
+.faq-item summary::-webkit-details-marker { display: none; }
+.faq-item summary::after {
+  content: "+";
+  margin-left: auto;
+  font-family: var(--font-code);
+  font-size: 18px;
+  font-weight: 400;
+  color: var(--accent);
+}
+.faq-item[open] summary::after { content: "\2212"; }
+.faq-item summary:hover { color: var(--accent); }
+.faq-n {
+  flex: none;
+  font-family: var(--font-code);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  color: var(--dim);
+}
+.faq-q { flex: 1; }
+.faq-item p { margin: 0 0 22px 0; padding-left: 42px; color: var(--muted); font-size: 15px; line-height: 1.65; max-width: 640px; }
+@media (max-width: 900px) {
+  .faq-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* 05 — closing call to action. */
+.cta { border-bottom: none; }
+.cta-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  gap: clamp(28px, 5vw, 72px);
+  align-items: end;
+}
+.cta-grid .display { margin-bottom: 0; }
+.cta-side { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.cta-side .section-lead { margin: 0; }
+@media (max-width: 960px) {
+  .cta-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ------------------------------------------------------------------
+   Footer
+   ------------------------------------------------------------------ */
+.site-footer {
+  position: relative;
+  overflow: hidden;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+.footer-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 48px;
+  flex-wrap: wrap;
+  padding-top: 64px;
+  padding-bottom: 40px;
+}
+.footer-brand-row { display: flex; align-items: center; gap: 12px; }
+.footer-mark { display: block; height: 34px; width: auto; }
+.footer-word { font-family: var(--font-code); font-weight: 700; font-size: 16px; letter-spacing: 0.24em; }
+.footer-statement {
+  margin: 14px 0 0;
+  font-family: var(--font-code);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.footer-columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(130px, 1fr));
+  gap: 32px;
+  flex: 1;
+  max-width: 560px;
+}
+.footer-col h3 {
+  margin: 0 0 16px;
+  font-family: var(--font-code);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.footer-col ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.footer-col a { color: var(--fg); font-size: 14.5px; }
+.footer-col a span { color: var(--dim); }
+.footer-col a:hover, .footer-col a:hover span { color: var(--accent); }
+
+/* The wordmark across the full width, outlined, cropped by the bar. */
+.footer-giant {
+  padding: 0 var(--gutter);
+  margin-bottom: -0.1em;
+  font-family: var(--font-body);
+  font-weight: 900;
+  font-stretch: 125%;
+  font-size: min(22vw, 316px);
+  line-height: 0.9;
+  letter-spacing: -0.02em;
+  text-align: center;
+  color: transparent;
+  -webkit-text-stroke: max(1px, 0.1vw) color-mix(in oklab, var(--accent), transparent 35%);
+  white-space: nowrap;
+  user-select: none;
+}
+.footer-bottom {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-top: 16px;
+  padding-bottom: 16px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  font-family: var(--font-code);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+@media (max-width: 640px) {
+  .footer-columns { grid-template-columns: repeat(2, 1fr); max-width: none; }
+}
+
+/* ------------------------------------------------------------------
+   Legal pages — a centred typeset reading column with a sticky
+   table of contents (components/docs-toc.tsx) beside it.
+   ------------------------------------------------------------------ */
 .article-wrap {
   max-width: 700px;
   padding-top: 64px;
   padding-bottom: 80px;
 }
 .article-wrap .typeset h1 {
-  font-size: 40px;
-  font-weight: 700;
-  letter-spacing: -0.5px;
-  line-height: 1.15;
+  font-weight: 900;
+  font-stretch: 115%;
+  font-size: clamp(34px, 5vw, 52px);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  text-transform: uppercase;
   margin: 0 0 28px;
 }
 .article-wrap .typeset hr {
@@ -499,337 +954,12 @@ h2 {
   border-top: 1px solid var(--border);
   margin: 40px 0;
 }
-/* Terms of Service / Privacy Policy: tighter heading rhythm than the
-   default typeset h2 spacing, scoped so /why's longer-form article
-   keeps its own spacing untouched. */
-.legal-typeset h2 {
-  margin: 10px 0 10px;
-}
-
-/* /legal/terms and /legal/privacy: the same .article-wrap prose column
-   as /why, now paired with a sticky Line Sidebar-style table of
-   contents (components/docs-toc.tsx) in a two-column row. The wider
-   max-width is scoped to .wrap.legal-page-wrap specifically (two
-   classes beats plain .wrap on specificity) so no other .wrap page is
-   affected. */
+.legal-typeset h2 { margin: 10px 0 10px; }
+.legal-typeset a { color: var(--accent); }
 .wrap.legal-page-wrap { max-width: 1040px; }
 .legal-page-row { display: flex; align-items: flex-start; justify-content: center; gap: 56px; }
-.legal-toc { position: sticky; top: 96px; width: 200px; flex-shrink: 0; padding-top: 64px; }
+.legal-toc { position: sticky; top: calc(var(--nav-h) + 24px); width: 200px; flex-shrink: 0; padding-top: 64px; }
 
 @media (max-width: 1180px) {
   .legal-toc { display: none; }
-}
-
-/* Section intros — every section now opens with a real sentence before
-   its table/grid/list, instead of a bare heading dropped straight onto
-   the data. Keeps the page reading like prose that happens to include
-   structured content, not a spec sheet. */
-.section-lead { font-size: 16px; line-height: 1.6; color: var(--fg); max-width: 640px; margin: 0 0 20px; }
-.section-body { font-size: 14px; line-height: 1.7; color: var(--muted); max-width: 640px; margin: 0 0 14px; }
-.section-body:last-of-type { margin-bottom: 0; }
-.section-lead a, .section-body a { color: var(--accent); }
-.section-lead a:hover, .section-body a:hover { color: var(--accent); text-decoration: underline; }
-.section-lead code, .section-body code {
-  font-family: var(--font-fira-mono), monospace;
-  font-size: 0.85em;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  padding: 1px 6px;
-  border-radius: 3px;
-  color: var(--fg);
-}
-
-/* Features grid — separate bordered cards rather than a table; the
-   detailed check-by-check breakdown now lives only in the docs' Check
-   Catalogue, so the landing page pitches the properties of the tool
-   instead of repeating that table. */
-/* Comparison — replaces the old flat Features grid. Two columns, same
-   underlying facts (on-chain settlement read, the check catalogue,
-   the two-interface split), framed as before/after instead of a list
-   read in isolation. The "with" column carries the accent so the eye
-   lands there first. */
-.compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-.compare-col {
-  padding: 24px 22px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface);
-}
-.compare-col h3 {
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: -0.1px;
-  margin: 0 0 16px;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-}
-.compare-col ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 13px; }
-.compare-col li {
-  position: relative;
-  padding-left: 22px;
-  font-size: 13.5px;
-  line-height: 1.6;
-  color: var(--muted);
-}
-.compare-col--without h3 { color: var(--muted); }
-.compare-col--without li::before {
-  content: "–";
-  position: absolute;
-  left: 2px;
-  color: var(--muted);
-}
-.compare-col--with {
-  background: color-mix(in oklab, var(--accent) 7%, var(--surface));
-  border-color: color-mix(in oklab, var(--accent), var(--border-strong) 45%);
-}
-.compare-col--with h3 { color: var(--accent); }
-.compare-col--with li { color: var(--fg); }
-.compare-col--with li::before {
-  content: "✓";
-  position: absolute;
-  left: 0;
-  color: var(--accent);
-  font-weight: 700;
-  font-size: 12px;
-}
-@media (max-width: 720px) {
-  .compare-grid { grid-template-columns: 1fr; }
-}
-
-/* FAQ — native <details>/<summary>, no JS: keyboard-operable and
-   accessible by default, and immune to the hydration concerns a
-   client-side accordion would carry. */
-.faq-list { display: flex; flex-direction: column; gap: 10px; max-width: 720px; }
-.faq-item {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 0 20px;
-  background: var(--surface);
-  transition: border-color 160ms ease;
-}
-.faq-item:hover { border-color: var(--border-strong); }
-.faq-item[open] { border-color: var(--border-strong); }
-.faq-item summary {
-  cursor: pointer;
-  padding: 16px 0;
-  font-size: 14.5px;
-  font-weight: 600;
-  color: var(--fg);
-  list-style: none;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-.faq-item summary::-webkit-details-marker { display: none; }
-.faq-item summary::after {
-  content: "+";
-  flex: none;
-  color: var(--muted);
-  font-size: 19px;
-  font-weight: 400;
-  line-height: 1;
-}
-.faq-item[open] summary::after { content: "\2013"; }
-.faq-item summary:hover { color: var(--accent); }
-.faq-item p { margin: 0 0 18px; color: var(--muted); font-size: 13.5px; line-height: 1.65; max-width: 640px; }
-
-/* Closing CTA — last section before the footer, inherits the shared
-   `section` hairline rules but centers its own content instead of the
-   left-aligned prose the rest of the page uses. */
-.cta-section { text-align: center; }
-.cta-wrap { max-width: 560px; margin: 0 auto; }
-
-/* Card composition follows a shadcn.io "CTA Card / Inset Code Snippet"
-   reference layout: one bordered card, a headline, a subline, an inset
-   code snippet, a single pill CTA, a small caption underneath — rather
-   than the previous free-floating headline + separate button row. The
-   inset snippet reuses .terminal/.terminal-bar/.cmdbox as-is (see
-   .cta-terminal below) so it's guaranteed to match the hero's macOS
-   terminal chrome exactly, not just resemble it. */
-.cta-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 28px;
-  padding: 44px 36px;
-  border: 1px solid var(--border-strong);
-  border-radius: 16px;
-  background: var(--surface);
-}
-.cta-card-lead { margin: 0; max-width: 440px; }
-.cta-terminal { width: 100%; max-width: 440px; margin: 0; }
-.cta-card-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-.cta-card-button span { transition: transform 160ms ease; }
-.cta-card-button:hover span { transform: translateX(3px); }
-.cta-card-caption { margin: 0; color: var(--muted); font-size: 12px; }
-
-/* Pixel-swap hover, scoped to headline + subtext only — the code
-   snippet below (.cta-terminal, in the JSX) is deliberately OUTSIDE
-   this zone so its copy button is never covered and stays clickable
-   at all times, hover or not. Inspired by the "Pixel Swap" effect at
-   reactbits.dev/animations/pixel-swap, rebuilt here in plain CSS
-   against this site's own dark/purple palette rather than pulled from
-   there — that component lives in React Bits' paid Pro collection, and
-   this needed no new dependency anyway.
-
-   Staggered, but short: each square pops in on its own delay (--i,
-   the shuffle from page.tsx) for the same lively ripple-in feel as
-   the reference, but the total sweep is capped around 340ms (50 tiles
-   * 6ms max stagger + 150ms transition) — short enough that a normal
-   hover always plays all the way through to full, gapless coverage
-   instead of getting caught mid-wipe with part of the box still bare
-   (what a slower ~1s sweep looked like earlier). */
-.cta-swap {
-  position: relative;
-  overflow: hidden;
-  isolation: isolate;
-  width: 100%;
-  border-radius: 12px;
-}
-.cta-swap-face {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  padding: 8px;
-  transition: opacity 150ms ease;
-}
-.cta-swap:hover .cta-swap-face { opacity: 0; transition-duration: 100ms; }
-
-/* The mosaic layer: a grid of small squares, each scaled to 0 and
-   transparent at rest. --i (set inline per pixel in page.tsx, a fixed
-   deterministic shuffle rather than reading order) staggers when each
-   one grows in, so the wipe reads as scattered rather than a uniform
-   sweep — same idea as the reference's tiled reveal. 10x5 covers the
-   headline + subtext block (no longer the taller headline + subtext +
-   terminal block from an earlier version). */
-.cta-pixels {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  grid-template-rows: repeat(5, 1fr);
-  pointer-events: none;
-}
-.cta-pixel {
-  background: var(--accent);
-  border-radius: 3px;
-  transform: scale(0);
-  opacity: 0;
-  transition: transform 150ms cubic-bezier(0.22, 1, 0.36, 1), opacity 150ms ease;
-  transition-delay: calc(var(--i) * 6ms);
-}
-.cta-swap:hover .cta-pixel { transform: scale(1); opacity: 1; }
-
-/* Second face: white on the purple mosaic — "font kontras" — timed
-   to land just after the sweep's own worst-case cover time (49 * 6ms
-   stagger + 150ms ~= 440ms), so the reveal text only appears once the
-   wipe has actually finished covering the block. */
-.cta-swap-hover {
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 8px;
-  text-align: center;
-  opacity: 0;
-  transition: opacity 150ms ease;
-  pointer-events: none;
-}
-.cta-swap:hover .cta-swap-hover { opacity: 1; transition-delay: 340ms; }
-.cta-swap-hover-eyebrow {
-  font-size: clamp(20px, 3vw, 26px);
-  font-weight: 700;
-  letter-spacing: -0.3px;
-  line-height: 1.2;
-  color: #fff;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .cta-card-button span { transition: none; }
-  .cta-swap-face,
-  .cta-swap-hover,
-  .cta-pixel {
-    transition-duration: 1ms;
-    transition-delay: 0ms;
-  }
-}
-.cta-primary {
-  color: #fff !important;
-  background: var(--accent);
-  padding: 11px 24px;
-  border-radius: 999px;
-  font-size: 14px;
-  font-weight: 600;
-  transition: background 160ms ease;
-}
-.cta-primary:hover { background: color-mix(in oklab, var(--accent), white 12%); color: #fff !important; }
-.cta-secondary {
-  color: var(--fg);
-  padding: 11px 24px;
-  border: 1px solid var(--border-strong);
-  border-radius: 999px;
-  font-size: 14px;
-  font-weight: 600;
-  transition: border-color 160ms ease, color 160ms ease;
-}
-.cta-secondary:hover { border-color: var(--accent); color: var(--accent); }
-
-/* Footer — a big brand statement beside four real link columns, then
-   a logo/CTA row, then a thin utility bar. Same dark/hairline-border/
-   mono language as the rest of the homepage, not VSCO's own palette —
-   only the layout shape (statement + columns, pill CTAs, slim bottom
-   bar) is borrowed. */
-footer { padding: 88px 0 0; border-top: 1px solid var(--border); }
-
-.footer-top { display: flex; justify-content: space-between; gap: 48px; flex-wrap: wrap; padding-bottom: 56px; }
-.footer-brand-block { max-width: 360px; }
-/* The full logo lockup (fox-head mark + WASIT wordmark, W-White.png)
-   is the primary brand moment here, with the "verify the settlement"
-   line demoted to a small tracked caption underneath it rather than
-   competing with the logo as its own big statement. Only `height` is
-   fixed on the image; width tracks it via the image's own aspect
-   ratio (set through the width/height props on the next/image
-   element). */
-.footer-wordmark-img {
-  display: block;
-  height: clamp(40px, 6vw, 64px);
-  width: auto;
-  margin-bottom: 14px;
-}
-.footer-statement {
-  font-weight: 500;
-  font-size: clamp(9px, 1vw, 10px);
-  letter-spacing: 1.2px;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin: 6px 0 0;
-  opacity: 0.75;
-}
-.footer-columns { display: grid; grid-template-columns: repeat(3, minmax(120px, 1fr)); gap: 32px; flex: 1; max-width: 480px; }
-.footer-col h3 { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); font-weight: 600; margin: 0 0 16px; }
-.footer-col ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.footer-col a { color: var(--fg); font-size: 14px; }
-.footer-col a:hover { color: var(--accent); }
-
-
-.footer-bottom { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 20px 0 40px; }
-.fine { color: var(--muted); font-size: 12px; }
-
-@media (max-width: 640px) {
-  .compare-grid { grid-template-columns: 1fr; }
-  .links-grid { grid-template-columns: 1fr; }
-  .footer-columns { grid-template-columns: repeat(2, 1fr); max-width: none; }
 }

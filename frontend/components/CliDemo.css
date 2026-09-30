@@ -19,21 +19,21 @@
   margin-bottom: 10px;
 }
 .cli-demo-tab {
-  font: inherit;
-  font-size: 11px;
+  font-family: var(--font-code);
+  font-size: 10.5px;
   font-weight: 700;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   color: var(--muted);
   background: transparent;
   border: 1px solid var(--border-strong);
-  border-radius: 999px;
-  padding: 3px 11px;
+  padding: 4px 11px;
   cursor: pointer;
   transition: color 140ms ease, border-color 140ms ease, background 140ms ease;
 }
 .cli-demo-tab:hover { color: var(--fg); border-color: var(--accent); }
 .cli-demo-tab--active {
-  color: #fff;
+  color: var(--on-accent);
   background: var(--accent);
   border-color: var(--accent);
 }
@@ -95,7 +95,6 @@
   text-transform: uppercase;
   color: color-mix(in oklab, var(--accent), white 25%);
   border: 1px solid color-mix(in oklab, var(--accent), transparent 45%);
-  border-radius: 999px;
   padding: 1px 7px;
   line-height: 1.5;
 }

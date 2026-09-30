@@ -88,7 +88,7 @@ export function DocsArticle({
 
   return (
     <div className="flex items-start justify-center gap-12 px-6 py-10 md:px-10">
-      <article id="docs-content" className="typeset typeset-docs w-full max-w-[68ch]">
+      <article id="docs-content" className="typeset typeset-docs w-full min-w-0 max-w-[68ch]">
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           rehypePlugins={[rehypeSlug]}

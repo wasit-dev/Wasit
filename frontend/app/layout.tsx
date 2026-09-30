@@ -1,18 +1,22 @@
 import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/next";
-import { Fira_Mono, Plus_Jakarta_Sans } from "next/font/google";
+import { Archivo, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-const firaMono = Fira_Mono({
+// Archivo carries the whole type system: its width axis runs from
+// condensed to expanded, so the display headings (expanded, heavy) and
+// the body copy (normal width) come from one family. JetBrains Mono
+// sets every label, the navigation and the terminal output.
+const archivo = Archivo({
   subsets: ["latin"],
-  weight: ["400", "500", "700"],
-  variable: "--font-fira-mono",
+  axes: ["wdth"],
+  variable: "--font-archivo",
   display: "swap",
 });
 
-const plusJakartaSans = Plus_Jakarta_Sans({
+const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
-  variable: "--font-jakarta",
+  variable: "--font-jbmono",
   display: "swap",
 });
 
@@ -28,7 +32,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${firaMono.variable} ${plusJakartaSans.variable}`}>
+    <html lang="en" className={`${archivo.variable} ${jetbrainsMono.variable}`}>
       <body>
         {children}
         {/* Cookieless page-view counts; see /legal/privacy. */}

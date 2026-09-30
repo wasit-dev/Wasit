@@ -8,8 +8,7 @@
   width: 100%;
   height: 380px;
   margin: 28px 0 20px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  border: 1px solid var(--border-strong);
   overflow: hidden;
   background: var(--surface);
 }
@@ -42,18 +41,17 @@
   min-height: 184px;
   padding: 16px 12px;
   border: 1px solid var(--border-strong);
-  border-radius: 10px;
-  background: #111;
+  background: var(--surface-2);
   text-align: center;
   cursor: grab;
 }
 .flow-actor:active { cursor: grabbing; }
 .flow-actor--chain {
   border-color: color-mix(in oklab, var(--accent), transparent 30%);
-  background: color-mix(in oklab, var(--accent), #111 88%);
+  background: color-mix(in oklab, var(--accent), var(--surface-2) 88%);
   box-shadow: 0 0 0 1px color-mix(in oklab, var(--accent), transparent 70%);
 }
-.flow-actor-label { font-size: 13px; font-weight: 600; letter-spacing: 0.5px; color: var(--fg); }
+.flow-actor-label { font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fg); }
 .flow-actor--chain .flow-actor-label { color: color-mix(in oklab, var(--accent), white 25%); }
 .flow-actor-sub { font-size: 11px; color: var(--muted); }
 
@@ -77,7 +75,7 @@
   border: none;
 }
 
-.react-flow__edge-text { fill: var(--muted); font-size: 11px; }
+.react-flow__edge-text { fill: var(--muted); font-size: 11px; font-family: var(--font-code); }
 .react-flow__edge-textbg { fill: var(--surface); stroke: var(--border-strong); stroke-width: 1; }
 .flow-edge-accent .react-flow__edge-path { stroke: var(--accent); stroke-width: 2; }
 .flow-edge-accent .react-flow__edge-text { fill: color-mix(in oklab, var(--accent), white 20%); font-weight: 600; }
@@ -85,7 +83,6 @@
 .react-flow__controls {
   box-shadow: none;
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
   overflow: hidden;
 }
 .react-flow__controls-button {

@@ -1,6 +1,7 @@
 import Image from "next/image"
 import Link from "next/link"
 import { DocsSearch } from "./DocsSearch"
+import { CHECK_COUNT, WASIT_VERSION } from "@/lib/site-facts"
 
 const GITHUB_URL = "https://github.com/wasit-dev/wasit"
 
@@ -17,63 +18,44 @@ function GitHubIcon() {
 }
 
 /**
- * Full-width bar navbar (React Flow docs-style layout), spread edge to
- * edge with its own wide max-width rather than sharing the page's
- * 880px `.wrap` content column — see .navbar in globals.css for why
- * that column would otherwise bunch brand+links+actions toward the
- * center on anything wider than a laptop screen.
+ * The site-wide bar: wolf mark and mono wordmark, a strip of facts, the
+ * landing page's section links, then search, GitHub and a full-height
+ * Docs cell. Each group is its own bordered cell so the bar reads as one
+ * row of a grid, the same hairline grid the rest of the site is drawn on.
  *
- * Link labels mostly mirror the landing page's own section ids/
- * headings (see app/page.tsx) — keep the two in sync when either
- * changes. Two exceptions: #get-started has no nav link (it's reached
- * via the CTA buttons themselves), and "Quick start" points straight
- * at the docs page rather than an on-page section — the landing page
- * no longer has its own Quick Start block, since it just duplicated
- * that docs page.
+ * Link targets mirror the landing page's section ids (app/page.tsx) —
+ * keep the two in sync when either changes. "Quick start" is the one
+ * exception and goes straight to the docs page.
  *
- * `variant` picks the brand lockup. /docs pages get the wordmark with
- * the DOCS badge (app/docs/layout.tsx passes it), so a reader landing
- * mid-documentation can tell at a glance which surface they are on —
- * the sidebar deliberately carries no brand of its own, so this bar is
- * the only place that can say it. Everywhere else gets the plain
- * wordmark. Passed as a prop rather than read from usePathname() to
- * keep Nav a server component; the layout already knows the answer.
+ * `variant` adds a DOCS tag to the wordmark on /docs pages
+ * (app/docs/layout.tsx passes it): the docs sidebar carries no brand of
+ * its own, so this bar is the only place a reader landing mid-docs can
+ * tell which surface they are on. A prop rather than usePathname() keeps
+ * Nav a server component, which it has to be to read lib/site-facts.
  */
-const BRAND = {
-  site: { src: "/W-White.png", width: 387, height: 100 },
-  // These numbers are not a display size — .brand-logo pins the height
-  // and leaves width auto, so they only carry the intrinsic aspect
-  // ratio. They must be re-derived whenever an asset is re-exported:
-  // 4972x1284 and 5980x1484 respectively. Get them wrong and the
-  // browser scales the mark to the ratio declared here, not the one in
-  // the file.
-  docs: { src: "/docs.png", width: 403, height: 100 },
-} as const
-
-export function Nav({ variant = "site" }: { variant?: keyof typeof BRAND } = {}) {
-  const brand = BRAND[variant]
-
+export function Nav({ variant = "site" }: { variant?: "site" | "docs" } = {}) {
   return (
     <header className="site-header">
       <div className="navbar">
-        <div className="navbar-left">
-          <Link href="/" className="brand" aria-label="Wasit">
-            <Image
-              src={brand.src}
-              alt={variant === "docs" ? "Wasit Docs" : "Wasit"}
-              width={brand.width}
-              height={brand.height}
-              className="brand-logo"
-              priority
-            />
-          </Link>
-          <nav className="navlinks">
-            <Link href="/#comparison">Why Wasit</Link>
-            <Link href="/#how-it-works">How it works</Link>
-            <Link href="/#faq">FAQ</Link>
-            <Link href="/docs/start/try-it">Quick start</Link>
-          </nav>
+        <Link href="/" className="brand" aria-label={variant === "docs" ? "Wasit Docs" : "Wasit"}>
+          <Image src="/Wolf.png" alt="" width={1924} height={1284} className="brand-mark" priority />
+          <span className="brand-word">WASIT</span>
+          {variant === "docs" && <span className="brand-tag">DOCS</span>}
+        </Link>
+
+        <div className="nav-facts" aria-hidden="true">
+          <span>v{WASIT_VERSION}</span>
+          <span>x402 + MPP</span>
+          <span>{CHECK_COUNT} checks</span>
+          <span>verified on-chain</span>
         </div>
+
+        <nav className="navlinks" aria-label="Site">
+          <Link href="/#comparison">Why</Link>
+          <Link href="/#how-it-works">How it works</Link>
+          <Link href="/#faq">FAQ</Link>
+          <Link href="/docs/start/try-it">Quick start</Link>
+        </nav>
 
         <div className="navbar-right">
           <DocsSearch />
@@ -86,7 +68,7 @@ export function Nav({ variant = "site" }: { variant?: keyof typeof BRAND } = {})
           >
             <GitHubIcon />
           </a>
-          <Link href="/docs/overview/wasit" className="navlinks-docs">
+          <Link href="/docs/overview/wasit" className="nav-cta">
             Docs
           </Link>
         </div>

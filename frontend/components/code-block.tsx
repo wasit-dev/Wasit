@@ -20,9 +20,8 @@ function extractText(node: React.ReactNode): string {
 /**
  * Overrides ReactMarkdown's `pre` renderer for every fenced code block
  * (inline `code` spans are untouched — those never render inside a
- * `pre`). Renders as a small macOS-terminal-style window — traffic
- * light dots, the fence's language, and a copy button in one title
- * bar — with the code body syntax-colored by the dependency-free
+ * `pre`). Renders as a square terminal panel — the fence's language
+ * and a copy button in one mono title bar — with the code body syntax-colored by the dependency-free
  * tokenizer in lib/code-highlight.ts. A ```mermaid fence skips all of
  * this and renders as a diagram instead.
  */
@@ -62,10 +61,8 @@ export function CodeBlock({ children, className, ...props }: React.ComponentProp
   return (
     <div className="doc-code">
       <div className="doc-code-bar">
-        <span className="terminal-dot terminal-dot-red" />
-        <span className="terminal-dot terminal-dot-yellow" />
-        <span className="terminal-dot terminal-dot-green" />
-        {lang && <span className="doc-code-lang mono">{lang}</span>}
+        <span className="doc-code-square" aria-hidden="true" />
+        <span className="doc-code-lang mono">{lang || "text"}</span>
         <button
           type="button"
           onClick={onCopy}
