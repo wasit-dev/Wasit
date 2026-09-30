@@ -7,6 +7,7 @@ import { Crosshair } from "@/components/Crosshair";
 import { FaqList, type FaqEntry } from "@/components/FaqList";
 import { McpSession } from "@/components/McpSession";
 import { SequenceFlow } from "@/components/SequenceFlow";
+import { StackStrip } from "@/components/StackStrip";
 import { StrokeText } from "@/components/StrokeText";
 import { TechText } from "@/components/TechText";
 import { ScrollReveal } from "@/components/ScrollReveal";
@@ -255,6 +256,8 @@ export default function Home() {
             ))}
           </div>
         </div>
+
+        <StackStrip />
 
         <section id="comparison" className="band">
           <div className="frame">
