@@ -176,7 +176,7 @@ Wasit exists so these are found by a tool, before they are found by a user.
 | Area                                   | Status                                                                                                                                                                                                       |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | x402 read-only checks (`X402-01`–`05`) | Done, verified against a real facilitator                                                                                                                                                                    |
-| x402 payment checks (`X402-06`, `07`)  | Done, settles on testnet                                                                                                                                                                                     |
+| x402 payment checks (`X402-06`, `07`)  | Done, settlement verified from contract events                                                                                                                                                               |
 | MPP charge mode (`MPP-01`)             | Done, settlement verified from contract events                                                                                                                                                               |
 | MPP channel mode (`MPP-10`–`14`)       | Done, including destructive close                                                                                                                                                                            |
 | CLI                                    | Done — five subcommands plus an interactive dashboard                                                                                                                                                        |
@@ -348,9 +348,9 @@ PASS  X402-01  402 Response Status
       Server responded with 402 as required.
 ...
 PASS  X402-06  Signature Resubmit Accepted
-      Valid payment accepted (HTTP 200).
+      Valid payment accepted (HTTP 200) and settled on-chain for exactly the advertised 100000 base units of CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA to GALVZ57VAY6BE33WYPJMUJ27PFAUDRQ6ATTVMIIF4STTGQTXDBEIBXUI, verified from the transfer event (tx 741c155b620641a7f8845c14e7857201aed67763ea7ca087a7adf921b550a474).
 PASS  X402-07  Invalid Signature Rejected
-      Corrupted payment correctly rejected (HTTP 402).
+      Payment with a corrupted authorization signature correctly rejected (HTTP 402).
 
 7 passed.
 ```

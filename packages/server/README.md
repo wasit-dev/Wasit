@@ -63,7 +63,7 @@ Any other stdio-based MCP client works the same way: `command: "npx"`, `args: ["
 | `wasit_mpp_channel_test` | `MPP-10`–`12`, `14` | Free |
 | `wasit_mpp_channel_test_with_close` | + `MPP-13` | **Destroys a channel — permanent** |
 
-`wasit_x402_test` also takes optional `method`, `body` and `headers` for a paid endpoint that is not a plain `GET`, matching the CLI's `--method`, `--body` and `--header`. Every probe, including the payment checks, uses the same request shape. Header values appear in the agent's transcript, so never pass a credential as a header; test an endpoint that needs one with the CLI instead.
+`wasit_x402_test` also takes optional `method`, `body` and `headers` for a paid endpoint that is not a plain `GET`, matching the CLI's `--method`, `--body` and `--header`. Every probe, including the payment checks, uses the same request shape. Header values appear in the agent's transcript, so never pass a credential as a header; test an endpoint that needs one with the CLI instead. Its optional `rpcUrl`, like the CLI's `--rpc-url`, overrides the Soroban RPC endpoint `X402-06` reads to verify the settlement on-chain.
 
 The fourth tool is registered **only** when the server is started with `WASIT_ALLOW_DESTRUCTIVE=1` or `--allow-destructive`. Without that opt-in it's absent from `tools/list` entirely — an agent can't call what it can't see. Even then it refuses unless a `destructiveChannel` is named and the target's own challenge advertises that same address.
 

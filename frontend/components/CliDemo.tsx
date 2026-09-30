@@ -35,11 +35,13 @@ interface Script {
 // a target that conforms. Illustrative numbers (channel balance, ledger)
 // stand in for values that are only known at run time, the same way
 // "https://api.example.com/paid-endpoint" stands in for a real target URL.
+// X402-06's amount, addresses and transaction come from a real testnet run
+// of 0.6.0 against Stellar's reference paywall.
 
 const X402_SCRIPT: Script = {
   command: "wasit test --target https://api.example.com/paid-endpoint",
   ariaLabel:
-    "Example wasit test run against a paid endpoint: all seven x402 checks pass, including a check that a payment with a corrupted signature is refused with HTTP 402.",
+    "Example wasit test run against a paid endpoint: all seven x402 checks pass, including a payment whose settlement is verified on-chain and a check that a payment with a corrupted authorization signature is refused with HTTP 402.",
   results: [
     {
       status: "PASS",
@@ -75,13 +77,14 @@ const X402_SCRIPT: Script = {
       status: "PASS",
       id: "X402-06",
       name: "Signature Resubmit Accepted",
-      detail: "Valid payment accepted (HTTP 200).",
+      detail:
+        "Valid payment accepted (HTTP 200) and settled on-chain for exactly the advertised 100000 base units of CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA to GALVZ57VAY6BE33WYPJMUJ27PFAUDRQ6ATTVMIIF4STTGQTXDBEIBXUI, verified from the transfer event (tx 741c155b620641a7f8845c14e7857201aed67763ea7ca087a7adf921b550a474).",
     },
     {
       status: "PASS",
       id: "X402-07",
       name: "Invalid Signature Rejected",
-      detail: "Corrupted payment correctly rejected (HTTP 402).",
+      detail: "Payment with a corrupted authorization signature correctly rejected (HTTP 402).",
       negative: true,
     },
   ],

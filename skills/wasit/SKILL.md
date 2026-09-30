@@ -53,7 +53,7 @@ npx @wasit-dev/cli test --target https://your-service.example/paid --read-only
 
 That runs `X402-01` through `X402-05`. Add a payer key
 (`--payer-key`/`STELLAR_PRIVATE_KEY`) to also run `X402-06`/`07`, which settle
-a real testnet payment. `wasit mpp-charge` and `wasit mpp-channel` cover MPP;
+a real testnet payment; `X402-06` then verifies that settlement on-chain. `wasit mpp-charge` and `wasit mpp-channel` cover MPP;
 channel mode is free except for the destructive close check, which is opt-in
 only (`--allow-destructive`) and never runs by accident.
 

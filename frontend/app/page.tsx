@@ -104,7 +104,7 @@ export default function Home() {
               </h1>
               <p className="tagline">
                 Wasit runs the real payment flow against your service, not a
-                schema check against its response — and verifies MPP settlement
+                schema check against its response — and verifies settlement
                 on-chain, from the token contract&rsquo;s own transfer event.
               </p>
               <div className="hero-cta-row">

@@ -100,6 +100,8 @@
   line-height: 1.5;
 }
 
-.cli-demo-detail { color: var(--muted); }
+/* X402-06's detail carries 56-character addresses and a 64-character hash,
+   which would push past a phone-width box without a break point. */
+.cli-demo-detail { color: var(--muted); overflow-wrap: anywhere; }
 .cli-demo-blank { height: 11px; }
 .cli-demo-summary { color: var(--fg); font-weight: 600; padding-top: 2px; }

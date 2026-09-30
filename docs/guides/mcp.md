@@ -103,6 +103,8 @@ endpoint that is not a plain `GET`, matching the CLI's `--method`, `--body` and
 `--header`. Every probe, including the payment checks, is sent with the same
 request shape. Header values appear in the agent's transcript, so never pass a
 credential as a header; test an endpoint that needs one with the CLI instead.
+Its optional `rpcUrl`, like the CLI's `--rpc-url`, overrides the Soroban RPC
+endpoint `X402-06` reads to verify the settlement on-chain.
 
 ## Resource
 

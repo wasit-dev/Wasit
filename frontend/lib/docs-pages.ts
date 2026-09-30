@@ -55,7 +55,7 @@ list of which environment variable each check reads — including
 | You want to run | You need to have |
 | --- | --- |
 | \`X402-01\`–\`05\` | Nothing at all |
-| \`X402-06\`, \`07\` | A testnet account funded with XLM |
+| \`X402-06\`, \`07\` | A testnet account funded with XLM **and** the asset the target charges in, usually USDC |
 | \`MPP-01\` | A testnet account funded with XLM **and** USDC |
 | \`MPP-10\`–\`14\` | A commitment signing key — no funds, no account |
 
@@ -221,6 +221,9 @@ MPP_PAYER_PUBLIC=G...
 \`\`\`bash
 wasit wallet fund --role mpp-charge --asset usdc
 \`\`\`
+
+An x402 target charges in whatever asset its challenge advertises, which
+is usually USDC too; fund that key the same way with \`--role x402\`.
 
 This opens the Circle testnet USDC trustline automatically. Receiving an
 actual balance needs one manual step, because no scriptable testnet USDC
