@@ -319,9 +319,9 @@ node packages/cli/dist/index.js mpp-channel --target http://localhost:3003/data
 <table>
   <tr>
     <td width="50%" valign="top" align="center">
-      <a href="docs/media/d1-x402.gif"><img src="docs/media/d1-x402.gif" width="380" alt="The wasit CLI running the x402 checks against a local fixture: five read-only, then all seven" /></a>
+      <a href="docs/media/x402-0.6.0.gif"><img src="docs/media/x402-0.6.0.gif" width="380" alt="The wasit CLI running the x402 checks against a local fixture: five read-only, then all seven, with the payment's settlement verified on-chain" /></a>
       <br />
-      <sub><b>CLI</b> &middot; <code>npx @wasit-dev/cli@0.4.0</code><br />catalogue, read-only 5/5, then 7/7 with a settled payment</sub>
+      <sub><b>CLI</b> &middot; <code>npx @wasit-dev/cli@0.6.0</code><br />catalogue, read-only 5/5, then 7/7 with the settlement verified on-chain</sub>
     </td>
     <td width="50%" valign="top" align="center">
       <a href="https://github.com/wasit-dev/wasit/releases/tag/v0.4.0"><img src="docs/media/d3-mcp-session-poster.png" width="380" alt="The same checks run as MCP tool calls from Claude Code, ending with the MPP channel suite conformant" /></a>
@@ -332,11 +332,12 @@ node packages/cli/dist/index.js mpp-channel --target http://localhost:3003/data
 </table>
 
 Click either one for full size. Both ran against the published packages rather
-than a local build: the CLI capture opens with `--version` printing `0.4.0`, and
-the MCP session started the server through `npx -y @wasit-dev/server@0.4.0`. The
-raw asciinema capture behind the left-hand one is
-[`docs/media/d1-x402.cast`](docs/media/d1-x402.cast), replayable with
-`asciinema play`.
+than a local build: the CLI capture opens with `--version` printing `0.6.0`, and
+the MCP session, recorded with 0.4.0, started the server through
+`npx -y @wasit-dev/server@0.4.0`. The raw asciinema capture behind the left-hand
+one is [`docs/media/x402-0.6.0.cast`](docs/media/x402-0.6.0.cast), replayable
+with `asciinema play`. The 0.4.0 capture submitted as SOW evidence stays at
+[`docs/media/d1-x402.gif`](docs/media/d1-x402.gif).
 
 The right-hand session is worth a second look. It calls `wasit_mpp_charge_test`
 and then `wasit_mpp_channel_test` back to back in a single server process. Until
