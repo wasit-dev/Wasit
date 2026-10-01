@@ -7,7 +7,7 @@ narrative, read the [completion summary](2026-09-20-completion-summary.md).
 **Builder:** Muhammad Dzakwan Najmi · **Program:** Stellar Chapter Ambassador
 Indonesia Instaward · **Repo:** [wasit-dev/wasit](https://github.com/wasit-dev/wasit)
 · **Site:** [usewasit.dev](https://usewasit.dev) · **Packages:** `@wasit-dev/core`,
-`@wasit-dev/cli`, `@wasit-dev/server` at 0.5.0 · **As of:** 2026-09-28
+`@wasit-dev/cli`, `@wasit-dev/server` at 0.6.0 · **As of:** 2026-10-01
 
 | Deliverable | Status |
 |---|---|
@@ -29,7 +29,8 @@ Indonesia Instaward · **Repo:** [wasit-dev/wasit](https://github.com/wasit-dev/
 Supporting, not SOW rows:
 [npm package](https://www.npmjs.com/package/@wasit-dev/cli) ·
 [published package matches source](2026-09-06-npm-package-parity-run.md) ·
-[7/7 against `stellar/x402-stellar`'s reference implementation](2026-09-06-reference-implementation-run.md)
+[7/7 against `stellar/x402-stellar`'s reference implementation](2026-09-06-reference-implementation-run.md),
+[again with 0.6.0, `X402-06` verified on-chain](2026-09-30-x402-0.6.0-verification-run.md)
 
 ## D2 — MPP Charge and Channel Flow Simulator
 
@@ -91,6 +92,7 @@ and what it does and does not establish. Newest first.
 
 | Date | File | What it shows | Deliverable |
 |---|---|---|---|
+| 2026-09-30 | [x402-0.6.0-verification-run](2026-09-30-x402-0.6.0-verification-run.md) | 0.6.0's stricter `X402-06` and `X402-07`, A/B against 0.5.0: servers built to skip settlement, misreport it or skip signature checks pass 0.5.0 and fail 0.6.0. `stellar/x402-stellar`'s reference still passes 7/7, with `X402-06` verified on-chain. Registry parity for the published 0.6.0 | D1 |
 | 2026-09-28 | [authorized-third-party-run](2026-09-28-authorized-third-party-run.md) | Published 0.5.0 against defi-copilot, a third-party service, with its operator's written authorization, as a local instance: 3 pass, 2 diverge from the Stellar spec (x402 v1, non-CAIP-2 network), 2 no verdict, nothing paid. Also 0.5.0 registry parity against Wasit's own fixtures | D2 |
 | 2026-09-24 | [official-sdk-reference-run](2026-09-24-official-sdk-reference-run.md) | Published 0.4.0 against `stellar/stellar-mpp-sdk`'s own example servers. Charge settles on-chain; an A/B across the SDK's `mppx` 0.10.1 bump shows rejected channel vouchers moving from 402 to 500 ([#82](https://github.com/stellar/stellar-mpp-sdk/issues/82)). Closes 0.4.0 registry parity | D2 |
 | 2026-09-20 | [completion-summary](2026-09-20-completion-summary.md) | One-page summary of every deliverable and what is still open | Overall |
@@ -100,6 +102,7 @@ and what it does and does not establish. Newest first.
 | 2026-09-05 | [full-settlement-run](2026-09-05-full-settlement-run.md) | Every suite against Wasit's own fixtures, with real testnet settlement, including negative checks | D2 |
 | 2026-08-15 | [ecosystem survey](2026-08-15-third-party-run.md) | Read-only x402 checks against seven cloned public repos, run on our machine without contacting their operators | Context only, not SOW evidence |
 
-**What none of these is.** None of these runs is the operator-authorized
-third-party test. Every target was either Wasit's own fixture or open-source
-code run on our machine, and no operator was contacted.
+**What the others are not.** Apart from the 2026-09-28 run, none of these is
+the operator-authorized third-party test. Every other target was either Wasit's
+own fixture or open-source code run on our machine, and no operator was
+contacted.
