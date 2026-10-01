@@ -32,6 +32,24 @@ for both MPP charge payments and x402 payments.
 
 </div>
 
+<table>
+  <tr>
+    <td width="50%" valign="top" align="center">
+      <a href="docs/media/x402-0.6.0.gif"><img src="docs/media/x402-0.6.0.gif" width="380" alt="The wasit CLI running the x402 checks against a local fixture: five read-only, then all seven, with the payment's settlement verified on-chain" /></a>
+      <br />
+      <sub><b>CLI</b> &middot; <code>npx @wasit-dev/cli@0.6.0</code><br />catalogue, read-only 5/5, then 7/7 with the settlement verified on-chain</sub>
+    </td>
+    <td width="50%" valign="top" align="center">
+      <a href="docs/media/mcp-0.6.0.gif"><img src="docs/media/mcp-0.6.0.gif" width="380" alt="The same checks run as MCP tool calls from Claude Code: x402 7/7 with the settlement verified on-chain, then MPP charge and channel conformant" /></a>
+      <br />
+      <sub><b>MCP</b> &middot; the same checks from Claude Code<br />x402, then MPP charge and channel in one session</sub>
+    </td>
+  </tr>
+</table>
+
+<p align="center"><sub>Both ran the published 0.6.0 packages against the local fixtures in
+<a href="#trying-it">Trying It</a>. Click either one for full size.</sub></p>
+
 ---
 
 ## Table of Contents
@@ -316,30 +334,18 @@ node packages/cli/dist/index.js mpp-charge --target http://localhost:3002/data
 node packages/cli/dist/index.js mpp-channel --target http://localhost:3003/data
 ```
 
-<table>
-  <tr>
-    <td width="50%" valign="top" align="center">
-      <a href="docs/media/x402-0.6.0.gif"><img src="docs/media/x402-0.6.0.gif" width="380" alt="The wasit CLI running the x402 checks against a local fixture: five read-only, then all seven, with the payment's settlement verified on-chain" /></a>
-      <br />
-      <sub><b>CLI</b> &middot; <code>npx @wasit-dev/cli@0.6.0</code><br />catalogue, read-only 5/5, then 7/7 with the settlement verified on-chain</sub>
-    </td>
-    <td width="50%" valign="top" align="center">
-      <a href="https://github.com/wasit-dev/wasit/releases/tag/v0.4.0"><img src="docs/media/d3-mcp-session-poster.png" width="380" alt="The same checks run as MCP tool calls from Claude Code, ending with the MPP channel suite conformant" /></a>
-      <br />
-      <sub><b>MCP</b> &middot; the same checks from Claude Code<br />charge then channel in one session &middot; <a href="https://github.com/wasit-dev/wasit/releases/tag/v0.4.0">watch</a></sub>
-    </td>
-  </tr>
-</table>
 
-Click either one for full size. Both ran against the published packages rather
-than a local build: the CLI capture opens with `--version` printing `0.6.0`, and
-the MCP session, recorded with 0.4.0, started the server through
-`npx -y @wasit-dev/server@0.4.0`. The raw asciinema capture behind the left-hand
-one is [`docs/media/x402-0.6.0.cast`](docs/media/x402-0.6.0.cast), replayable
-with `asciinema play`. The 0.4.0 capture submitted as SOW evidence stays at
-[`docs/media/d1-x402.gif`](docs/media/d1-x402.gif).
+The two captures at the top of this README ran against these fixtures, from the
+published packages rather than a local build: the CLI capture opens with
+`--version` printing `0.6.0`, and the MCP session started the server through
+`npx -y @wasit-dev/server@0.6.0`. The
+raw asciinema captures are [`docs/media/x402-0.6.0.cast`](docs/media/x402-0.6.0.cast)
+and [`docs/media/mcp-0.6.0.cast`](docs/media/mcp-0.6.0.cast), replayable with
+`asciinema play`. The 0.4.0 captures submitted as SOW evidence stay available:
+the CLI at [`docs/media/d1-x402.gif`](docs/media/d1-x402.gif), the MCP session in
+the [v0.4.0 release](https://github.com/wasit-dev/wasit/releases/tag/v0.4.0).
 
-The right-hand session is worth a second look. It calls `wasit_mpp_charge_test`
+The MCP session is worth a second look. It calls `wasit_mpp_charge_test`
 and then `wasit_mpp_channel_test` back to back in a single server process. Until
 0.4.0 that sequence failed every time, for a reason that had nothing to do with
 the target being tested:
