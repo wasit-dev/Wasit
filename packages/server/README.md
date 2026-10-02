@@ -1,6 +1,6 @@
 # @wasit-dev/server
 
-MCP server exposing [Wasit](https://github.com/wasit-dev/wasit)'s **x402** / **MPP** conformance checks as tools, for Claude Code, Claude Desktop, and any other MCP-compatible agent.
+MCP server exposing [Wasit](https://github.com/wasit-dev/wasit)'s **x402** / **MPP** conformance checks as tools, for Claude Code, Claude Desktop, Codex, Cursor, VS Code, and any other MCP-compatible agent.
 
 The suite logic isn't reimplemented here — this is a thin adapter over [`@wasit-dev/core`](https://www.npmjs.com/package/@wasit-dev/core), the same package [`@wasit-dev/cli`](https://www.npmjs.com/package/@wasit-dev/cli) runs. An agent's run and a CLI run against the same target can never disagree.
 
@@ -16,7 +16,7 @@ npx -y @wasit-dev/server
 
 Transport is stdio. Requires Node.js `>=22`.
 
-## Claude Code
+## <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/wasit-dev/Wasit/main/docs/media/clients/claude-paper.svg" /><img src="https://raw.githubusercontent.com/wasit-dev/Wasit/main/docs/media/clients/claude-ink.svg" height="22" alt="" /></picture> Claude Code
 
 ```bash
 claude mcp add --transport stdio wasit \
@@ -29,7 +29,7 @@ claude mcp add --transport stdio wasit \
 
 Verify it connected with `claude mcp list`, then ask directly — for example "run wasit_x402_test against https://my-service.example.com". Remove it later with `claude mcp remove wasit`.
 
-## Claude Desktop
+## <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/wasit-dev/Wasit/main/docs/media/clients/claude-paper.svg" /><img src="https://raw.githubusercontent.com/wasit-dev/Wasit/main/docs/media/clients/claude-ink.svg" height="22" alt="" /></picture> Claude Desktop
 
 Settings → Developer → Edit Config, then add a `wasit` entry under `mcpServers`:
 
@@ -52,7 +52,17 @@ Settings → Developer → Edit Config, then add a `wasit` entry under `mcpServe
 
 Fully quit and restart Claude Desktop (not just close the window — use the Claude menu, Quit) for it to pick up the new server. If it doesn't show up under the connectors indicator, check `~/Library/Logs/Claude/mcp-server-wasit.log` (macOS) or `%APPDATA%\Claude\logs\mcp-server-wasit.log` (Windows).
 
-Any other stdio-based MCP client works the same way: `command: "npx"`, `args: ["-y", "@wasit-dev/server"]`, plus the environment variables above. Use an absolute path to `node`/the server entrypoint instead if launching from a local checkout, since a client starts the process from a working directory you don't control.
+## Codex, Cursor, VS Code and other clients
+
+Any stdio-based MCP client works the same way: `command: "npx"`, `args: ["-y", "@wasit-dev/server"]`, plus the environment variables above. Where each client keeps it:
+
+| Client | Config file | Shape |
+|---|---|---|
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/wasit-dev/Wasit/main/docs/media/clients/openai-paper.svg" /><img src="https://raw.githubusercontent.com/wasit-dev/Wasit/main/docs/media/clients/openai-ink.svg" height="18" alt="" /></picture> Codex | `~/.codex/config.toml` | `[mcp_servers.wasit]` with `command`, `args`, and `env_vars` to forward keys from your shell |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/wasit-dev/Wasit/main/docs/media/clients/cursor-paper.svg" /><img src="https://raw.githubusercontent.com/wasit-dev/Wasit/main/docs/media/clients/cursor-ink.svg" height="18" alt="" /></picture> Cursor | `.cursor/mcp.json` or `~/.cursor/mcp.json` | `mcpServers.wasit`, with `envFile` pointing at your `.env` |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/wasit-dev/Wasit/main/docs/media/clients/vscode-paper.svg" /><img src="https://raw.githubusercontent.com/wasit-dev/Wasit/main/docs/media/clients/vscode-ink.svg" height="18" alt="" /></picture> VS Code (Copilot agent mode) | `.vscode/mcp.json` | `servers.wasit` with `"type": "stdio"` and `envFile` |
+
+Full snippets are in the [MCP guide](https://github.com/wasit-dev/wasit/blob/main/docs/guides/mcp.md#codex-cursor-vs-code-and-other-clients). Keep keys out of a config file that might be committed. Client names and logos are trademarks of their owners. Use an absolute path to `node`/the server entrypoint instead if launching from a local checkout, since a client starts the process from a working directory you don't control.
 
 ## Tools
 

@@ -1096,6 +1096,40 @@ mark { color: inherit; background: none; }
 }
 .mcp-side { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
 .mcp-side .section-lead { margin: 0; }
+/* "Works with": one cell per MCP client, its mark and name, each linking to
+   that client's config in the MCP guide. */
+.mcp-clients { display: flex; flex-direction: column; gap: 10px; }
+.mcp-clients-label {
+  font-family: var(--font-code);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.mcp-clients ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  border-top: 1px solid var(--border-strong);
+  border-left: 1px solid var(--border-strong);
+}
+.mcp-clients li { border-right: 1px solid var(--border-strong); border-bottom: 1px solid var(--border-strong); }
+.mcp-clients a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg);
+  transition: background 140ms ease, color 140ms ease;
+}
+.mcp-client-mark { flex: none; width: 18px; height: 18px; color: var(--fg); transition: color 140ms ease; }
+.mcp-clients a:hover { background: var(--accent); color: var(--on-accent); }
+.mcp-clients a:hover .mcp-client-mark { color: var(--on-accent); }
+
 .mcp-tools { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border-strong); }
 .mcp-tools li {
   display: grid;

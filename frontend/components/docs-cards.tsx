@@ -106,7 +106,7 @@ const SECTIONS: DocSection[] = [
         href: "/docs/mcp/overview",
         icon: Cable,
         title: "MCP Guide",
-        description: "Wire Wasit into Claude Code, Claude Desktop, or any MCP client.",
+        description: "Wire Wasit into Claude Code, Codex, Cursor, VS Code, or any MCP client.",
       },
       {
         href: "/docs/core/overview",

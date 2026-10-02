@@ -2,6 +2,7 @@ import type { ComponentPropsWithoutRef, ReactNode } from "react"
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown"
 import remarkGfm from "remark-gfm"
 import rehypeSlug from "rehype-slug"
+import { ClientLogo, clientMarkForHeading } from "@/components/ClientLogo"
 import { CodeBlock } from "@/components/code-block"
 import { DocsToc } from "@/components/docs-toc"
 import { DocsPager } from "@/components/docs-pager"
@@ -54,6 +55,28 @@ function MarkdownCell(props: ComponentPropsWithoutRef<"td">) {
 }
 
 /**
+ * Headings that name an MCP client ("Codex", "VS Code") get that client's
+ * mark in front of them, so the MCP guide's config sections are findable at
+ * a glance. Every other heading renders unchanged. The mark is aria-hidden
+ * and carries no text, so the table of contents, which reads each heading's
+ * textContent, still lists the plain name.
+ */
+function withClientMark(Tag: "h2" | "h3") {
+  return function Heading({ children, ...props }: ComponentPropsWithoutRef<"h2">) {
+    const mark = typeof children === "string" ? clientMarkForHeading(children) : undefined
+    return (
+      <Tag {...props}>
+        {mark && <ClientLogo mark={mark} className="docs-client-mark" />}
+        {children}
+      </Tag>
+    )
+  }
+}
+
+const MarkdownH2 = withClientMark("h2")
+const MarkdownH3 = withClientMark("h3")
+
+/**
  * The shared shell for every /docs page: one page's markdown, rendered
  * on its own (never concatenated with any other page anymore), plus its
  * own right-hand table of contents and, when `slug` is passed, a
@@ -99,6 +122,8 @@ export function DocsArticle({
           }
           components={{
             pre: CodeBlock,
+            h2: MarkdownH2,
+            h3: MarkdownH3,
             table: MarkdownTable,
             thead: TableHeader,
             tbody: TableBody,

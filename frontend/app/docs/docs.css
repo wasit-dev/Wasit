@@ -563,6 +563,17 @@
   }
 }
 
+/* An MCP client's mark in front of the heading that names it
+   (components/docs-article.tsx). Sized to the heading's cap height. */
+.typeset-docs .docs-client-mark {
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  margin-right: 0.45em;
+  vertical-align: -0.08em;
+  color: var(--accent);
+}
+
 /* Breadcrumb link hover ("Docs" / group name, top of a docs page) —
    shadcn's own component only ships `hover:text-foreground`, which has
    nothing to do with the site's purple accent. Unlayered so it beats

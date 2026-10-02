@@ -3,6 +3,7 @@ import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { CopyButton } from "@/components/CopyButton";
 import { CliDemo } from "@/components/CliDemo";
+import { ClientLogo, MCP_CLIENTS } from "@/components/ClientLogo";
 import { Crosshair } from "@/components/Crosshair";
 import { FaqList, type FaqEntry } from "@/components/FaqList";
 import { McpSession } from "@/components/McpSession";
@@ -73,7 +74,7 @@ const PACKAGES: PackageCard[] = [
   {
     tag: "MCP",
     name: "@wasit-dev/server",
-    body: "The same checks as MCP tools, for Claude Code, Claude Desktop and any other MCP-compatible agent.",
+    body: "The same checks as MCP tools, for Claude Code, Codex, Cursor, VS Code and any other MCP client.",
     href: "/docs/mcp/overview",
     cmd: "npx -y @wasit-dev/server",
   },
@@ -370,10 +371,24 @@ export default function Home() {
             <div className="mcp-grid">
               <div className="mcp-side" data-reveal>
                 <p className="section-lead">
-                  The MCP server puts the same checks in front of Claude Code, Claude Desktop and any other MCP
-                  client — as <mark className="hl">tools it can call</mark>, with the check catalogue as a resource
-                  it can read first.
+                  The MCP server puts the same checks in front of Claude Code, Codex, Cursor, VS Code and any
+                  other MCP client — as <mark className="hl">tools it can call</mark>, with the check catalogue as a
+                  resource it can read first.
                 </p>
+                {/* Each client links to its own config in the MCP guide. */}
+                <div className="mcp-clients">
+                  <span className="mcp-clients-label">Works with</span>
+                  <ul>
+                    {MCP_CLIENTS.map((client) => (
+                      <li key={client.name}>
+                        <Link href={client.href}>
+                          <ClientLogo mark={client.mark} className="mcp-client-mark" />
+                          {client.name}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
                 <ul className="mcp-tools">
                   {MCP_TOOLS.map((tool) => (
                     <li key={tool.name} className={tool.warn ? "is-warn" : undefined}>

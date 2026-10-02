@@ -108,7 +108,7 @@ export const DOCS_NAV: DocNavEntry[] = [
     pages: [
       { title: "Overview", slug: ["mcp", "overview"] },
       { title: "Claude Code & Claude Desktop", slug: ["mcp", "claude-code"] },
-      { title: "Manual / other clients", slug: ["mcp", "other-clients"] },
+      { title: "Codex, Cursor, VS Code and other clients", slug: ["mcp", "other-clients"] },
       { title: "Tools", slug: ["mcp", "tools"] },
       { title: "Resource", slug: ["mcp", "resource"] },
       { title: "Secrets are never tool arguments", slug: ["mcp", "secrets"] },

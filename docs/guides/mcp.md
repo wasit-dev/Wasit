@@ -67,13 +67,92 @@ connectors indicator in the message box. If the server doesn't show up, check
 `~/Library/Logs/Claude/mcp-server-wasit.log` (macOS) or
 `%APPDATA%\Claude\logs\mcp-server-wasit.log` (Windows) for the stderr output.
 
-## Manual / other clients
+## Codex, Cursor, VS Code and other clients
 
-Any MCP client that supports stdio works the same way — point `command` at
-`npx`, `args` at `["-y", "@wasit-dev/server"]`, and set the environment
-variables above. Use absolute paths for `node packages/server/dist/index.js`
+Every client below launches the same stdio server; only the config file
+differs. The read-only checks (`X402-01`–`05`) need no keys at all, so the
+environment can be left out until you want the checks that pay.
+
+Keep keys out of a project config file that might be committed. The examples
+read them from your existing `.env` (which `.gitignore` already covers) or
+forward them from your shell, rather than writing them into the config.
+
+### Codex
+
+In `~/.codex/config.toml`, or `.codex/config.toml` for one project:
+
+```toml
+[mcp_servers.wasit]
+command = "npx"
+args = ["-y", "@wasit-dev/server"]
+env_vars = ["STELLAR_PRIVATE_KEY", "MPP_PAYER_SECRET", "COMMITMENT_SECRET_HEX"]
+
+[mcp_servers.wasit.env]
+MPP_STELLAR_NETWORK = "stellar:testnet"
+```
+
+`env_vars` forwards those variables from the shell Codex was started in, so
+export them first (`set -a; source .env; set +a`). For the read-only checks
+alone, `codex mcp add wasit -- npx -y @wasit-dev/server` is enough. Check it
+with `codex mcp list`.
+
+### Cursor
+
+In `.cursor/mcp.json` at the project root, or `~/.cursor/mcp.json` for every
+project:
+
+```json
+{
+  "mcpServers": {
+    "wasit": {
+      "command": "npx",
+      "args": ["-y", "@wasit-dev/server"],
+      "envFile": "${workspaceFolder}/.env"
+    }
+  }
+}
+```
+
+In the global file, where there is no workspace `.env`, pass each variable as
+`"env": { "STELLAR_PRIVATE_KEY": "${env:STELLAR_PRIVATE_KEY}", ... }` instead.
+
+### VS Code
+
+For Copilot's agent mode, in `.vscode/mcp.json`. The top-level key is
+`servers`, not `mcpServers`:
+
+```json
+{
+  "servers": {
+    "wasit": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@wasit-dev/server"],
+      "envFile": "${workspaceFolder}/.env"
+    }
+  }
+}
+```
+
+To be asked for a key instead of reading `.env`, declare it under `inputs` with
+`"password": true` and reference it as `"${input:id}"` in `env`.
+
+### Other clients
+
+Any MCP client that runs stdio servers takes the same three things: `command`
+set to `npx`, `args` set to `["-y", "@wasit-dev/server"]`, and the environment
+variables `MPP_STELLAR_NETWORK`, `STELLAR_PRIVATE_KEY`, `MPP_PAYER_SECRET` and
+`COMMITMENT_SECRET_HEX`. Use absolute paths for `node packages/server/dist/index.js`
 if launching from a local checkout instead of npx, since a client launches the
 server from a working directory you don't control.
+
+**What has been run.** Claude Code is the client Wasit's MCP server has been
+run in end to end, including the session recorded in the README. Every CI run
+also installs the published package and completes an MCP handshake with it
+over stdio (`npm run verify:clean-install`), which is the same exchange any of
+these clients performs. The configurations above follow each client's own
+documentation as of October 2026. Client names and logos are trademarks of
+their owners, shown only to say which client a configuration is for.
 
 ## Tools
 

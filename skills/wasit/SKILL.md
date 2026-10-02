@@ -26,7 +26,7 @@ of them.
 
 - Testing your own x402 or MPP service before you ship it, with no keys and no
   cost: `npx @wasit-dev/cli test --target <url> --read-only`.
-- Wiring an agent (Claude Code, Claude Desktop, any MCP client) to run checks
+- Wiring an agent (Claude Code, Claude Desktop, Codex, Cursor, VS Code, any MCP client) to run checks
   programmatically: read the MCP section below, or the full guide.
 - Need to know exactly what a check ID asserts before trusting or disputing a
   result: read `docs/CHECKS.md` in the repository, or the `wasit://checks` MCP
