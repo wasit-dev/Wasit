@@ -137,6 +137,25 @@ For Copilot's agent mode, in `.vscode/mcp.json`. The top-level key is
 To be asked for a key instead of reading `.env`, declare it under `inputs` with
 `"password": true` and reference it as `"${input:id}"` in `env`.
 
+### GitHub Copilot CLI
+
+The same shape as `claude mcp add`. It writes the user-level
+`~/.copilot/mcp-config.json`, outside any project:
+
+```bash
+copilot mcp add wasit \
+  --env MPP_STELLAR_NETWORK=stellar:testnet \
+  --env STELLAR_PRIVATE_KEY=S... \
+  --env MPP_PAYER_SECRET=S... \
+  --env COMMITMENT_SECRET_HEX=... \
+  -- npx -y @wasit-dev/server
+```
+
+By hand, the entry goes under `mcpServers` with `"type": "local"`, the same
+`command` and `args`, an `env` object, and `"tools": ["*"]`. In a
+non-interactive run (`copilot -p "..."`), allow the server's tools with
+`--allow-tool wasit`.
+
 ### Other clients
 
 Any MCP client that runs stdio servers takes the same three things: `command`
@@ -146,12 +165,14 @@ variables `MPP_STELLAR_NETWORK`, `STELLAR_PRIVATE_KEY`, `MPP_PAYER_SECRET` and
 if launching from a local checkout instead of npx, since a client launches the
 server from a working directory you don't control.
 
-**What has been run.** Claude Code is the client Wasit's MCP server has been
-run in end to end, including the session recorded in the README. Every CI run
-also installs the published package and completes an MCP handshake with it
-over stdio (`npm run verify:clean-install`), which is the same exchange any of
-these clients performs. The configurations above follow each client's own
-documentation as of October 2026. Client names and logos are trademarks of
+**What has been run.** Two clients have run Wasit's MCP server end to end
+against its fixtures: Claude Code, in the session recorded in the README, and
+GitHub Copilot CLI 1.0.91 on 3 October 2026 (`X402-01`–`07` all passing with
+`X402-06` settled on-chain, then `MPP-01` and the channel checks in the same
+session). Every CI run also installs the published package and completes an
+MCP handshake with it over stdio (`npm run verify:clean-install`), which is the
+same exchange any of these clients performs. The Codex, Cursor and VS Code
+configurations follow each client's own documentation as of October 2026. Client names and logos are trademarks of
 their owners, shown only to say which client a configuration is for.
 
 ## Tools

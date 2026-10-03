@@ -371,8 +371,8 @@ export default function Home() {
             <div className="mcp-grid">
               <div className="mcp-side" data-reveal>
                 <p className="section-lead">
-                  The MCP server puts the same checks in front of Claude Code, Codex, Cursor, VS Code and any
-                  other MCP client — as <mark className="hl">tools it can call</mark>, with the check catalogue as a
+                  The MCP server puts the same checks in front of Claude Code, GitHub Copilot, Codex, Cursor,
+                  VS Code and any other MCP client — as <mark className="hl">tools it can call</mark>, with the check catalogue as a
                   resource it can read first.
                 </p>
                 {/* Each client links to its own config in the MCP guide. */}
