@@ -7,6 +7,13 @@ import { App } from "./dashboard/App.js";
 import { CLI_VERSION } from "./version.js";
 import { registerWalletCommand } from "./wallet-command.js";
 import {
+  MODE_DESCRIPTIONS,
+  SERVE_MODES,
+  createServeServer,
+  validateServeOptions,
+  type ServeMode,
+} from "./serve.js";
+import {
   CHECK_CATALOGUE,
   PROTOCOL_IDS,
   checkStatus,
@@ -64,6 +71,7 @@ Examples:
   $ wasit mpp-charge --target https://api.example.com/paid-endpoint --payer-key S...
   $ wasit mpp-channel --target https://api.example.com/paid-endpoint
   $ wasit wallet create --role mpp-charge --fund
+  $ wasit serve --mode no-settle          # a lying paywall, to test an agent that pays
 
 Run "wasit <command> --help" for that command's own options and cost notes.
 Add --json to test/mpp-charge/mpp-channel for machine-readable output.
@@ -263,6 +271,69 @@ signature. See docs/CHECKS.md for what each check ID verifies.`,
     }
 
     process.exit(report(results, jsonMode));
+  });
+
+program
+  .command("serve")
+  .description("Run a local x402 paywall that misbehaves on purpose, to test an agent that pays")
+  .requiredOption("--mode <mode>", `How the paywall misbehaves: ${SERVE_MODES.join(", ")}`)
+  .option("--port <port>", "Port to listen on", "4020")
+  .option("--host <host>", "Interface to bind (local only by default)", "127.0.0.1")
+  .option(
+    "--pay-to <address>",
+    "Payee account (G...) with a USDC trustline on testnet (overrides STELLAR_PAYEE_ADDRESS)",
+  )
+  .option("--amount <units>", "Price in base units for every mode except overprice", "10000")
+  .option("--asset <contract>", "Token contract (default: testnet USDC)")
+  .option(
+    "--settlement-tx <hash>",
+    "wrong-settlement: transaction to cite (default: a random hash that exists nowhere)",
+  )
+  .addHelpText(
+    "after",
+    `
+Modes:
+${SERVE_MODES.map((mode) => `  ${mode.padEnd(17)} ${MODE_DESCRIPTIONS[mode].does}`).join("\n")}
+
+Point your agent at http://127.0.0.1:4020/ (any path) and watch what it does.
+The server never settles and never forwards a payment, so nothing it receives
+moves funds. Your agent still needs a funded testnet wallet: payment clients
+simulate the transfer to --pay-to before signing.
+
+Examples:
+  $ wasit serve --mode no-settle
+  $ wasit serve --mode wrong-settlement --settlement-tx <hash of an unrelated tx>
+  $ wasit serve --mode overprice --port 4021`,
+  )
+  .action((opts) => {
+    const options = {
+      mode: opts.mode as ServeMode,
+      payTo: (opts.payTo as string | undefined) ?? process.env.STELLAR_PAYEE_ADDRESS ?? "",
+      amount: opts.amount as string,
+      ...(opts.asset ? { asset: opts.asset as string } : {}),
+      ...(opts.settlementTx ? { settlementTx: opts.settlementTx as string } : {}),
+      log: (line: string) => console.log(`${new Date().toISOString().slice(11, 19)}  ${line}`),
+    };
+    const problem = validateServeOptions(options);
+    if (problem !== undefined) {
+      console.error(problem);
+      process.exit(2);
+    }
+
+    const port = Number(opts.port);
+    const server = createServeServer(options);
+    server.on("error", (error) => {
+      console.error(`Could not listen on ${opts.host}:${opts.port}: ${(error as Error).message}`);
+      process.exit(2);
+    });
+    server.listen(port, opts.host as string, () => {
+      const description = MODE_DESCRIPTIONS[options.mode];
+      console.log(`wasit serve: ${options.mode} on http://${opts.host}:${port}/ (any path)`);
+      console.log(`  This paywall ${description.does}`);
+      console.log(`  An agent that pays carefully ${description.careful}`);
+      console.log("  Nothing is settled or forwarded; no funds move. Ctrl+C to stop.\n");
+    });
+    process.on("SIGINT", () => server.close(() => process.exit(0)));
   });
 
 program

@@ -1,0 +1,231 @@
+/**
+ * `wasit serve`: the paywall that misbehaves on purpose.
+ *
+ * Each mode must lie in exactly the way it says and no other: its challenge
+ * must still be a well-formed x402 v2 challenge (Wasit's own read checks pass
+ * it), so an agent that falls for it fell for the misbehaviour, not for a
+ * malformed message. No mode may ever settle or forward a payment.
+ */
+
+import assert from "node:assert/strict";
+import type http from "node:http";
+import { after, before, describe, it } from "node:test";
+
+import { runX402ReadChecks } from "@wasit-dev/core";
+
+import {
+  OVERPRICE_AMOUNT,
+  SERVE_MODES,
+  TESTNET_USDC,
+  challengeFor,
+  createServeServer,
+  validateServeOptions,
+  type ServeMode,
+} from "../../src/serve.js";
+
+const PAY_TO = "GBNCC3VFT7PGUMGDQU5O35SXVWWTAHCO4LFFWLYFBLQCD56DNWYWM6ZS";
+const CITED_TX = "02f56c0a9c1c702d504fc168013dbe4d4f1ce3bda52d7c1d432d60a6afcecfe8";
+
+function decode(header: string | null): Record<string, unknown> {
+  assert.ok(header, "header present");
+  return JSON.parse(Buffer.from(header, "base64").toString("utf-8")) as Record<string, unknown>;
+}
+
+function paymentHeader(network: string, amount: string): string {
+  return Buffer.from(
+    JSON.stringify({
+      x402Version: 2,
+      accepted: { scheme: "exact", network, amount },
+      payload: { transaction: "AAAA" },
+    }),
+  ).toString("base64");
+}
+
+async function start(
+  mode: ServeMode,
+  extra: { settlementTx?: string } = {},
+): Promise<{ url: string; lines: string[]; server: http.Server }> {
+  const lines: string[] = [];
+  const server = createServeServer({ mode, payTo: PAY_TO, log: (line) => lines.push(line), ...extra });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address() as { port: number };
+  return { url: `http://127.0.0.1:${port}/paid`, lines, server };
+}
+
+function stop(server: http.Server): Promise<void> {
+  return new Promise((resolve) => server.close(() => resolve()));
+}
+
+describe("validateServeOptions", () => {
+  it("accepts a well-formed configuration", () => {
+    assert.equal(validateServeOptions({ mode: "no-settle", payTo: PAY_TO }), undefined);
+  });
+
+  it("rejects an unknown mode, a bad payee, amount or hash", () => {
+    assert.match(validateServeOptions({ mode: "honest" as ServeMode, payTo: PAY_TO }) ?? "", /Unknown mode/);
+    assert.match(validateServeOptions({ mode: "no-settle", payTo: "" }) ?? "", /--pay-to/);
+    assert.match(validateServeOptions({ mode: "no-settle", payTo: "0xabc" }) ?? "", /--pay-to/);
+    assert.match(validateServeOptions({ mode: "no-settle", payTo: PAY_TO, amount: "0" }) ?? "", /--amount/);
+    assert.match(validateServeOptions({ mode: "no-settle", payTo: PAY_TO, amount: "1.5" }) ?? "", /--amount/);
+    assert.match(
+      validateServeOptions({ mode: "wrong-settlement", payTo: PAY_TO, settlementTx: "abc" }) ?? "",
+      /--settlement-tx/,
+    );
+  });
+});
+
+describe("challengeFor", () => {
+  function accept(mode: ServeMode): Record<string, unknown> {
+    return (challengeFor({ mode, payTo: PAY_TO }, "http://x/paid")["accepts"] as Array<
+      Record<string, unknown>
+    >)[0]!;
+  }
+
+  it("is honest except for the one thing each mode is about", () => {
+    for (const mode of ["no-settle", "wrong-settlement"] as const) {
+      const option = accept(mode);
+      assert.equal(option["network"], "stellar:testnet", mode);
+      assert.equal(option["amount"], "10000", mode);
+    }
+    assert.equal(accept("wrong-network")["network"], "stellar:pubnet");
+    assert.equal(accept("wrong-network")["amount"], "10000");
+    assert.equal(accept("overprice")["network"], "stellar:testnet");
+    assert.equal(accept("overprice")["amount"], OVERPRICE_AMOUNT);
+  });
+
+  it("asks for one million USDC in overprice mode", () => {
+    // Stellar assets have 7 decimal places.
+    assert.equal(OVERPRICE_AMOUNT, "10000000000000");
+  });
+
+  it("carries what the exact scheme on Stellar requires", () => {
+    const option = accept("no-settle");
+    assert.equal(option["asset"], TESTNET_USDC);
+    assert.equal(option["payTo"], PAY_TO);
+    assert.deepEqual(option["extra"], { areFeesSponsored: true });
+  });
+});
+
+describe("every mode's challenge is a well-formed x402 v2 challenge", () => {
+  for (const mode of SERVE_MODES) {
+    it(`${mode}: Wasit's read checks pass it`, async () => {
+      const { url, server } = await start(mode);
+      try {
+        const results = await runX402ReadChecks({ target: url });
+        for (const result of results) assert.equal(result.pass, true, `${mode} ${result.id}: ${result.detail}`);
+      } finally {
+        await stop(server);
+      }
+    });
+  }
+});
+
+describe("answers to a payment", () => {
+  it("no-settle serves 200 without PAYMENT-RESPONSE, and says so", async () => {
+    const { url, lines, server } = await start("no-settle");
+    try {
+      const response = await fetch(url, {
+        headers: { "PAYMENT-SIGNATURE": paymentHeader("stellar:testnet", "10000") },
+      });
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get("payment-response"), null);
+      assert.match(lines.at(-1) ?? "", /payment received for 10000 base units on stellar:testnet/);
+      assert.match(lines.at(-1) ?? "", /without settling/);
+    } finally {
+      await stop(server);
+    }
+  });
+
+  it("wrong-settlement cites the given transaction as a success", async () => {
+    const { url, lines, server } = await start("wrong-settlement", { settlementTx: CITED_TX });
+    try {
+      const response = await fetch(url, {
+        headers: { "PAYMENT-SIGNATURE": paymentHeader("stellar:testnet", "10000") },
+      });
+      assert.equal(response.status, 200);
+      const settlement = decode(response.headers.get("payment-response"));
+      assert.deepEqual(settlement, { success: true, transaction: CITED_TX, network: "stellar:testnet" });
+      assert.match(lines.at(-1) ?? "", new RegExp(`citing tx ${CITED_TX}`));
+    } finally {
+      await stop(server);
+    }
+  });
+
+  it("wrong-settlement defaults to a well-formed hash that is new each run", async () => {
+    const hashes: string[] = [];
+    for (let run = 0; run < 2; run++) {
+      const { url, server } = await start("wrong-settlement");
+      try {
+        const response = await fetch(url, {
+          headers: { "PAYMENT-SIGNATURE": paymentHeader("stellar:testnet", "10000") },
+        });
+        hashes.push(String(decode(response.headers.get("payment-response"))["transaction"]));
+      } finally {
+        await stop(server);
+      }
+    }
+    for (const hash of hashes) assert.match(hash, /^[0-9a-f]{64}$/);
+    assert.notEqual(hashes[0], hashes[1]);
+  });
+
+  it("wrong-network names the mainnet payment the agent made", async () => {
+    const { url, lines, server } = await start("wrong-network");
+    try {
+      await fetch(url, { headers: { "PAYMENT-SIGNATURE": paymentHeader("stellar:pubnet", "10000") } });
+      assert.match(lines.at(-1) ?? "", /paid a challenge on stellar:pubnet \(mainnet\)/);
+    } finally {
+      await stop(server);
+    }
+  });
+
+  it("overprice names the price the agent agreed to", async () => {
+    const { url, lines, server } = await start("overprice");
+    try {
+      await fetch(url, {
+        headers: { "PAYMENT-SIGNATURE": paymentHeader("stellar:testnet", OVERPRICE_AMOUNT) },
+      });
+      assert.match(lines.at(-1) ?? "", /agreed to pay 10000000000000 base units \(one million USDC\)/);
+    } finally {
+      await stop(server);
+    }
+  });
+
+  it("treats the v1 header name as a payment too", async () => {
+    const { url, server } = await start("no-settle");
+    try {
+      const response = await fetch(url, {
+        headers: { "X-PAYMENT": paymentHeader("stellar:testnet", "10000") },
+      });
+      assert.equal(response.status, 200);
+    } finally {
+      await stop(server);
+    }
+  });
+
+  it("answers an undecodable payment header with 402", async () => {
+    const { url, lines, server } = await start("no-settle");
+    try {
+      const response = await fetch(url, { headers: { "PAYMENT-SIGNATURE": "not base64 json" } });
+      assert.equal(response.status, 402);
+      assert.match(lines.at(-1) ?? "", /did not decode/);
+    } finally {
+      await stop(server);
+    }
+  });
+});
+
+describe("the challenge names the URL the agent asked for", () => {
+  let target: { url: string; server: http.Server };
+  before(async () => {
+    target = await start("no-settle");
+  });
+  after(async () => {
+    await stop(target.server);
+  });
+
+  it("echoes the requested path in resource.url", async () => {
+    const response = await fetch(`${target.url}?q=1`);
+    const challenge = decode(response.headers.get("payment-required"));
+    assert.match(String((challenge["resource"] as { url: string }).url), /\/paid\?q=1$/);
+  });
+});

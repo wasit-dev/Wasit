@@ -119,6 +119,19 @@ Testnet-only helpers for the keys the subcommands above read from `.env`. There 
 
 `create` prints a secret key to stdout — don't run it on a screen you're recording.
 
+### `wasit serve` — a paywall that misbehaves, for testing an agent that pays
+
+```bash
+wasit serve --mode no-settle            # also: wrong-settlement, wrong-network, overprice
+```
+
+Runs a local x402 paywall that lies in one chosen way: serves without settling,
+cites someone else's settlement, asks for mainnet, or asks for one million USDC.
+Point your agent at `http://127.0.0.1:4020/` and the server reports what the
+agent did. Nothing is settled or forwarded, so no funds move; the agent still
+needs a funded testnet wallet, and `--pay-to` (default `STELLAR_PAYEE_ADDRESS`)
+must be a testnet account with a USDC trustline. See `wasit serve --help`.
+
 ### The interactive dashboard
 
 Running `wasit` with no arguments in a terminal opens a menu: the same three check runners, a catalogue browser, and a wallet screen, driven by arrow keys. A run shows a live elapsed timer and per-check progress, and `s` saves the finished run to `wasit-<protocol>-<timestamp>.json` — the same shape `--json` prints. Piped or in CI it prints help instead, so nothing that scripts Wasit today changes behaviour. See [`docs/guides/cli.md`](https://github.com/wasit-dev/wasit/blob/main/docs/guides/cli.md).

@@ -98,6 +98,7 @@ export const DOCS_NAV: DocNavEntry[] = [
       { title: "x402 (Test)", slug: ["cli", "test-x402"] },
       { title: "MPP Charge Mode", slug: ["cli", "mpp-charge"] },
       { title: "MPP Channel Mode", slug: ["cli", "mpp-channel"] },
+      { title: "Testing an agent that pays", slug: ["cli", "serve"] },
       { title: "Reading output", slug: ["cli", "reading-output"] },
     ],
   },

@@ -44,6 +44,16 @@ type, such as a numeric `amount` or a `maxTimeoutSeconds` that is not a positive
 number, is reported as such instead of as missing. Challenges built with the
 official x402 server SDK carry every field, so they are unaffected.
 
+**Added — `wasit serve`, a paywall that misbehaves on purpose.** The checks
+test a service that sells; this tests an agent that pays. It runs a local x402
+paywall in one of four modes: `no-settle` serves without settling,
+`wrong-settlement` cites a transaction that is not the payment, `wrong-network`
+asks for mainnet, `overprice` asks for one million USDC. The server reports
+what the agent did. It never settles or forwards anything, so no funds move.
+Every mode's challenge is well-formed (`wasit test --read-only` passes it), and
+the two settlement modes reproduce the servers built for the 0.6.0 A/B:
+`X402-06` and `X402-07` fail against them.
+
 **Changed — the CLI's payment warning says when it applies.** It said funds
 would move before every payment run, including runs where the target offered
 no option on the run's network and nothing was paid.
