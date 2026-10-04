@@ -183,7 +183,12 @@ program
   .command("test")
   .description("Run x402 compliance checks against a target service")
   .requiredOption("--target <url>", "URL of the service to test")
-  .option("--network <network>", "Network identifier", "stellar:testnet")
+  .option(
+    "--network <network>",
+    "Network the payment checks pay on: stellar:testnet or stellar:pubnet. " +
+      "X402-01..05 apply to a challenge on any chain.",
+    "stellar:testnet",
+  )
   .option("--rpc-url <url>", "Override the Soroban RPC endpoint used to verify X402-06's settlement")
   .option(
     "--payer-key <key>",

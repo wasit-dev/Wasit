@@ -158,7 +158,7 @@ wasit test --target <url> [options]
 | Option | Default | Notes |
 |---|---|---|
 | `--target <url>` | required | Must include the scheme |
-| `--network <id>` | `stellar:testnet` | CAIP-2 |
+| `--network <id>` | `stellar:testnet` | Network the payment checks pay on: `stellar:testnet` or `stellar:pubnet`. `X402-01`–`05` apply to a challenge on any chain |
 | `--payer-key <key>` | `STELLAR_PRIVATE_KEY` | Secret key, `S...` |
 | `--rpc-url <url>` | testnet default | Soroban RPC used to verify `X402-06`'s settlement; required for pubnet |
 | `--method <verb>` | `GET` | HTTP method the paid endpoint uses. Endpoints that compute something usually take `POST` |

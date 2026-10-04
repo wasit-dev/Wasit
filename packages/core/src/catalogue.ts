@@ -68,8 +68,9 @@ export const CHECK_CATALOGUE: readonly CheckCatalogueEntry[] = [
     id: "X402-05",
     name: "Network Identifier Valid",
     protocol: "x402",
-    specRef: "x402 built-on-stellar guide",
-    summary: "The network identifier must follow CAIP-2 (stellar:testnet or stellar:pubnet).",
+    specRef: "x402 v2 spec §11.1; CAIP-2",
+    summary:
+      "Every advertised network identifier must be CAIP-2, and follow its namespace's rules where Wasit knows them (stellar, eip155, solana).",
   },
   {
     id: "X402-06",

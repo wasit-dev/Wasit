@@ -169,7 +169,10 @@ server.registerTool(
       network: z
         .string()
         .optional()
-        .describe('CAIP-2 network id, e.g. "stellar:testnet" (default)'),
+        .describe(
+          'Network the payment checks pay on: "stellar:testnet" (default) or ' +
+            '"stellar:pubnet". The read-only checks apply to a challenge on any chain.',
+        ),
       readOnly: z
         .boolean()
         .optional()

@@ -6,6 +6,7 @@ import {
   assertHttpUrl,
   fetchTarget,
 } from "../errors.js";
+import { checkNetworkIdentifier, checkRequiredFields } from "./requirements.js";
 
 export type { CheckResult };
 
@@ -139,85 +140,6 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
     : undefined;
 }
 
-/** x402 v2 nests the payment terms inside `accepts[]`, not at the top level. */
-function firstAccept(payload: unknown): Record<string, unknown> | undefined {
-  const accepts = asRecord(payload)?.["accepts"];
-  return Array.isArray(accepts) ? asRecord(accepts[0]) : undefined;
-}
-
-/**
- * The field carrying the price, per protocol version.
- *
- * x402 v2 renamed `maxAmountRequired` to `amount` and dropped the embedded
- * resource object. Checking for whichever name happens to be present would
- * hide a real conformance failure: a service advertising `x402Version: 2`
- * while emitting the v1 field name is not conformant to the version it claims.
- */
-const PRICE_FIELD: Readonly<Record<1 | 2, "maxAmountRequired" | "amount">> = {
-  1: "maxAmountRequired",
-  2: "amount",
-};
-
-function isSupportedVersion(value: unknown): value is 1 | 2 {
-  return value === 1 || value === 2;
-}
-
-function nonEmptyString(value: unknown): boolean {
-  return typeof value === "string" && value.length > 0;
-}
-
-/** X402-04: the challenge must carry price, network, and payTo. */
-function checkRequiredFields(payload: unknown): CheckResult {
-  const version = asRecord(payload)?.["x402Version"];
-  const accept = firstAccept(payload);
-
-  if (!isSupportedVersion(version)) {
-    return {
-      id: "X402-04",
-      name: "Required Fields Present",
-      pass: false,
-      detail:
-        `Challenge advertises x402Version ${JSON.stringify(version)}, which is ` +
-        `neither 1 nor 2. The payment terms use different field names per ` +
-        `version, so they cannot be checked against an unknown one.`,
-    };
-  }
-
-  const expected = PRICE_FIELD[version];
-  const wrongVersionField = version === 2 ? "maxAmountRequired" : "amount";
-
-  // A v2 challenge carrying the v1 field name is a specific, actionable
-  // failure — say which name was found and which one the version requires,
-  // rather than reporting the price as simply absent.
-  if (!nonEmptyString(accept?.[expected]) && accept?.[wrongVersionField] !== undefined) {
-    return {
-      id: "X402-04",
-      name: "Required Fields Present",
-      pass: false,
-      detail:
-        `Challenge advertises x402Version ${version} but carries ` +
-        `\`${wrongVersionField}\`, which is the v${version === 2 ? 1 : 2} field ` +
-        `name. v${version} requires \`${expected}\`.`,
-    };
-  }
-
-  const missing = [
-    nonEmptyString(accept?.[expected]) ? null : expected,
-    nonEmptyString(accept?.["network"]) ? null : "network",
-    nonEmptyString(accept?.["payTo"]) ? null : "payTo",
-  ].filter((entry): entry is string => entry !== null);
-
-  return {
-    id: "X402-04",
-    name: "Required Fields Present",
-    pass: missing.length === 0,
-    detail:
-      missing.length === 0
-        ? `All required v${version} fields present.`
-        : `Missing: ${missing.join(", ")}.`,
-  };
-}
-
 /**
  * Reads an x402 v1 challenge from a 402 response body, if that is what it is.
  *
@@ -244,31 +166,6 @@ async function readText(response: Response): Promise<string> {
   } catch {
     return "";
   }
-}
-
-/** X402-05: the network identifier must be CAIP-2. */
-function checkNetworkIdentifier(payload: unknown): CheckResult {
-  const network = firstAccept(payload)?.["network"];
-
-  // Absent is X402-04's finding, not a second one: report it there only.
-  if (typeof network !== "string" || network.length === 0) {
-    return skipped(
-      "X402-05",
-      "Network Identifier Valid",
-      "the challenge carries no network field to validate (see X402-04).",
-    );
-  }
-
-  const pass = /^stellar:(testnet|pubnet)$/.test(network);
-  return {
-    id: "X402-05",
-    name: "Network Identifier Valid",
-    pass,
-    detail: pass
-      ? `Network identifier "${network}" is valid.`
-      : `"${network}" does not match stellar:testnet or stellar:pubnet, the CAIP-2 ` +
-        `identifiers the \`exact\` scheme on Stellar defines.`,
-  };
 }
 
 /**
@@ -453,11 +350,22 @@ class PaymentNotAttemptedError extends Error {
 
 function buildX402Client(network: string, payerSecretKey: string) {
   const signer = createEd25519Signer(payerSecretKey, network as `${string}:${string}`);
-  const client = new x402Client().register(
-    "stellar:*",
-    new ExactStellarClientScheme(signer),
-  );
+  const client = new x402Client()
+    .register("stellar:*", new ExactStellarClientScheme(signer))
+    // A challenge may offer several networks, including both Stellar ones.
+    // The client's default pick is the first it supports, which would sign
+    // for one network with a signer built for another; pay only on the
+    // network this run was asked to use.
+    .registerPolicy((_version, requirements) =>
+      requirements.filter((requirement) => requirement.network === network),
+    );
   return { client, httpClient: new x402HTTPClient(client) };
+}
+
+/** The networks a challenge offers, for a report. */
+function describeOffered(accepts: ReadonlyArray<{ readonly network: string }>): string {
+  const networks = [...new Set(accepts.map((requirement) => requirement.network))];
+  return networks.length === 0 ? "none" : networks.join(", ");
 }
 
 /**
@@ -494,6 +402,27 @@ async function preparePayment(options: X402PaymentCheckOptions) {
         : `the challenge could not be read as x402 payment requirements ` +
             `(${(error as Error).message}), so no payment was attempted ` +
             `(see X402-02–04).`,
+    );
+  }
+
+  // A target that offers no option Wasit can pay has not refused anything:
+  // there is no payment to judge, so neither check gets a verdict. X402-05
+  // already reports which networks it advertises.
+  const onNetwork = paymentRequired.accepts.filter(
+    (requirement) => requirement.network === options.network,
+  );
+  if (onNetwork.length === 0) {
+    throw new PaymentNotAttemptedError(
+      `the target offers no payment option on ${options.network} (it offers ` +
+        `${describeOffered(paymentRequired.accepts)}), so no payment was ` +
+        `attempted (see X402-05).`,
+    );
+  }
+  if (!onNetwork.some((requirement) => requirement.scheme === "exact")) {
+    throw new PaymentNotAttemptedError(
+      `the target's ${options.network} option uses the ` +
+        `"${onNetwork[0]!.scheme}" scheme, and Wasit pays through the \`exact\` ` +
+        `scheme only, so no payment was attempted.`,
     );
   }
 
@@ -715,6 +644,11 @@ export async function runX402PaymentChecks(
   try {
     assertHttpUrl(options.target);
     buildInit(options);
+    // Payment checks pay on Stellar only, and X402-06 can only verify a
+    // settlement it can look up. Resolving the RPC endpoint establishes both
+    // (it rejects any other network) before any money moves, so a run that
+    // could not finish is stopped here rather than after paying.
+    resolveRpcUrl(options.network, options.rpcUrl);
   } catch (error) {
     const preflight = errored("PREFLIGHT", "Run Preflight", error);
     options.onResult?.(preflight);
