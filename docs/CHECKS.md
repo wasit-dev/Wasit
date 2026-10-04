@@ -206,3 +206,141 @@ payment rather than authorisation; configuring it with the funder's key produces
 a transaction that reaches the chain and fails there with an opaque
 `scecInvalidAction`, which the SDK surfaces as `[object Object]`. By contrast,
 `close_start()` requires `from.require_auth()` — the funder. Both details are documented in [docs/findings/upstream-sdk.md](findings/upstream-sdk.md) for upstream reporting.
+
+## Common failures and fixes
+
+The failures builders hit most often, what each looks like in a run, and what
+fixes it. Every FAIL in a run already carries its own `Fix` line; this page
+collects them by check, with the reasoning. Where a failure was met in a real
+implementation, it links the write-up.
+
+### The unpaid request does not get a 402 (`X402-01`)
+
+- **200**: the route serves without payment. The payment middleware is not in
+  front of it, or protects a different path.
+- **401 or 403**: the endpoint asks for authentication instead of payment.
+  x402 clients act only on 402.
+- **404 or 405**: usually the wrong path or method. An endpoint that computes
+  something often takes POST: `wasit test --method POST --body '{...}'` (MCP:
+  `method` and `body`).
+
+### There is no payment header (`X402-02`)
+
+x402 v2 carries the challenge base64-encoded in the `PAYMENT-REQUIRED` response
+header. A service that puts an x402 v1 challenge in the response body fails
+here, and the result says it found one; its terms are still checked. The
+`exact` scheme on Stellar is defined for v2 only. This is the divergence Wasit
+has met in a real implementation
+([conformance findings](findings/conformance-findings.md), class 1).
+
+### The header does not decode (`X402-03`)
+
+The header value must be the base64 of the JSON `PaymentRequired` object. Raw
+JSON, or a value cut short, does not decode.
+
+### A field is missing or has the wrong type (`X402-04`)
+
+Every option in `accepts` needs every field its `x402Version` requires: for v2,
+`scheme`, `network`, `amount`, `asset`, `payTo` and `maxTimeoutSeconds`. The
+usual slips in a challenge built by hand:
+
+- `maxTimeoutSeconds` left out. The official x402 server SDK sets it to 300
+  when you do not.
+- `amount` sent as a number. It is a string of the token's smallest units,
+  such as `"10000"`.
+- The v1 price name `maxAmountRequired` in a v2 challenge. v2 calls it
+  `amount`.
+
+A challenge built with the official server SDK carries every field.
+
+### The network id is rejected (`X402-05`)
+
+x402 v2 names each network with a CAIP-2 id, `namespace:reference`:
+
+| Network | CAIP-2 id |
+|---|---|
+| Stellar testnet | `stellar:testnet` |
+| Stellar mainnet | `stellar:pubnet` |
+| Base Sepolia | `eip155:84532` |
+| Base | `eip155:8453` |
+| BNB Smart Chain testnet | `eip155:97` |
+| BNB Smart Chain | `eip155:56` |
+| Solana devnet | `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` |
+| Solana mainnet | `solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp` |
+
+The Stellar ids come from the `exact` scheme on Stellar, the Base and Solana ids
+are the x402 v2 specification's own examples (§11.1), and the BNB Smart Chain
+ids are its EIP-155 chain ids. The usual slips:
+
+- A v1 name such as `stellar-testnet` or `base-sepolia`
+  ([conformance findings](findings/conformance-findings.md), class 2).
+- A hex chain id. `eth_chainId` returns hex; the CAIP-2 reference is base 10,
+  so `eip155:0x14a34` is `eip155:84532`.
+- `stellar:mainnet`. Stellar's mainnet is `stellar:pubnet`.
+- A Solana cluster name. The reference is the first 32 characters of the
+  cluster's genesis hash.
+
+### A valid payment is refused (`X402-06`)
+
+Wasit built the payment with the official client, for exactly the advertised
+terms, and the target refused it. The target's own log of the facilitator's
+verify or settle response says why.
+
+### The paid response has no `PAYMENT-RESPONSE` (`X402-06`)
+
+After settling, the server returns the facilitator's settle result,
+base64-encoded, in `PAYMENT-RESPONSE`; it names the settlement transaction.
+Without it a client cannot tell whether the payment settled, so `X402-06`
+fails. The official x402 middleware sends it. A server that serves without
+settling looks exactly like this, and `wasit serve --mode no-settle` is one,
+for testing an agent against it.
+
+### The settlement does not match (`X402-06`)
+
+The transaction `PAYMENT-RESPONSE` names must have succeeded and moved exactly
+`amount` of `asset` from this run's payer to `payTo`, in one transfer. A server
+that cites another transaction fails, even a real and successful one
+([0.6.0 verification run](evidence/2026-09-30-x402-0.6.0-verification-run.md)).
+
+### A forged signature is accepted (`X402-07`)
+
+The target served a payment whose authorization signature was corrupted: it
+decoded the payment without verifying it. Pass every payment to the
+facilitator's verify step and refuse it when verification fails.
+
+### A charge to a muxed recipient is refused (`MPP-01`)
+
+A charge server on `@stellar/mpp` 0.7.1 configured with a muxed (`M...`)
+recipient cannot verify the payment and refuses it. Since CAP-67, a transfer
+to a muxed address reports its amount in a form the SDK does not read. Use a
+`G...` recipient until the SDK handles it
+([Finding 5](findings/upstream-sdk.md), reported as
+[stellar/stellar-mpp-sdk#89](https://github.com/stellar/stellar-mpp-sdk/issues/89)).
+Wasit reads both forms.
+
+### A stale or replayed voucher is accepted, or refused with 500 (`MPP-11`, `MPP-12`, `MPP-14`)
+
+The server must refuse with 402: a commitment that does not exceed the stored
+cumulative or does not cover the price, a second credential for a challenge
+already used, and an accepted commitment presented under a new challenge. The
+`@stellar/mpp` channel server enforces all three. Refusals reported as HTTP 500
+instead of 402 were seen on the SDK's `main` branch between its `mppx` 0.10.1
+upgrade and the fix in #83, never in a release
+([Finding 4](findings/upstream-sdk.md)).
+
+### No verdict on the channel checks (`ERROR (setup)`)
+
+`MPP-11`, `MPP-12` and `MPP-14` each need one correctly advancing commitment
+accepted first. When three attempts are refused, the run reports no verdict
+rather than a failure, because a channel another payer is advancing at the same
+time looks the same from the client. Re-run against a channel nothing else is
+paying through.
+
+### The payment checks cannot pay
+
+The payment checks need a testnet payer holding testnet USDC.
+`wasit wallet create --role x402 --fund` generates the key and funds it with
+testnet XLM, and `wasit wallet fund --role x402 --asset usdc` adds the USDC
+trustline; the
+balance itself needs one visit to https://faucet.circle.com, since there is no
+scriptable USDC faucet for Stellar (see the CLI guide's wallet setup).

@@ -151,6 +151,7 @@ export const DOCS_NAV: DocNavEntry[] = [
       { title: "x402", slug: ["checks", "x402"] },
       { title: "MPP - Charge Mode", slug: ["checks", "mpp-charge-mode"] },
       { title: "MPP - Channel Mode", slug: ["checks", "mpp-channel-mode"] },
+      { title: "Common failures and fixes", slug: ["checks", "common-failures"] },
     ],
   },
   {

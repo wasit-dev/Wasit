@@ -35,6 +35,10 @@ route, a missing `PAYMENT-RESPONSE` is told what to return. Otherwise it is the
 check's general fix, now part of every catalogue entry (`fix`). Only a FAIL
 carries one; a skip or a no-verdict is not a defect. New in core: `fixFor()`,
 `catalogueEntry()`, `docsUrlFor()`, and an optional `hint` on `CheckResult`.
+The check catalogue gains "Common failures and fixes"
+(`/docs/checks/common-failures`): the failures builders hit most, by check, with
+the reasoning, the CAIP-2 ids of common networks, and links to where each was
+met in a real implementation.
 
 **Changed — `X402-04` checks every field the advertised version requires.**
 It checked three: the price, `network` and `payTo`. x402 v2 requires `scheme`,
