@@ -126,6 +126,29 @@ const READ_CHECKS: ReadonlyArray<readonly [string, string]> = [
   ["X402-05", "Network Identifier Valid"],
 ];
 
+/** What a wrong status on an unpaid request usually means, and what to do. */
+function statusHint(status: number): string {
+  if (status >= 200 && status < 300) {
+    return (
+      `The route served HTTP ${status} without payment: put the x402 payment ` +
+      `middleware in front of it, so unpaid requests get 402 and a challenge.`
+    );
+  }
+  if (status === 401 || status === 403) {
+    return (
+      `Answer an unpaid request with 402, not ${status}: authentication errors ` +
+      `and payment challenges are different signals, and x402 clients act only on 402.`
+    );
+  }
+  if (status === 404 || status === 405) {
+    return (
+      `A ${status} usually means the wrong path or method. Check the URL, and ` +
+      `pass the method the endpoint uses (--method POST, MCP \`method\`).`
+    );
+  }
+  return "Answer an unpaid request with 402 Payment Required and the challenge in a PAYMENT-REQUIRED header.";
+}
+
 /** Skips every check after `id`, naming the one cause they all depend on. */
 function skipAfter(id: string, reason: string): CheckResult[] {
   const index = READ_CHECKS.findIndex(([candidate]) => candidate === id);
@@ -217,6 +240,7 @@ export async function runX402ReadChecks(
     detail: statusPass
       ? "Server responded with 402 as required."
       : `Expected status 402, got ${response.status}.`,
+    ...(statusPass ? {} : { hint: statusHint(response.status) }),
   };
 
   if (!statusPass) {
@@ -255,6 +279,17 @@ export async function runX402ReadChecks(
             `scheme on Stellar is defined for v2 only, which signals payment in ` +
             `the PAYMENT-REQUIRED header.`
           : "Neither PAYMENT-REQUIRED nor X-Payment header was present.",
+    ...(headerValue !== null
+      ? {}
+      : {
+          hint:
+            v1Payload !== undefined
+              ? "Move to x402 v2: send the challenge base64-encoded in a " +
+                "PAYMENT-REQUIRED response header instead of the body, with " +
+                "x402Version 2 and v2 field names."
+              : "Send the challenge as base64-encoded JSON in a PAYMENT-REQUIRED " +
+                "response header, as the x402 v2 HTTP transport defines.",
+        }),
   };
 
   if (headerValue === null && v1Payload !== undefined) {
@@ -298,6 +333,9 @@ export async function runX402ReadChecks(
         name: "Header Payload Decodable",
         pass: false,
         detail: `Failed to decode/parse: ${(error as Error).message}`,
+        hint:
+          "Base64-encode the JSON PaymentRequired object for the header; raw " +
+          "JSON or a truncated value does not decode.",
       },
       ...skipAfter(
         "X402-03",
@@ -447,7 +485,7 @@ export function readSettlementReference(
     readonly transaction?: string;
     readonly errorReason?: string;
   },
-): { readonly reference: string } | { readonly failure: string } {
+): { readonly reference: string } | { readonly failure: string; readonly hint: string } {
   let settlement;
   try {
     settlement = readSettlement();
@@ -457,6 +495,9 @@ export function readSettlementReference(
         `Valid payment accepted (HTTP ${status}), but the response carried no ` +
         `PAYMENT-RESPONSE header, which the x402 v2 HTTP transport uses to ` +
         `report settlement. Whether the payment settled cannot be verified.`,
+      hint:
+        "After settling, return the facilitator's settle result base64-encoded " +
+        "in a PAYMENT-RESPONSE header; the official x402 middleware does this.",
     };
   }
 
@@ -470,6 +511,9 @@ export function readSettlementReference(
         `Valid payment accepted (HTTP ${status}), but its PAYMENT-RESPONSE ` +
         `reports ${settlement.success ? "success" : "failure"} with transaction ` +
         `${JSON.stringify(reference)}, not a settled Stellar transaction hash.`,
+      hint:
+        "PAYMENT-RESPONSE must report `success: true` and carry the settlement " +
+        "transaction's hash in `transaction`.",
     };
   }
   return { reference };
@@ -490,7 +534,7 @@ async function checkSignatureAccepted(
 ): Promise<CheckResult> {
   const id = "X402-06";
   const name = "Signature Resubmit Accepted";
-  const fail = (detail: string): CheckResult => ({ id, name, pass: false, detail });
+  const fail = (detail: string, hint: string): CheckResult => ({ id, name, pass: false, detail, hint });
 
   const { httpClient, paymentPayload } = await preparePayment(options);
   const paymentHeaders = httpClient.encodePaymentSignatureHeader(paymentPayload);
@@ -500,13 +544,18 @@ async function checkSignatureAccepted(
   );
 
   if (paid.status < 200 || paid.status >= 300) {
-    return fail(`Expected 2xx after a valid payment, got ${paid.status}.`);
+    return fail(
+      `Expected 2xx after a valid payment, got ${paid.status}.`,
+      "A valid payment was refused. Your server's log of the facilitator's " +
+        "verify or settle response says why; serve the resource with a 2xx once " +
+        "the payment settles.",
+    );
   }
 
   const read = readSettlementReference(paid.status, () =>
     httpClient.getPaymentSettleResponse((header) => paid.headers.get(header)),
   );
-  if ("failure" in read) return fail(read.failure);
+  if ("failure" in read) return fail(read.failure, read.hint);
   const reference = read.reference;
 
   const accepted = paymentPayload.accepted;
@@ -535,7 +584,12 @@ async function checkSignatureAccepted(
         pass: true,
         detail: `Valid payment accepted (HTTP ${paid.status}) and ${verdict.detail}.`,
       }
-    : fail(verdict.detail);
+    : fail(
+        verdict.detail,
+        "PAYMENT-RESPONSE must name the transaction that settled this payment, " +
+          "and that transaction must move exactly `amount` of `asset` from the " +
+          "payer to `payTo`, in a single transfer.",
+      );
 }
 
 /**
@@ -620,16 +674,32 @@ async function checkInvalidSignatureRejected(
     withPaymentHeaders(options, paymentHeaders),
   );
 
-  const accepted = response.status >= 200 && response.status < 300;
+  return signatureRejectionVerdict(response.status);
+}
+
+/**
+ * X402-07's verdict from the status a corrupted payment drew. Split out so
+ * the verdict can be tested without building a payment.
+ */
+export function signatureRejectionVerdict(status: number): CheckResult {
+  const accepted = status >= 200 && status < 300;
   return {
     id: "X402-07",
     name: "Invalid Signature Rejected",
     pass: !accepted,
     detail: accepted
       ? `A payment with a corrupted authorization signature was accepted with ` +
-        `HTTP ${response.status} — security-relevant failure.`
+        `HTTP ${status} — security-relevant failure.`
       : `Payment with a corrupted authorization signature correctly rejected ` +
-        `(HTTP ${response.status}).`,
+        `(HTTP ${status}).`,
+    ...(accepted
+      ? {
+          hint:
+            "Verify every payment before serving: pass it to the facilitator's " +
+            "verify step and refuse it when verification fails. Never serve on a " +
+            "payload that was only decoded.",
+        }
+      : {}),
   };
 }
 

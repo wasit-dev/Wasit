@@ -255,6 +255,11 @@ and `no-verdict` must never be read as `conformant`. When any check errored, the
 prose channel carries an explicit caveat that no statement was made about the
 target's conformance.
 
+A result with `"status": "FAIL"` also carries `fix`, what to change for the
+cause the check found (or the check's general fix), and `docs`, the check's
+page on usewasit.dev. An agent can pass `fix` on to the developer as the next
+step. Nothing else carries them: a skip or a no-verdict is not a defect.
+
 A result with `"status": "ERROR"` also carries `errorKind`, one of
 `unreachable`, `configuration`, `setup` or `harness`. `setup` means a
 precondition the check needed could not be established — for the channel checks,

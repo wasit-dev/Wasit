@@ -10,6 +10,7 @@ import {
   CHECK_CATALOGUE,
   PROTOCOL_IDS,
   checkStatus,
+  fixFor,
   runMppChannelSuite,
   runMppChargeSuite,
   runX402PaymentChecks,
@@ -106,7 +107,13 @@ function report(results: CheckResult[], json: boolean): number {
   for (const result of results) {
     const flag = result.destructive ? "  [destructive]" : "";
     console.log(`${checkStatus(result)}  ${result.id}  ${result.name}${flag}`);
-    console.log(`      ${result.detail}\n`);
+    console.log(`      ${result.detail}`);
+    const guidance = fixFor(result);
+    if (guidance !== undefined) {
+      console.log(`      Fix: ${guidance.fix}`);
+      if (guidance.docs !== undefined) console.log(`      Docs: ${guidance.docs}`);
+    }
+    console.log("");
   }
 
   const line = [`${counts.passed} passed`];
@@ -241,7 +248,8 @@ signature. See docs/CHECKS.md for what each check ID verifies.`,
     } else {
       note(
         jsonMode,
-        "X402-06 settles a real payment and X402-07 attempts one. Testnet funds will move.\n",
+        `When the target offers a ${opts.network} option, X402-06 settles a real ` +
+          "payment and X402-07 attempts one. Testnet funds will move.\n",
       );
       results.push(
         ...(await runX402PaymentChecks({

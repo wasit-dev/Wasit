@@ -1,6 +1,7 @@
 export {
   checkStatus,
   errored,
+  fixFor,
   skipped,
   skippedDestructive,
   summarize,
@@ -9,12 +10,13 @@ export {
 export type {
   CheckResult,
   CheckStatus,
+  FailureGuidance,
   RunSummary,
   StructuredCheckResult,
   StructuredRun,
 } from "./check.js";
 
-export { CHECK_CATALOGUE, PROTOCOL_IDS } from "./catalogue.js";
+export { CHECK_CATALOGUE, PROTOCOL_IDS, catalogueEntry, docsUrlFor } from "./catalogue.js";
 export type { CheckCatalogueEntry, ProtocolId } from "./catalogue.js";
 
 export * from "./errors.js";

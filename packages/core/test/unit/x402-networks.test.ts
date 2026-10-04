@@ -155,7 +155,10 @@ describe("checkRequiredFields across payment options", () => {
 
   it("reads an option that is not an object as one with every field missing", () => {
     const result = checkRequiredFields(v2(option("stellar:testnet"), "oops"));
-    assert.equal(result.detail, "accepts[1]: Missing: amount, network, payTo.");
+    assert.equal(
+      result.detail,
+      "accepts[1]: Missing: scheme, network, amount, asset, payTo, maxTimeoutSeconds.",
+    );
   });
 });
 

@@ -238,6 +238,20 @@ SKIP  MPP-13  Close Settlement  [destructive]
       permanently ends it.
 ```
 
+A FAIL also says what to change, and where the check is documented:
+
+```
+FAIL  X402-05  Network Identifier Valid
+      "eip155:0x14a34" does not carry an EIP-155 chain id in base 10, which the
+      eip155 namespace requires (Base Sepolia is eip155:84532).
+      Fix: Write the chain id in base 10: eip155:84532.
+      Docs: https://usewasit.dev/docs/checks/x402
+```
+
+`Fix` is specific to the cause the check found where Wasit can tell it, and the
+check's general fix otherwise. Only a FAIL carries one: a SKIP or an ERROR is not
+a defect in the target, so there is nothing for it to change.
+
 `PREFLIGHT` appears in place of the checks when the target URL or network
 identifier is invalid. Both are wrong for every check in the suite, so they are
 reported once rather than repeated identically.
@@ -263,6 +277,9 @@ wasit test --target https://api.example.com/paid-endpoint --read-only --json
   ]
 }
 ```
+
+A result with `"status": "FAIL"` also carries `fix` and `docs`, the same two
+lines the text output prints.
 
 Any advisory line that would normally print above the results (missing payer
 key, `--read-only` set, a payment-cost warning) is written to stderr instead of

@@ -85,6 +85,9 @@ and a per-check result array. `outcome` is the field to read, not an exit
 code: an integer means nothing to an agent on its own, and `no-verdict` is
 never a pass.
 
+A per-check `status` of `FAIL` carries `fix`, what the developer should change,
+and `docs`, the check's documentation page. Relay `fix` as the next step.
+
 A per-check `status` of `ERROR` carries an `errorKind` of `unreachable`,
 `configuration`, `setup` or `harness`, and means no verdict was reached about
 the target. Report it as such, never as a defect. `setup` in particular means a

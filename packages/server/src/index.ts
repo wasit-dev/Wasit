@@ -22,6 +22,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { SERVER_VERSION } from "./version.js";
 import {
   checkStatus,
+  fixFor,
   runMppChannelSuite,
   runMppChargeSuite,
   runX402PaymentChecks,
@@ -60,6 +61,10 @@ const resultShape = {
   destructive: z.boolean(),
   /** Present only on ERROR: unreachable | configuration | harness | setup. */
   errorKind: z.string().optional(),
+  /** Present only on FAIL: what to change. */
+  fix: z.string().optional(),
+  /** Present only on FAIL: the check's docs page. */
+  docs: z.string().optional(),
 };
 
 const runOutputShape = {
@@ -86,7 +91,12 @@ function present(results: CheckResult[]): {
 
   const lines = results.map((result) => {
     const flag = result.destructive === true ? " [destructive]" : "";
-    return `${checkStatus(result)}  ${result.id}  ${result.name}${flag}\n      ${result.detail}`;
+    const guidance = fixFor(result);
+    const advice =
+      guidance === undefined
+        ? ""
+        : `\n      Fix: ${guidance.fix}${guidance.docs ? `\n      Docs: ${guidance.docs}` : ""}`;
+    return `${checkStatus(result)}  ${result.id}  ${result.name}${flag}\n      ${result.detail}${advice}`;
   });
 
   const summaryLine =

@@ -84,9 +84,11 @@ The full check catalogue — every check's exact pass criteria and spec referenc
 
 | Export | What it is |
 |---|---|
-| `CHECK_CATALOGUE` | `readonly CheckCatalogueEntry[]` — every check the suite can run: `id`, `name`, `protocol`, `specRef`, a one-line `summary`, and the optional flags `negative`, `destructive`, `costsFunds`. This is what `wasit checks` prints. |
+| `CHECK_CATALOGUE` | `readonly CheckCatalogueEntry[]` — every check the suite can run: `id`, `name`, `protocol`, `specRef`, a one-line `summary`, a `fix` saying what to change when it fails, and the optional flags `negative`, `destructive`, `costsFunds`. This is what `wasit checks` prints. |
+| `fixFor(result)` | → `FailureGuidance \| undefined` — for a FAIL, `{ fix, docs }`: the result's own `hint` when it has one, else the catalogue `fix`, and the check's docs page. Undefined for anything that is not a FAIL. |
+| `catalogueEntry(id)`, `docsUrlFor(id)` | Look up a check's catalogue entry, or its docs page on usewasit.dev |
 | `PROTOCOL_IDS` | `readonly ProtocolId[]` — `"x402"`, `"mpp-charge"`, `"mpp-channel"` |
-| `toStructuredRun(results)` | → `StructuredRun` — the machine-readable reshape of a run: `outcome`, per-status counts, and a `results` array of `StructuredCheckResult`. The CLI's `--json` and the MCP server's `structuredContent` are both this function's output verbatim, so the three surfaces cannot describe the same run differently. |
+| `toStructuredRun(results)` | → `StructuredRun` — the machine-readable reshape of a run: `outcome`, per-status counts, and a `results` array of `StructuredCheckResult` (a FAIL also carries `fix` and `docs`). The CLI's `--json` and the MCP server's `structuredContent` are both this function's output verbatim, so the three surfaces cannot describe the same run differently. |
 
 `outcome` is a name — `"conformant"`, `"non-conformant"`, `"no-verdict"` — not an exit code. `no-verdict` must never be read as `conformant`.
 

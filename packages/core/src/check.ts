@@ -2,6 +2,7 @@
  * The result shape shared by every conformance check, across protocols.
  */
 
+import { catalogueEntry, docsUrlFor } from "./catalogue.js";
 import { type CheckError, classifyCheckError } from "./errors.js";
 
 export interface CheckResult {
@@ -11,6 +12,12 @@ export interface CheckResult {
   /** False when the check ran and the target did not conform. */
   pass: boolean;
   detail: string;
+  /**
+   * What to change, for the specific cause this failure found. Optional:
+   * a failure without one falls back to its catalogue entry's `fix` (see
+   * {@link fixFor}). Meaningful only on a FAIL.
+   */
+  hint?: string;
   /**
    * True when the check did not run. A skipped check is neither a pass nor a
    * failure: `pass` is false so it can never be counted as conformance, and
@@ -150,6 +157,25 @@ export function skipped(id: string, name: string, reason: string): CheckResult {
   };
 }
 
+/** What to do about a failure, and where it is documented. */
+export interface FailureGuidance {
+  readonly fix: string;
+  readonly docs?: string;
+}
+
+/**
+ * The guidance a front end shows under a FAIL: the result's own hint when it
+ * has one, else the check's catalogue fix. Undefined for anything that is not
+ * a FAIL, so a pass, a skip or a no-verdict never reads as a defect to fix.
+ */
+export function fixFor(result: CheckResult): FailureGuidance | undefined {
+  if (checkStatus(result) !== "FAIL") return undefined;
+  const fix = result.hint ?? catalogueEntry(result.id)?.fix;
+  if (fix === undefined) return undefined;
+  const docs = docsUrlFor(result.id);
+  return docs === undefined ? { fix } : { fix, docs };
+}
+
 /** One check's result, reshaped for a machine-readable front end (CLI --json, MCP). */
 export interface StructuredCheckResult {
   readonly id: string;
@@ -162,6 +188,10 @@ export interface StructuredCheckResult {
    * unreachable | configuration | harness | setup.
    */
   readonly errorKind?: string;
+  /** Present only when `status` is "FAIL": what to change (see {@link fixFor}). */
+  readonly fix?: string;
+  /** Present only when `status` is "FAIL": the check's docs page. */
+  readonly docs?: string;
 }
 
 /** A full run, reshaped for a machine-readable front end (CLI --json, MCP). */
@@ -200,13 +230,17 @@ export function toStructuredRun(results: CheckResult[]): StructuredRun {
     failed: counts.failed,
     errored: counts.errored,
     skipped: counts.skipped,
-    results: results.map((result) => ({
-      id: result.id,
-      name: result.name,
-      status: checkStatus(result),
-      detail: result.detail,
-      destructive: result.destructive === true,
-      ...(result.error ? { errorKind: result.error.kind } : {}),
-    })),
+    results: results.map((result) => {
+      const guidance = fixFor(result);
+      return {
+        id: result.id,
+        name: result.name,
+        status: checkStatus(result),
+        detail: result.detail,
+        destructive: result.destructive === true,
+        ...(result.error ? { errorKind: result.error.kind } : {}),
+        ...(guidance ?? {}),
+      };
+    }),
   };
 }
