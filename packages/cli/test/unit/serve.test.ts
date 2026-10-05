@@ -15,6 +15,7 @@ import { runX402ReadChecks } from "@wasit-dev/core";
 
 import {
   BASE_SEPOLIA_USDC,
+  BROKEN_CHALLENGE_MODES,
   OVERPRICE_AMOUNT,
   SERVE_MODES,
   SOLANA_DEVNET_USDC,
@@ -22,9 +23,13 @@ import {
   challengeFor,
   createServeServer,
   overpriceAmount,
+  v1ChallengeFor,
   validateServeOptions,
   type ServeMode,
 } from "../../src/serve.js";
+
+/** The modes whose challenge is a well-formed x402 v2 challenge. */
+const WELL_FORMED_MODES = SERVE_MODES.filter((mode) => !BROKEN_CHALLENGE_MODES.includes(mode));
 
 const PAY_TO = "GBNCC3VFT7PGUMGDQU5O35SXVWWTAHCO4LFFWLYFBLQCD56DNWYWM6ZS";
 const CITED_TX = "02f56c0a9c1c702d504fc168013dbe4d4f1ce3bda52d7c1d432d60a6afcecfe8";
@@ -110,7 +115,7 @@ describe("challengeFor", () => {
 });
 
 describe("every mode's challenge is a well-formed x402 v2 challenge", () => {
-  for (const mode of SERVE_MODES) {
+  for (const mode of WELL_FORMED_MODES) {
     it(`${mode}: Wasit's read checks pass it`, async () => {
       const { url, server } = await start(mode);
       try {
@@ -264,7 +269,7 @@ describe("on Base Sepolia", () => {
     assert.match(validateServeOptions({ mode: "no-settle", network: "eip155:1", payTo: EVM_PAY_TO }) ?? "", /Unknown network/);
   });
 
-  for (const mode of SERVE_MODES) {
+  for (const mode of WELL_FORMED_MODES) {
     it(`${mode}: Wasit's read checks pass the Base Sepolia challenge`, async () => {
       const { url, server } = await start(mode, BASE);
       try {
@@ -331,7 +336,7 @@ describe("on Solana devnet", () => {
     );
   });
 
-  for (const mode of SERVE_MODES) {
+  for (const mode of WELL_FORMED_MODES) {
     it(`${mode}: Wasit's read checks pass the Solana devnet challenge`, async () => {
       const { url, server } = await start(mode, SOLANA);
       try {
@@ -367,6 +372,103 @@ describe("on Solana devnet", () => {
         headers: { "PAYMENT-SIGNATURE": paymentHeader("solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp", "10000") },
       });
       assert.match(lines.at(-1) ?? "", /\(Solana mainnet\)/);
+    } finally {
+      await stop(server);
+    }
+  });
+});
+
+function v1PaymentHeader(network: string): string {
+  return Buffer.from(
+    JSON.stringify({ x402Version: 1, scheme: "exact", network, payload: { signature: "0x00" } }),
+  ).toString("base64");
+}
+
+describe("v1-challenge", () => {
+  it("poses only where x402 v1 names the network", () => {
+    assert.equal(validateServeOptions({ mode: "v1-challenge", ...BASE }), undefined);
+    assert.equal(validateServeOptions({ mode: "v1-challenge", ...SOLANA }), undefined);
+    assert.match(
+      validateServeOptions({ mode: "v1-challenge", payTo: PAY_TO }) ?? "",
+      /x402 v1 names no Stellar testnet network/,
+    );
+  });
+
+  it("issues the v1 body challenge with v1 field names and network names, and no header", async () => {
+    const { url, server } = await start("v1-challenge", BASE);
+    try {
+      const response = await fetch(url);
+      assert.equal(response.status, 402);
+      assert.equal(response.headers.get("payment-required"), null);
+      const body = (await response.json()) as { x402Version: number; accepts: Array<Record<string, unknown>> };
+      assert.equal(body.x402Version, 1);
+      assert.equal(body.accepts[0]?.["network"], "base-sepolia");
+      assert.equal(body.accepts[0]?.["maxAmountRequired"], "10000");
+      assert.equal(body.accepts[0]?.["resource"], url);
+      assert.equal(body.accepts[0]?.["amount"], undefined, "v1 has no amount field");
+    } finally {
+      await stop(server);
+    }
+    const solana = v1ChallengeFor({ mode: "v1-challenge", ...SOLANA }, "http://x/paid");
+    const option = (solana["accepts"] as Array<Record<string, unknown>>)[0]!;
+    assert.equal(option["network"], "solana-devnet");
+    assert.deepEqual(option["extra"], { feePayer: SVM_PAY_TO });
+  });
+
+  it("is a complete v1 challenge to Wasit's read checks, and fails only as v1", async () => {
+    const { url, server } = await start("v1-challenge", BASE);
+    try {
+      const r = Object.fromEntries((await runX402ReadChecks({ target: url })).map((result) => [result.id, result]));
+      assert.equal(r["X402-02"]?.pass, false);
+      assert.match(r["X402-02"]?.detail ?? "", /x402 v1 challenge/);
+      assert.match(r["X402-04"]?.detail ?? "", /All required v1 fields present/);
+      assert.equal(r["X402-05"]?.pass, false, "base-sepolia is not CAIP-2");
+    } finally {
+      await stop(server);
+    }
+  });
+
+  it("tells a v1 payment in X-PAYMENT from a v2 answer, and serves neither", async () => {
+    const { url, lines, server } = await start("v1-challenge", BASE);
+    try {
+      const v1 = await fetch(url, { headers: { "X-PAYMENT": v1PaymentHeader("base-sepolia") } });
+      assert.equal(v1.status, 402);
+      assert.match(lines.at(-1) ?? "", /in X-PAYMENT for \? base units on base-sepolia\./);
+      assert.match(lines.at(-1) ?? "", /paid the v1 challenge as v1, in X-PAYMENT/);
+      const v2 = await fetch(url, { headers: { "PAYMENT-SIGNATURE": paymentHeader("eip155:84532", "10000") } });
+      assert.equal(v2.status, 402);
+      assert.match(lines.at(-1) ?? "", /in PAYMENT-SIGNATURE with x402Version 2.*would ignore this payment/);
+    } finally {
+      await stop(server);
+    }
+  });
+});
+
+describe("malformed-header", () => {
+  it("sends a header that is base64 but does not decode to JSON", async () => {
+    const { url, server } = await start("malformed-header");
+    try {
+      const response = await fetch(url);
+      assert.equal(response.status, 402);
+      const header = response.headers.get("payment-required");
+      assert.ok(header);
+      const text = Buffer.from(header, "base64").toString("utf-8");
+      assert.ok(text.startsWith('{"x402Version":2'), "it is the real challenge, cut short");
+      assert.throws(() => JSON.parse(text));
+    } finally {
+      await stop(server);
+    }
+  });
+
+  it("fails X402-03, and serves no payment made on terms that could not be read", async () => {
+    const { url, lines, server } = await start("malformed-header");
+    try {
+      const r = Object.fromEntries((await runX402ReadChecks({ target: url })).map((result) => [result.id, result]));
+      assert.equal(r["X402-02"]?.pass, true);
+      assert.equal(r["X402-03"]?.pass, false);
+      const paid = await fetch(url, { headers: { "PAYMENT-SIGNATURE": paymentHeader("stellar:testnet", "10000") } });
+      assert.equal(paid.status, 402);
+      assert.match(lines.at(-1) ?? "", /paid on terms it could not have read/);
     } finally {
       await stop(server);
     }

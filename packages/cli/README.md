@@ -122,11 +122,13 @@ Testnet-only helpers for the keys the subcommands above read from `.env`. `--net
 ### `wasit serve` — a paywall that misbehaves, for testing an agent that pays
 
 ```bash
-wasit serve --mode no-settle            # also: wrong-settlement, wrong-network, overprice
+wasit serve --mode no-settle            # also: wrong-settlement, wrong-network, overprice,
+                                        #       v1-challenge, malformed-header
 ```
 
 Runs a local x402 paywall that lies in one chosen way: serves without settling,
-cites someone else's settlement, asks for mainnet, or asks for one million USDC.
+cites someone else's settlement, asks for mainnet, asks for one million USDC, issues
+only an x402 v1 challenge, or sends a challenge header that does not decode.
 Point your agent at `http://127.0.0.1:4020/` and the server reports what the
 agent did. Nothing is settled or forwarded, so no funds move; the agent still
 needs a funded testnet wallet, and `--pay-to` (default `STELLAR_PAYEE_ADDRESS`)

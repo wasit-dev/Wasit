@@ -121,7 +121,12 @@ Every mode's challenge is well-formed (`wasit test --read-only` passes it), and
 the two settlement modes reproduce the servers built for the 0.6.0 A/B:
 `X402-06` and `X402-07` fail against them. `--network eip155:84532` poses the same
 modes on Base Sepolia, and `--network solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` on Solana
-devnet.
+devnet. Two more modes are about the challenge: `v1-challenge` sends only an x402 v1
+challenge (Base Sepolia and Solana devnet; v1 names no Stellar network), and
+`malformed-header` a `PAYMENT-REQUIRED` header that does not decode; both answer a
+payment with 402 and log which header it came in. The official SDK client pays the
+first as v1 and refuses the second without paying
+([evidence](docs/evidence/2026-10-05-wallet-network-and-serve-modes-run.md)).
 
 **Added — `wasit wallet --network` for the Base Sepolia and Solana devnet payers.**
 `wasit wallet create --role x402 --network eip155:84532` (or Solana devnet) generates the

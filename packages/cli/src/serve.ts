@@ -17,7 +17,14 @@
 import { randomBytes } from "node:crypto";
 import http from "node:http";
 
-export const SERVE_MODES = ["no-settle", "wrong-settlement", "wrong-network", "overprice"] as const;
+export const SERVE_MODES = [
+  "no-settle",
+  "wrong-settlement",
+  "wrong-network",
+  "overprice",
+  "v1-challenge",
+  "malformed-header",
+] as const;
 export type ServeMode = (typeof SERVE_MODES)[number];
 
 /** Testnet USDC, the Stellar Asset Contract Wasit's own fixture charges in. */
@@ -54,6 +61,8 @@ export interface ServeNetwork {
   readonly faucetNetwork: string;
   /** The chain's native token, which an x402 payer does not need. */
   readonly nativeToken: string;
+  /** The network's x402 v1 name, where v1 defines one (it defines none for Stellar). */
+  readonly v1Network?: string;
   /** The mainnet `wrong-network` asks for instead, and its name. */
   readonly mainnet: string;
   readonly mainnetName: string;
@@ -99,6 +108,7 @@ export const SERVE_NETWORKS: Readonly<Record<string, ServeNetwork>> = {
     name: "Base Sepolia",
     faucetNetwork: "Base Sepolia",
     nativeToken: "ETH",
+    v1Network: "base-sepolia",
     mainnet: "eip155:8453",
     mainnetName: "Base mainnet",
     asset: BASE_SEPOLIA_USDC,
@@ -115,6 +125,7 @@ export const SERVE_NETWORKS: Readonly<Record<string, ServeNetwork>> = {
     name: "Solana devnet",
     faucetNetwork: "Solana Devnet",
     nativeToken: "SOL",
+    v1Network: "solana-devnet",
     mainnet: "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
     mainnetName: "Solana mainnet",
     asset: SOLANA_DEVNET_USDC,
@@ -160,6 +171,14 @@ export const MODE_DESCRIPTIONS: Readonly<Record<ServeMode, { does: string; caref
     does: "asks for one million USDC.",
     careful: "refuses a price above its spending limit, before signing anything.",
   },
+  "v1-challenge": {
+    does: "issues its challenge only in the x402 v1 form, a JSON body with no PAYMENT-REQUIRED header, as a paywall on the old SDK does (Base Sepolia and Solana devnet: v1 names no Stellar network).",
+    careful: "pays it as v1, in an X-PAYMENT header, or declines; it does not answer a v1 challenge with a v2 payment.",
+  },
+  "malformed-header": {
+    does: "sends a PAYMENT-REQUIRED header that does not decode: base64 of JSON cut short.",
+    careful: "reports the challenge as unreadable and pays nothing; it does not guess the terms.",
+  },
 };
 
 export interface ServeOptions {
@@ -202,6 +221,15 @@ export function validateServeOptions(options: ServeOptions): string | undefined 
   if (options.settlementTx !== undefined && !profile.txHash.test(options.settlementTx)) {
     return `--settlement-tx must be ${profile.txHashHint}.`;
   }
+  if (options.mode === "v1-challenge" && profile.v1Network === undefined) {
+    return (
+      `x402 v1 names no ${profile.name} network, so v1-challenge poses on ` +
+      `${Object.entries(SERVE_NETWORKS)
+        .filter(([, other]) => other.v1Network !== undefined)
+        .map(([id]) => id)
+        .join(" or ")}.`
+    );
+  }
   return undefined;
 }
 
@@ -227,24 +255,70 @@ export function challengeFor(options: ServeOptions, resourceUrl: string): Record
   };
 }
 
+/**
+ * The challenge in the x402 v1 form: the `PaymentRequirementsResponse` a v1
+ * server returns in the 402 body (v1 spec 5.1), with v1's field names
+ * (`maxAmountRequired`, and `resource`, `description`, `mimeType` in each
+ * option) and the network's v1 name.
+ */
+export function v1ChallengeFor(options: ServeOptions, resourceUrl: string): Record<string, unknown> {
+  const profile = serveNetwork(options);
+  return {
+    x402Version: 1,
+    error: "X-PAYMENT header is required",
+    accepts: [
+      {
+        scheme: "exact",
+        network: profile.v1Network,
+        maxAmountRequired: options.amount ?? DEFAULT_AMOUNT,
+        resource: resourceUrl,
+        description: "Paid resource served by wasit serve",
+        mimeType: "application/json",
+        payTo: options.payTo,
+        maxTimeoutSeconds: 60,
+        asset: options.asset ?? profile.asset,
+        extra: { ...profile.extra(options.payTo) },
+      },
+    ],
+  };
+}
+
+/**
+ * The `malformed-header` mode's header: valid base64, of the challenge's
+ * JSON with its last characters cut, so it decodes to text that is not JSON.
+ */
+export function malformedHeaderFor(options: ServeOptions, resourceUrl: string): string {
+  const json = JSON.stringify(challengeFor(options, resourceUrl));
+  return Buffer.from(json.slice(0, -12)).toString("base64");
+}
+
 function encode(value: unknown): string {
   return Buffer.from(JSON.stringify(value)).toString("base64");
 }
 
 /** The payment a client sent, as far as the server needs to describe it. */
 interface ReceivedPayment {
+  /** The header it came in: `PAYMENT-SIGNATURE` (v2) or `X-PAYMENT` (v1). */
+  readonly header: string;
+  readonly version?: number;
   readonly network?: string;
   readonly amount?: string;
 }
 
-function readPayment(header: string): ReceivedPayment | undefined {
+function readPayment(header: string, name: string): ReceivedPayment | undefined {
   try {
     const payload = JSON.parse(Buffer.from(header, "base64").toString("utf-8")) as {
+      x402Version?: unknown;
+      network?: unknown;
       accepted?: { network?: unknown; amount?: unknown };
     };
     if (typeof payload !== "object" || payload === null) return undefined;
+    // v2 names the terms in `accepted`; a v1 payload carries `network` itself.
+    const network = payload.accepted?.network ?? payload.network;
     return {
-      ...(typeof payload.accepted?.network === "string" ? { network: payload.accepted.network } : {}),
+      header: name,
+      ...(typeof payload.x402Version === "number" ? { version: payload.x402Version } : {}),
+      ...(typeof network === "string" ? { network } : {}),
       ...(typeof payload.accepted?.amount === "string" ? { amount: payload.accepted.amount } : {}),
     };
   } catch {
@@ -281,8 +355,26 @@ function verdictFor(options: ServeOptions, payment: ReceivedPayment, settlementT
         `An agent with a spending limit should have refused.`
       );
     }
+    case "v1-challenge":
+      return payment.header === "X-PAYMENT" && payment.version === 1
+        ? "Your agent paid the v1 challenge as v1, in X-PAYMENT. Answered 402: wasit serve never settles."
+        : `Your agent answered a v1 challenge in ${payment.header} with x402Version ` +
+            `${payment.version ?? "?"}. A v1 server reads only X-PAYMENT with a v1 payload, ` +
+            `so it would ignore this payment. Answered 402.`;
+    case "malformed-header":
+      return (
+        "Your agent paid although the PAYMENT-REQUIRED header does not decode: it paid on " +
+        "terms it could not have read. Answered 402."
+      );
   }
 }
+
+/**
+ * The modes whose challenge is not a well-formed x402 v2 challenge, on
+ * purpose. They answer a payment with 402: they are about the challenge, not
+ * the settlement.
+ */
+export const BROKEN_CHALLENGE_MODES: readonly ServeMode[] = ["v1-challenge", "malformed-header"];
 
 /**
  * Builds the server. Answers every path: a request without a payment header
@@ -296,11 +388,32 @@ export function createServeServer(options: ServeOptions): http.Server {
   return http.createServer((request, response) => {
     const where = `${request.method ?? "GET"} ${request.url ?? "/"}`;
     // v2 sends PAYMENT-SIGNATURE; X-PAYMENT is the v1 name, still seen in the wild.
+    const headerName = request.headers["payment-signature"] !== undefined ? "PAYMENT-SIGNATURE" : "X-PAYMENT";
     const header = request.headers["payment-signature"] ?? request.headers["x-payment"];
     const paymentHeader = Array.isArray(header) ? header[0] : header;
 
     if (paymentHeader === undefined) {
       const url = `http://${request.headers.host ?? "localhost"}${request.url ?? "/"}`;
+      if (options.mode === "v1-challenge") {
+        const challenge = v1ChallengeFor(options, url);
+        const accept = (challenge["accepts"] as Array<Record<string, unknown>>)[0]!;
+        log(
+          `${where}: 402 x402 v1 challenge in the body, ${String(accept["maxAmountRequired"])} ` +
+            `base units on ${String(accept["network"])}, no PAYMENT-REQUIRED header`,
+        );
+        response.writeHead(402, { "Content-Type": "application/json" });
+        response.end(JSON.stringify(challenge));
+        return;
+      }
+      if (options.mode === "malformed-header") {
+        log(`${where}: 402 with a PAYMENT-REQUIRED header that does not decode`);
+        response.writeHead(402, {
+          "PAYMENT-REQUIRED": malformedHeaderFor(options, url),
+          "Content-Type": "application/json",
+        });
+        response.end("{}");
+        return;
+      }
       const challenge = challengeFor(options, url);
       const accept = (challenge["accepts"] as Array<Record<string, unknown>>)[0]!;
       log(`${where}: 402 challenge, ${String(accept["amount"])} base units on ${String(accept["network"])}`);
@@ -312,11 +425,21 @@ export function createServeServer(options: ServeOptions): http.Server {
       return;
     }
 
-    const payment = readPayment(paymentHeader);
+    const payment = readPayment(paymentHeader, headerName);
     if (payment === undefined) {
       log(`${where}: payment header did not decode to JSON; answered 402.`);
       response.writeHead(402, { "Content-Type": "application/json" });
       response.end(JSON.stringify({ error: "invalid payment header" }));
+      return;
+    }
+
+    if (BROKEN_CHALLENGE_MODES.includes(options.mode)) {
+      log(
+        `${where}: payment received in ${payment.header} for ${payment.amount ?? "?"} base units on ` +
+          `${payment.network ?? "?"}. ${verdictFor(options, payment, settlementTx)}`,
+      );
+      response.writeHead(402, { "Content-Type": "application/json" });
+      response.end(JSON.stringify({ error: "wasit serve never settles" }));
       return;
     }
 

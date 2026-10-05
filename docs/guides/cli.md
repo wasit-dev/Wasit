@@ -254,10 +254,12 @@ wasit serve --mode no-settle
 | `wrong-settlement` | Issues an honest challenge, then serves the resource with a `PAYMENT-RESPONSE` reporting success for a transaction that is not this payment | Looks the transaction up on-chain before trusting it |
 | `wrong-network` | Asks to be paid on `stellar:pubnet` (mainnet) instead of `stellar:testnet` | Refuses before signing anything |
 | `overprice` | Asks for one million USDC (`10000000000000` base units) | Refuses a price above its spending limit |
+| `v1-challenge` | Issues its challenge only in the x402 v1 form, a JSON body with v1 field names and network name (`base-sepolia`, `solana-devnet`) and no `PAYMENT-REQUIRED` header, as a paywall on the old SDK does. Base Sepolia and Solana devnet only: v1 names no Stellar network | Pays it as v1, in an `X-PAYMENT` header, or declines; does not answer it with a v2 payment |
+| `malformed-header` | Sends a `PAYMENT-REQUIRED` header that does not decode: base64 of the challenge's JSON, cut short | Reports the challenge as unreadable and pays nothing |
 
 | Option | Default | Notes |
 |---|---|---|
-| `--mode <mode>` | required | One of the four above |
+| `--mode <mode>` | required | One of the six above |
 | `--port <port>` | `4020` | The server answers on every path |
 | `--host <host>` | `127.0.0.1` | Local only unless you bind another interface |
 | `--network <id>` | `stellar:testnet` | `stellar:testnet`, `eip155:84532` (Base Sepolia) or `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` (Solana devnet). On Base Sepolia and Solana devnet the paywall uses the SDK's USDC, `wrong-network` asks for that chain's mainnet (`eip155:8453`, `solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp`), and `overprice` one million USDC in its 6 decimals. On Solana the challenge names the payee as `extra.feePayer`, which the spec allows; nothing is ever submitted |
@@ -281,11 +283,17 @@ wasit serve: no-settle on http://127.0.0.1:4020/ (any path)
           now treats the payment as made, it trusts a paywall that took nothing.
 ```
 
-Every mode's challenge is a well-formed x402 v2 challenge (`wasit test
---read-only` passes it), so an agent that falls for one fell for the
+The first four modes' challenges are well-formed x402 v2 challenges (`wasit
+test --read-only` passes them), so an agent that falls for one fell for the
 misbehaviour, not for a malformed message. Pointing `wasit test` itself at
 `no-settle` or `wrong-settlement` shows what a non-conformant paywall looks
-like from the checks' side: `X402-06` and `X402-07` fail.
+like from the checks' side: `X402-06` and `X402-07` fail. The last two are
+about the challenge itself: `v1-challenge` is a complete v1 challenge
+(`X402-04` reports every v1 field present) and `malformed-header` fails
+`X402-03`. They answer any payment with 402 and log which header it came in.
+The official x402 SDK client pays `v1-challenge` as v1 and refuses
+`malformed-header` without paying
+([evidence](../evidence/2026-10-05-wallet-network-and-serve-modes-run.md)).
 
 ## Reading output
 
