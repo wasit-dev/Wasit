@@ -465,7 +465,9 @@ Wasit is an independent protocol-compliance tester for two agentic-payment
 protocols on Stellar: **x402** and **MPP**. It runs the real payment flow
 against a live service and verifies the settlement itself — by reading
 Stellar RPC and the token contract's own transfer event — rather than
-trusting whatever the service's response claims happened.
+trusting whatever the service's response claims happened. The x402 payment
+checks also pay on Base Sepolia, Ethereum Sepolia and Solana devnet, where
+the settlement is read from that chain's own record of the transfer.
 
 It is not a schema validator. A response can have every field in the right
 place and still take money without settling it; that gap is exactly what

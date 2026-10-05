@@ -37,11 +37,14 @@ compile, no native dependency, and no service to run.
 Continuous integration builds and tests on Node 22 and Node 24. Node 26
 works too — the full build, typecheck and test suite has been run on it.
 
-> **Note** — Wasit is testnet-only. Every check, and every key it reads,
-> targets Stellar testnet. There is no mainnet mode and no flag that
-> enables one.
+> **Note** — Wasit is built for testnets: Stellar testnet by default, and
+> Base Sepolia, Ethereum Sepolia and Solana devnet for the x402 payment
+> checks. The one mainnet it can pay on is Stellar's, and only when you
+> name \`stellar:pubnet\` and pass your own \`--rpc-url\`: there is no
+> default endpoint for it, so it cannot be reached by accident. Do not do
+> this; see the [Security Policy](/docs/security/overview).
 
-## A Stellar testnet account
+## A testnet account
 
 Only for the checks that move money. The read-only x402 checks
 (\`X402-01\`–\`05\`) need no key, no funds, and no account — that is the
@@ -55,12 +58,15 @@ list of which environment variable each check reads — including
 | You want to run | You need to have |
 | --- | --- |
 | \`X402-01\`–\`05\` | Nothing at all |
-| \`X402-06\`, \`07\` | A testnet account funded with XLM **and** the asset the target charges in, usually USDC |
+| \`X402-06\`–\`10\` on Stellar | A testnet account funded with XLM **and** the asset the target charges in, usually USDC |
+| \`X402-06\`–\`10\` on Base Sepolia, Ethereum Sepolia or Solana devnet | A key holding that network's USDC, and nothing else: the facilitator pays the fee |
 | \`MPP-01\` | A testnet account funded with XLM **and** USDC |
 | \`MPP-10\`–\`14\` | A commitment signing key — no funds, no account |
 
 \`wasit wallet create\` generates any of these and \`wasit wallet fund\`
-funds them from Friendbot — see [Quick setup](/docs/start/quick-setup).
+funds the Stellar ones from Friendbot; \`--network\` makes the key for
+another testnet, whose USDC comes from Circle's faucet — see
+[Quick setup](/docs/start/quick-setup).
 
 ## AI clients, for the MCP server
 
@@ -186,14 +192,15 @@ Set-Location wasit-testnet
 New-Item -ItemType File .env
 \`\`\`
 
-> **Note** — \`.env\` holds Stellar secret keys. On macOS and Linux,
+> **Note** — \`.env\` holds testnet secret keys. On macOS and Linux,
 > \`chmod 600\` makes it readable only by you; Windows files are already
 > restricted to your user profile by default. Never commit it.
 
 ## Generate and fund a key
 
-\`wasit wallet\` does both. It is testnet-only and has no \`--network\`
-flag, so there is nothing here that can be pointed at mainnet by mistake.
+\`wasit wallet\` does both. It is testnet-only: its \`--network\` takes
+testnets and nothing else, so there is nothing here that can be pointed
+at mainnet by mistake.
 
 \`\`\`bash
 wasit wallet create --role mpp-charge --fund
@@ -232,6 +239,22 @@ faucet exists for Stellar: paste the printed public key into
 \`WASIT_USDC_DISTRIBUTOR_SECRET\` to an account you already funded that
 way and every later run sends from it automatically.
 
+### Paying on Base Sepolia, Ethereum Sepolia or Solana devnet
+
+The x402 payment checks also pay on these testnets, with a key of that
+chain's own kind:
+
+\`\`\`bash
+wasit wallet create --role x402 --network eip155:84532
+\`\`\`
+
+That prints an \`EVM_PRIVATE_KEY=\` line to paste and the address to
+fund. The same key pays on Ethereum Sepolia (\`eip155:11155111\`); for
+Solana devnet use \`--network solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1\`,
+which prints an \`SVM_PRIVATE_KEY=\` line. The only funding step is USDC
+from [faucet.circle.com](https://faucet.circle.com), on that network: the
+payer needs no ETH or SOL, since the facilitator pays the fee.
+
 ## Check what you have
 
 \`\`\`bash
@@ -239,7 +262,8 @@ wasit wallet status
 \`\`\`
 
 Prints each configured role's address and balances, or tells you which
-variable is still unset.
+variable is still unset. \`wasit wallet status --network eip155:84532\`
+shows the x402 payer's USDC on that network instead.
 
 ## Run a settling check
 

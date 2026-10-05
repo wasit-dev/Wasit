@@ -46,7 +46,7 @@ type CompareRow = { without: string; with: string };
 const COMPARE_ROWS: CompareRow[] = [
   {
     without: "A 200 OK is the whole signal — nothing confirms the payment actually settled.",
-    with: "Settlement is read from the token contract's own transfer event via Stellar RPC.",
+    with: "Settlement is read from the token contract's own transfer event via Stellar RPC, and from each chain's own record on Base, Ethereum and Solana testnets.",
   },
   {
     without: "Payment and channel bugs surface in production, the first time a real payer hits them.",
@@ -109,7 +109,7 @@ const FAQ_ITEMS: FaqEntry[] = [
   },
   {
     q: "Is this safe to point at a service I don't control?",
-    a: "Destructive checks require an explicit flag and only run against a channel you name as disposable. Wasit is built for Stellar testnet.",
+    a: "Destructive checks require an explicit flag and only run against a channel you name as disposable. Wasit is built for testnets: Stellar testnet first, and Base Sepolia, Ethereum Sepolia and Solana devnet for the x402 payment checks.",
   },
   {
     q: "What's the difference between the CLI and the MCP server?",
@@ -331,7 +331,9 @@ export default function Home() {
             <p className="section-body" data-reveal>
               Steps 5 and 6 are the point of the tool: Wasit calls Stellar RPC
               directly and checks the transfer event itself, instead of
-              trusting your service&apos;s receipt about what happened on chain.{" "}
+              trusting your service&apos;s receipt about what happened on chain.
+              On Base, Ethereum and Solana testnets the x402 checks read that
+              chain&apos;s RPC the same way.{" "}
               <Link href="/docs/overview/how-it-works">Full flow in the docs →</Link>
             </p>
           </div>

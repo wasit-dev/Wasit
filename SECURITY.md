@@ -8,8 +8,10 @@ keys, what it will and will not do on its own, and how to report a problem.
 
 ## Testnet only
 
-Wasit is built and tested for Stellar testnet. Several checks settle real
-transactions, and one permanently closes a payment channel.
+Wasit is built and tested for testnets: Stellar testnet, and for the x402
+payment checks Base Sepolia, Ethereum Sepolia and Solana devnet, whose mainnets
+it does not pay on at all. Several checks settle real transactions, and one
+permanently closes a payment channel.
 
 Nothing in the tool prevents a `stellar:pubnet` network identifier from
 parsing, but pubnet deliberately has no default RPC endpoint, so a pubnet run
