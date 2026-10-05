@@ -18,6 +18,7 @@ import {
   PROTOCOL_IDS,
   checkStatus,
   fixFor,
+  paymentChainFor,
   runMppChannelSuite,
   runMppChargeSuite,
   runX402PaymentChecks,
@@ -200,14 +201,17 @@ program
   .requiredOption("--target <url>", "URL of the service to test")
   .option(
     "--network <network>",
-    "Network the payment checks pay on: stellar:testnet or stellar:pubnet. " +
-      "X402-01..05 apply to a challenge on any chain.",
+    "Network the payment checks pay on: stellar:testnet, stellar:pubnet or " +
+      "eip155:84532 (Base Sepolia). X402-01..05 apply to a challenge on any chain.",
     "stellar:testnet",
   )
-  .option("--rpc-url <url>", "Override the Soroban RPC endpoint used to verify X402-06's settlement")
+  .option(
+    "--rpc-url <url>",
+    "Override the RPC endpoint used to verify X402-06's settlement (Soroban RPC on Stellar, JSON-RPC on EVM)",
+  )
   .option(
     "--payer-key <key>",
-    "Testnet payer secret key (overrides STELLAR_PRIVATE_KEY from .env)",
+    "Testnet payer key (overrides STELLAR_PRIVATE_KEY, or EVM_PRIVATE_KEY on eip155 networks, from .env)",
   )
   .option(
     "--method <verb>",
@@ -244,14 +248,16 @@ signature. See docs/CHECKS.md for what each check ID verifies.`,
     };
 
     const results = await runX402ReadChecks({ target: opts.target, ...shape });
-    const payerKey: string | undefined = opts.payerKey ?? process.env.STELLAR_PRIVATE_KEY;
+    // Each chain reads its own payer key: a Stellar secret is no use on EVM.
+    const keyEnv = paymentChainFor(opts.network as string)?.payerKeyEnv ?? "STELLAR_PRIVATE_KEY";
+    const payerKey: string | undefined = opts.payerKey ?? process.env[keyEnv];
 
     if (opts.readOnly) {
       note(jsonMode, "(--read-only set: skipping payment checks)\n");
     } else if (!payerKey) {
       note(
         jsonMode,
-        "(no payer key: set STELLAR_PRIVATE_KEY in .env or pass --payer-key — skipping payment checks)\n",
+        `(no payer key: set ${keyEnv} in .env or pass --payer-key — skipping payment checks)\n`,
       );
     } else {
       note(

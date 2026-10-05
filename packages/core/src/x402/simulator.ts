@@ -683,7 +683,20 @@ export async function runX402PaymentChecks(
     // only verify a settlement it can look up. Both are known before any
     // money moves, so a run that could not finish is stopped here rather than
     // after paying.
-    chainFor(options.network).resolveRpcUrl(options.network, options.rpcUrl);
+    const chain = chainFor(options.network);
+    chain.resolveRpcUrl(options.network, options.rpcUrl);
+    // A key for another chain, or a malformed one, would otherwise surface
+    // mid-payment as a harness error. Checked here, it is what it is: the
+    // run's configuration. The message never echoes the key.
+    try {
+      chain.payerAddress(options.payerSecretKey);
+    } catch (error) {
+      if (error instanceof ConfigurationError) throw error;
+      throw new ConfigurationError(
+        `The payer key is not a valid ${chain.name} key (read from ${chain.payerKeyEnv} ` +
+          `or --payer-key).`,
+      );
+    }
   } catch (error) {
     const preflight = errored("PREFLIGHT", "Run Preflight", error);
     options.onResult?.(preflight);

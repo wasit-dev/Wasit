@@ -277,11 +277,12 @@ describe("payment checks on a challenge Wasit cannot pay", () => {
   }
 
   it("stops before paying when asked to pay on a network it cannot pay on", async () => {
-    const target = await serveV2(v2(option(BASE_SEPOLIA)));
+    // Ethereum Sepolia: read-only only.
+    const target = await serveV2(v2(option("eip155:11155111")));
     try {
       const results = await runX402PaymentChecks({
         target: target.url,
-        network: BASE_SEPOLIA,
+        network: "eip155:11155111",
         payerSecretKey,
       });
       assert.equal(results.length, 1);
@@ -292,6 +293,27 @@ describe("payment checks on a challenge Wasit cannot pay", () => {
       await target.close();
     }
   });
+
+  // A Stellar secret on an EVM network, or any malformed key, is the run's
+  // configuration, caught before anything is sent.
+  for (const [label, network, key] of [
+    ["a Stellar secret on Base Sepolia", BASE_SEPOLIA, Keypair.random().secret()],
+    ["a malformed Stellar secret", "stellar:testnet", "SNOTAREALKEY"],
+  ] as const) {
+    it(`stops before paying with ${label}`, async () => {
+      const target = await serveV2(v2(option(network)));
+      try {
+        const results = await runX402PaymentChecks({ target: target.url, network, payerSecretKey: key });
+        assert.equal(results.length, 1);
+        assert.equal(results[0]?.id, "PREFLIGHT");
+        assert.equal(results[0]?.error?.kind, "configuration");
+        assert.equal(results[0]?.detail.includes(key), false);
+        assert.equal(target.paymentHeadersSeen(), 0);
+      } finally {
+        await target.close();
+      }
+    });
+  }
 
   // pubnet has no default RPC endpoint. Without one X402-06 could
   // not verify the settlement, so the payment must not be made at all.
