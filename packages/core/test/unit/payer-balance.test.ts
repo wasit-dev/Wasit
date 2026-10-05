@@ -7,7 +7,7 @@
  * own contract id, and a Solana payer's balance is every token account it
  * holds for the mint, or nothing when RPC answers in a shape it does not
  * know. The Stellar `balance` read and the trustline lookup were run live
- * against testnet (runs/2026-10-05-m4-solana.md).
+ * against testnet (docs/evidence/2026-10-05-0.7.0-verification-runs.md, part 4).
  */
 
 import assert from "node:assert/strict";

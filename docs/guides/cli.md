@@ -293,7 +293,7 @@ about the challenge itself: `v1-challenge` is a complete v1 challenge
 `X402-03`. They answer any payment with 402 and log which header it came in.
 The official x402 SDK client pays `v1-challenge` as v1 and refuses
 `malformed-header` without paying
-([evidence](../evidence/2026-10-05-wallet-network-and-serve-modes-run.md)).
+([evidence](../evidence/2026-10-05-0.7.0-verification-runs.md#part-5-payer-keys-for-base-sepolia-and-solana-and-two-new-serve-modes)).
 
 ## Reading output
 

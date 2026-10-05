@@ -59,7 +59,7 @@ EIP-3009, and Permit2 with its approval signed as a gas-sponsored EIP-2612 permi
 `ERROR (setup)`, not a failure). Against Wasit's own Base Sepolia fixtures, both
 methods pass with `X402-06` settled on-chain and the payer holding no ETH; against `wasit serve` posing on Base
 Sepolia, the lying modes fail both checks
-([evidence](docs/evidence/2026-10-05-base-sepolia-verification-run.md)). Stellar stays
+([evidence](docs/evidence/2026-10-05-0.7.0-verification-runs.md#part-1-x402-payment-checks-on-base-sepolia-eip-3009-and-permit2)). Stellar stays
 the default; MPP is Stellar only. Under the hood, the payment checks now go through a
 per-chain adapter, and the x402 SDK moves from 2.19 to 2.28.
 
@@ -72,7 +72,7 @@ for a settled transaction is now per network: 10 blocks on Sepolia, whose blocks
 seconds apart. No public facilitator settles Ethereum Sepolia, so Wasit's own fixture
 runs the SDK's facilitator itself. Against it, all ten pass with the settlement read back
 independently; against `wasit serve` there, the lying modes fail
-([evidence](docs/evidence/2026-10-06-ethereum-sepolia-verification-run.md)). BNB Smart
+([evidence](docs/evidence/2026-10-06-0.7.0-verification-runs.md#part-1-x402-payment-checks-on-ethereum-sepolia)). BNB Smart
 Chain testnet stays read-only.
 
 **Added — the x402 payment checks pay on Solana devnet.** `--network
@@ -87,7 +87,7 @@ the RPC confirms has expired, since on Solana the blockhash, not `maxTimeoutSeco
 sets a payment's lifetime. Against Wasit's own Solana fixture, all ten pass with the
 settlement read back independently and the payer holding no SOL; against `wasit serve`
 on devnet, the lying modes fail
-([evidence](docs/evidence/2026-10-05-solana-devnet-verification-run.md)). The payee's
+([evidence](docs/evidence/2026-10-05-0.7.0-verification-runs.md#part-3-x402-payment-checks-on-solana-devnet)). The payee's
 token account must exist before the payment. Library users with TypeScript 6 or 7 see
 npm peer warnings from `@solana/kit` 5 at install; the install succeeds and core runs.
 
@@ -101,7 +101,8 @@ target's stated reason, when it gives one. Against Wasit's own fixtures all thre
 all three chains, refused for the reason each is about
 (`invalid_exact_stellar_payload_wrong_amount`, `invalid_exact_evm_payload_authorization_value_mismatch`,
 `invalid_exact_evm_payload_authorization_valid_before`, `invalid_exact_svm_payload_amount_mismatch`,
-...); against `wasit serve --mode no-settle` all three fail. `X402-08` is skipped when the challenge advertises the
+...); against `wasit serve --mode no-settle` all three fail
+([evidence](docs/evidence/2026-10-05-0.7.0-verification-runs.md#part-2-three-new-negative-checks-replay-underpayment-expired-authorization)). `X402-08` is skipped when the challenge advertises the
 `payment-identifier` extension, whose cached replies are legitimate. The catalogue grows
 from 13 to 16 checks. `X402-10` waits about 20 seconds on Stellar for the authorization
 to expire.
@@ -131,7 +132,7 @@ payer's balance of the advertised asset before it signs; below the price, it rep
 unfunded payer used to fail `X402-06` on Solana devnet, for a reason real defects give
 too, and to stop on Stellar with only the token's error code. A balance that cannot be
 read pays as before. Measured on all three chains with fresh payers
-([evidence](docs/evidence/2026-10-05-payer-balance-check-run.md)).
+([evidence](docs/evidence/2026-10-05-0.7.0-verification-runs.md#part-4-x402-06-reads-the-payers-balance-before-paying)).
 
 **Changed — a payer key for the wrong chain, or a malformed one, stops the run at
 preflight.** It used to surface mid-payment as a harness error. The message never
@@ -152,7 +153,7 @@ challenge (Base Sepolia and Solana devnet; v1 names no Stellar network), and
 `malformed-header` a `PAYMENT-REQUIRED` header that does not decode; both answer a
 payment with 402 and log which header it came in. The official SDK client pays the
 first as v1 and refuses the second without paying
-([evidence](docs/evidence/2026-10-05-wallet-network-and-serve-modes-run.md)).
+([evidence](docs/evidence/2026-10-05-0.7.0-verification-runs.md#part-5-payer-keys-for-base-sepolia-and-solana-and-two-new-serve-modes)).
 
 **Added — `wasit wallet --network` for the Base Sepolia and Solana devnet payers.**
 `wasit wallet create --role x402 --network eip155:84532` (or Solana devnet) generates the

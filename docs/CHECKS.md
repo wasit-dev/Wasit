@@ -382,14 +382,14 @@ paying through.
 `X402-06` reads the payer's balance before it signs. When the chain reports less than
 the advertised amount it stops with `ERROR (setup)`: "This run's payer holds less of …
 than the advertised … base units", naming the key to fund. Nothing is sent, and
-`X402-07`–`10` are skipped ([evidence](evidence/2026-10-05-payer-balance-check-run.md)).
+`X402-07`–`10` are skipped ([evidence](evidence/2026-10-05-0.7.0-verification-runs.md#part-4-x402-06-reads-the-payers-balance-before-paying)).
 
 The official x402 client, which Wasit pays through, refuses a price above $1 and an asset
 outside the SDK's defaults (Circle's USDC on Ethereum Sepolia is allowed too). Such a
 target gets `ERROR (setup)` saying which, and nothing is sent: the cap keeps a paywall
 from charging a payer more than it meant to, and Wasit pays automatically, on
 `stellar:pubnet` with real money
-([evidence](evidence/2026-10-06-ethereum-sepolia-verification-run.md#the-clients-spend-controls)).
+([evidence](evidence/2026-10-06-0.7.0-verification-runs.md#part-2-the-clients-spend-controls)).
 
 On Stellar, the payment checks need a testnet payer holding testnet USDC.
 `wasit wallet create --role x402 --fund` generates the key and funds it with
