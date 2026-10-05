@@ -99,6 +99,14 @@ refuses `X402-06`'s valid payment, `X402-07` to `X402-10` are skipped rather tha
 a target that refuses everything proves nothing by refusing a bad payment. `X402-07` used
 to pass in that case.
 
+**Changed — a payer that cannot cover the price gets no verdict.** `X402-06` reads the
+payer's balance of the advertised asset before it signs; below the price, it reports
+`ERROR (setup)` naming the key to fund, sends nothing, and skips `X402-07`–`10`. An
+unfunded payer used to fail `X402-06` on Solana devnet, for a reason real defects give
+too, and to stop on Stellar with only the token's error code. A balance that cannot be
+read pays as before. Measured on all three chains with fresh payers
+([evidence](docs/evidence/2026-10-05-payer-balance-check-run.md)).
+
 **Changed — a payer key for the wrong chain, or a malformed one, stops the run at
 preflight.** It used to surface mid-payment as a harness error. The message never
 echoes the key.

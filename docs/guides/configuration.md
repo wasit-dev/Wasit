@@ -68,8 +68,8 @@ anything is sent, without echoing it.
 
 For Solana devnet, `SVM_PRIVATE_KEY` is the base58 encoding of the keypair's 64
 bytes (seed, then public key), the form wallets export. The payer needs devnet USDC
-of the SDK's default mint, `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`, and **no
-SOL**: the facilitator signs as fee payer and pays the fee. The payee's USDC token
+of the SDK's default mint, `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`, from
+https://faucet.circle.com (network Solana Devnet), and **no SOL**: the facilitator signs as fee payer and pays the fee. The payee's USDC token
 account must exist before the first payment, since the payment's transaction does
 not create it. A keypair whose public half does not belong to its seed, or any
 malformed key, is reported at `PREFLIGHT` without echoing it.
