@@ -361,12 +361,11 @@ export async function runX402ReadChecks(
 }
 
 import { x402Client, x402HTTPClient } from "@x402/fetch";
-import { createEd25519Signer } from "@x402/stellar";
-import { ExactStellarScheme as ExactStellarClientScheme } from "@x402/stellar/exact/client";
-import { Keypair, xdr } from "@stellar/stellar-sdk";
 
-import { resolveRpcUrl } from "../mpp/network.js";
-import { verifySettlement } from "../settlement.js";
+import { paymentChainFor, paymentNetworks, type PaymentChain } from "./chains/index.js";
+import { stellarChain } from "./chains/stellar.js";
+
+export { corruptAuthSignature } from "./chains/stellar.js";
 
 export interface X402PaymentCheckOptions extends RequestShape {
   readonly target: string;
@@ -386,10 +385,27 @@ class PaymentNotAttemptedError extends Error {
   }
 }
 
-function buildX402Client(network: string, payerSecretKey: string) {
-  const signer = createEd25519Signer(payerSecretKey, network as `${string}:${string}`);
-  const client = new x402Client()
-    .register("stellar:*", new ExactStellarClientScheme(signer))
+/**
+ * The adapter for the run's network. Throws `ConfigurationError` for a
+ * network the payment checks cannot pay on; preflight calls this before
+ * anything is sent.
+ */
+function chainFor(network: string): PaymentChain {
+  const chain = paymentChainFor(network);
+  if (chain === undefined) {
+    throw new ConfigurationError(
+      `The payment checks pay on ${paymentNetworks().join(", ")}; "${network}" is ` +
+        `not one of them. X402-01..05 still apply to a challenge on any chain ` +
+        `(--read-only, MCP readOnly).`,
+    );
+  }
+  return chain;
+}
+
+function buildX402Client(chain: PaymentChain, network: string, payerSecretKey: string) {
+  const client = new x402Client();
+  chain.registerPayer(client, network, payerSecretKey);
+  client
     // A challenge may offer several networks, including both Stellar ones.
     // The client's default pick is the first it supports, which would sign
     // for one network with a signer built for another; pay only on the
@@ -414,6 +430,7 @@ function describeOffered(accepts: ReadonlyArray<{ readonly network: string }>): 
  */
 async function preparePayment(options: X402PaymentCheckOptions) {
   const { client, httpClient } = buildX402Client(
+    chainFor(options.network),
     options.network,
     options.payerSecretKey,
   );
@@ -468,9 +485,6 @@ async function preparePayment(options: X402PaymentCheckOptions) {
   return { httpClient, paymentPayload };
 }
 
-/** A Stellar transaction hash: 64 hex characters. */
-const TRANSACTION_HASH = /^[0-9a-f]{64}$/i;
-
 /**
  * Reads the settlement a paid response reports, before anything is looked up.
  *
@@ -485,6 +499,7 @@ export function readSettlementReference(
     readonly transaction?: string;
     readonly errorReason?: string;
   },
+  chain: PaymentChain = stellarChain,
 ): { readonly reference: string } | { readonly failure: string; readonly hint: string } {
   let settlement;
   try {
@@ -505,12 +520,12 @@ export function readSettlementReference(
   // `settlement_pending` means broadcast but unconfirmed; the x402 spec has the
   // caller reconcile on chain, which is exactly what X402-06 goes on to do.
   const pending = !settlement.success && settlement.errorReason === "settlement_pending";
-  if ((!settlement.success && !pending) || !TRANSACTION_HASH.test(reference)) {
+  if ((!settlement.success && !pending) || !chain.isSettlementReference(reference)) {
     return {
       failure:
         `Valid payment accepted (HTTP ${status}), but its PAYMENT-RESPONSE ` +
         `reports ${settlement.success ? "success" : "failure"} with transaction ` +
-        `${JSON.stringify(reference)}, not a settled Stellar transaction hash.`,
+        `${JSON.stringify(reference)}, not ${chain.referenceKind}.`,
       hint:
         "PAYMENT-RESPONSE must report `success: true` and carry the settlement " +
         "transaction's hash in `transaction`.",
@@ -552,8 +567,11 @@ async function checkSignatureAccepted(
     );
   }
 
-  const read = readSettlementReference(paid.status, () =>
-    httpClient.getPaymentSettleResponse((header) => paid.headers.get(header)),
+  const chain = chainFor(options.network);
+  const read = readSettlementReference(
+    paid.status,
+    () => httpClient.getPaymentSettleResponse((header) => paid.headers.get(header)),
+    chain,
   );
   if ("failure" in read) return fail(read.failure, read.hint);
   const reference = read.reference;
@@ -569,12 +587,12 @@ async function checkSignatureAccepted(
     );
   }
 
-  const rpcUrl = resolveRpcUrl(options.network, options.rpcUrl);
-  const verdict = await verifySettlement(rpcUrl, reference, {
+  const rpcUrl = chain.resolveRpcUrl(options.network, options.rpcUrl);
+  const verdict = await chain.verifySettlement(rpcUrl, reference, {
     amount,
     token: accepted.asset,
     recipient: accepted.payTo,
-    payer: Keypair.fromSecret(options.payerSecretKey).publicKey(),
+    payer: chain.payerAddress(options.payerSecretKey),
   });
 
   return verdict.pass
@@ -590,56 +608,6 @@ async function checkSignatureAccepted(
           "and that transaction must move exactly `amount` of `asset` from the " +
           "payer to `payTo`, in a single transfer.",
       );
-}
-
-/**
- * Corrupts the client's authorization signature, and nothing else.
- *
- * In the `exact` scheme on Stellar the client signs a Soroban authorization
- * entry, not the envelope: the facilitator signs the envelope later. So the
- * signature that proves the payer consented is the address credential's
- * `signature`, a `Vec<{ public_key, signature }>`. Flipping one byte of it
- * leaves a transaction that still decodes, carries the same amount, payer and
- * recipient, and fails only signature verification. A target can refuse it
- * only by verifying the signature.
- *
- * Throws {@link CheckSetupError} if the payload carries no such signature, so
- * the check reports no verdict rather than one it did not establish.
- */
-export function corruptAuthSignature(transaction: string): string {
-  const envelope = xdr.TransactionEnvelope.fromXDR(transaction, "base64");
-  const operations =
-    envelope.switch().name === "envelopeTypeTx" ? envelope.v1().tx().operations() : [];
-
-  let corrupted = false;
-  for (const operation of operations) {
-    if (operation.body().switch().name !== "invokeHostFunction") continue;
-    for (const entry of operation.body().invokeHostFunctionOp().auth()) {
-      const credentials = entry.credentials();
-      if (credentials.switch().name !== "sorobanCredentialsAddress") continue;
-      const signature = credentials.address().signature();
-      if (signature.switch().name !== "scvVec") continue;
-      for (const item of signature.vec() ?? []) {
-        if (item.switch().name !== "scvMap") continue;
-        for (const field of item.map() ?? []) {
-          if (field.key().switch().name !== "scvSymbol") continue;
-          if (field.key().sym().toString() !== "signature") continue;
-          const bytes = Buffer.from(field.val().bytes());
-          bytes[0] = bytes[0]! ^ 0xff;
-          field.val(xdr.ScVal.scvBytes(bytes));
-          corrupted = true;
-        }
-      }
-    }
-  }
-
-  if (!corrupted) {
-    throw new CheckSetupError(
-      "The payment payload carries no authorization-entry signature to " +
-        "corrupt, so a corrupted signature cannot be tested.",
-    );
-  }
-  return envelope.toXDR("base64");
 }
 
 /**
@@ -662,10 +630,7 @@ async function checkInvalidSignatureRejected(
 
   const corrupted = {
     ...paymentPayload,
-    payload: {
-      ...paymentPayload.payload,
-      transaction: corruptAuthSignature(paymentPayload.payload.transaction as string),
-    },
+    payload: chainFor(options.network).corruptPayload(paymentPayload.payload),
   };
 
   const paymentHeaders = httpClient.encodePaymentSignatureHeader(corrupted);
@@ -714,11 +679,11 @@ export async function runX402PaymentChecks(
   try {
     assertHttpUrl(options.target);
     buildInit(options);
-    // Payment checks pay on Stellar only, and X402-06 can only verify a
-    // settlement it can look up. Resolving the RPC endpoint establishes both
-    // (it rejects any other network) before any money moves, so a run that
-    // could not finish is stopped here rather than after paying.
-    resolveRpcUrl(options.network, options.rpcUrl);
+    // The payment checks pay only where Wasit has an adapter, and X402-06 can
+    // only verify a settlement it can look up. Both are known before any
+    // money moves, so a run that could not finish is stopped here rather than
+    // after paying.
+    chainFor(options.network).resolveRpcUrl(options.network, options.rpcUrl);
   } catch (error) {
     const preflight = errored("PREFLIGHT", "Run Preflight", error);
     options.onResult?.(preflight);
