@@ -7,8 +7,10 @@ import { App } from "./dashboard/App.js";
 import { CLI_VERSION } from "./version.js";
 import { registerWalletCommand } from "./wallet-command.js";
 import {
+  DEFAULT_SERVE_NETWORK,
   MODE_DESCRIPTIONS,
   SERVE_MODES,
+  SERVE_NETWORKS,
   createServeServer,
   validateServeOptions,
   type ServeMode,
@@ -283,14 +285,20 @@ program
   .command("serve")
   .description("Run a local x402 paywall that misbehaves on purpose, to test an agent that pays")
   .requiredOption("--mode <mode>", `How the paywall misbehaves: ${SERVE_MODES.join(", ")}`)
+  .option(
+    "--network <network>",
+    `Testnet to pose on: ${Object.keys(SERVE_NETWORKS).join(" or ")}`,
+    DEFAULT_SERVE_NETWORK,
+  )
   .option("--port <port>", "Port to listen on", "4020")
   .option("--host <host>", "Interface to bind (local only by default)", "127.0.0.1")
   .option(
     "--pay-to <address>",
-    "Payee account (G...) with a USDC trustline on testnet (overrides STELLAR_PAYEE_ADDRESS)",
+    "Payee: a Stellar account (G...) with a USDC trustline, or an EVM address (0x...) " +
+      "on Base Sepolia (overrides STELLAR_PAYEE_ADDRESS or EVM_PAYEE_ADDRESS)",
   )
   .option("--amount <units>", "Price in base units for every mode except overprice", "10000")
-  .option("--asset <contract>", "Token contract (default: testnet USDC)")
+  .option("--asset <contract>", "Token contract (default: the network's testnet USDC)")
   .option(
     "--settlement-tx <hash>",
     "wrong-settlement: transaction to cite (default: a random hash that exists nowhere)",
@@ -309,12 +317,16 @@ simulate the transfer to --pay-to before signing.
 Examples:
   $ wasit serve --mode no-settle
   $ wasit serve --mode wrong-settlement --settlement-tx <hash of an unrelated tx>
-  $ wasit serve --mode overprice --port 4021`,
+  $ wasit serve --mode overprice --port 4021
+  $ wasit serve --mode no-settle --network eip155:84532   # Base Sepolia`,
   )
   .action((opts) => {
+    const network = opts.network as string;
+    const payeeEnv = SERVE_NETWORKS[network]?.payeeEnv ?? "STELLAR_PAYEE_ADDRESS";
     const options = {
       mode: opts.mode as ServeMode,
-      payTo: (opts.payTo as string | undefined) ?? process.env.STELLAR_PAYEE_ADDRESS ?? "",
+      network,
+      payTo: (opts.payTo as string | undefined) ?? process.env[payeeEnv] ?? "",
       amount: opts.amount as string,
       ...(opts.asset ? { asset: opts.asset as string } : {}),
       ...(opts.settlementTx ? { settlementTx: opts.settlementTx as string } : {}),
@@ -334,7 +346,7 @@ Examples:
     });
     server.listen(port, opts.host as string, () => {
       const description = MODE_DESCRIPTIONS[options.mode];
-      console.log(`wasit serve: ${options.mode} on http://${opts.host}:${port}/ (any path)`);
+      console.log(`wasit serve: ${options.mode} on ${network}, http://${opts.host}:${port}/ (any path)`);
       console.log(`  This paywall ${description.does}`);
       console.log(`  An agent that pays carefully ${description.careful}`);
       console.log("  Nothing is settled or forwarded; no funds move. Ctrl+C to stop.\n");
