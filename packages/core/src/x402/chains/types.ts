@@ -80,11 +80,12 @@ export interface PaymentChain {
   /** Whether `reference` has the shape of a settlement on this chain. */
   isSettlementReference(reference: string): boolean;
   /**
-   * Looks the settlement up and holds it to the advertised terms. Returns a
-   * verdict about the target; throws when the chain's RPC gives no answer,
-   * which says nothing about the target.
+   * Looks the settlement up on `network` and holds it to the advertised
+   * terms. Returns a verdict about the target; throws when the chain's RPC
+   * gives no answer, which says nothing about the target.
    */
   verifySettlement(
+    network: string,
     rpcUrl: string,
     reference: string,
     expected: ExpectedSettlement,

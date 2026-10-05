@@ -704,7 +704,7 @@ async function checkSignatureAccepted(options: X402PaymentCheckOptions): Promise
   }
 
   const rpcUrl = chain.resolveRpcUrl(options.network, options.rpcUrl);
-  const verdict = await chain.verifySettlement(rpcUrl, reference, {
+  const verdict = await chain.verifySettlement(options.network, rpcUrl, reference, {
     amount,
     token: accepted.asset,
     recipient: accepted.payTo,

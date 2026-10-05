@@ -29,6 +29,7 @@ FIXTURES=(
   "x402-evm:3005:packages/core/test/fixtures/x402-evm-server.ts"
   "x402-permit2:3006:packages/core/test/fixtures/x402-evm-permit2-server.ts"
   "x402-svm:3007:packages/core/test/fixtures/x402-svm-server.ts"
+  "x402-sepolia:3008:packages/core/test/fixtures/x402-evm-sepolia-server.ts"
 )
 
 field() { echo "$1" | cut -d: -f"$2"; }
@@ -91,6 +92,13 @@ cmd_start() {
           continue
         fi
         ;;
+      x402-sepolia)
+        # It runs its own facilitator, which pays the gas from this key.
+        if ! grep -q '^EVM_PAYEE_ADDRESS=.' "$ROOT/.env" || ! grep -q '^EVM_FACILITATOR_PRIVATE_KEY=.' "$ROOT/.env"; then
+          printf "  %-9s skipped (EVM_PAYEE_ADDRESS or EVM_FACILITATOR_PRIVATE_KEY not set in .env)\n" "$(field "$fixture" 1)"
+          continue
+        fi
+        ;;
       x402-svm)
         if ! grep -q '^SVM_PAYEE_ADDRESS=.' "$ROOT/.env"; then
           printf "  %-9s skipped (SVM_PAYEE_ADDRESS not set in .env)\n" "$(field "$fixture" 1)"
@@ -109,6 +117,7 @@ cmd_start() {
   echo "  x402-evm http://localhost:3005/protected   (Base Sepolia, needs EVM_PAYEE_ADDRESS)"
   echo "  x402-permit2 http://localhost:3006/protected   (Base Sepolia, Permit2 with EIP-2612 sponsoring)"
   echo "  x402-svm http://localhost:3007/protected   (Solana devnet, needs SVM_PAYEE_ADDRESS)"
+  echo "  x402-sepolia http://localhost:3008/protected   (Ethereum Sepolia, own facilitator, needs EVM_FACILITATOR_PRIVATE_KEY)"
 }
 
 cmd_stop() {

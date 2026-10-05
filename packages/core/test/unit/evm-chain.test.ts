@@ -169,15 +169,19 @@ describe("corruptEvmSignature", () => {
 });
 
 describe("the EVM adapter", () => {
-  it("pays on Base Sepolia, and Stellar still pays on Stellar", () => {
+  it("pays on Base Sepolia and Ethereum Sepolia, and Stellar still pays on Stellar", () => {
     assert.equal(paymentChainFor("eip155:84532")?.name, "EVM");
+    assert.equal(paymentChainFor("eip155:11155111")?.name, "EVM");
     assert.equal(paymentChainFor("stellar:testnet")?.name, "Stellar");
-    assert.equal(paymentChainFor("eip155:11155111"), undefined);
+    // BNB Smart Chain testnet: read-only only.
+    assert.equal(paymentChainFor("eip155:97"), undefined);
   });
 
   it("defaults to the chain's public RPC and honours an override", () => {
     assert.equal(evmChain.resolveRpcUrl("eip155:84532"), "https://sepolia.base.org");
     assert.equal(evmChain.resolveRpcUrl("eip155:84532", "https://rpc.internal"), "https://rpc.internal");
+    // viem's default for Ethereum Sepolia; the docs name it.
+    assert.equal(evmChain.resolveRpcUrl("eip155:11155111"), "https://11155111.rpc.thirdweb.com");
   });
 
   it("derives the payer address, and rejects a malformed key without echoing it", () => {

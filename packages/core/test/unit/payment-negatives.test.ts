@@ -44,6 +44,8 @@ async function standIn(options: {
   mode: "accept" | "refuse" | "permit2-allowance";
   amount?: string;
   paymentIdentifier?: boolean;
+  network?: string;
+  asset?: string;
 }): Promise<{ url: string; received: Received[]; close: () => Promise<void> }> {
   const received: Received[] = [];
   const challenge = {
@@ -52,9 +54,9 @@ async function standIn(options: {
     accepts: [
       {
         scheme: "exact",
-        network: NETWORK,
+        network: options.network ?? NETWORK,
         amount: options.amount ?? "10000",
-        asset: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+        asset: options.asset ?? "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
         payTo: "0x209693Bc6afc0C5328bA36FaF03C514EF312287C",
         maxTimeoutSeconds: 60,
         extra: { name: "USDC", version: "2" },
@@ -248,6 +250,39 @@ describe("a refused valid payment", () => {
       assert.match(r["X402-06"]?.detail ?? "", /^Expected 2xx after a valid payment, got 402\.$/);
     } finally {
       await target.close();
+    }
+  });
+});
+
+describe("on Ethereum Sepolia", () => {
+  // Circle's Sepolia USDC is not an SDK default asset, and the SDK client's
+  // spend controls refuse non-default assets unless they are allowed.
+  it("pays in Circle's Sepolia USDC, up to the SDK's own $1 cap", async () => {
+    for (const [amount, paid] of [
+      ["10000", true],
+      ["1000001", false],
+    ] as const) {
+      const target = await standIn({
+        mode: "refuse",
+        amount,
+        network: "eip155:11155111",
+        asset: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+      });
+      try {
+        const r = byId(
+          await runX402PaymentChecks({
+            target: target.url,
+            network: "eip155:11155111",
+            payerSecretKey: generatePrivateKey(),
+            rpcUrl: funded.url,
+          }),
+        );
+        assert.equal(target.received.length, paid ? 1 : 0, amount);
+        if (paid) assert.match(r["X402-06"]?.detail ?? "", /got 402/);
+        else assert.match(r["X402-06"]?.detail ?? "", /spendControls/);
+      } finally {
+        await target.close();
+      }
     }
   });
 });
