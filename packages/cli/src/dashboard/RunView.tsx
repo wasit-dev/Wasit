@@ -8,6 +8,7 @@ import {
   toStructuredRun,
   type CheckResult,
   type ProtocolId,
+  X402_PAYMENT_CHECK_IDS,
 } from "@wasit-dev/core";
 import type { DashboardAction } from "./App.js";
 import { runAction } from "./runners.js";
@@ -63,10 +64,11 @@ function colorFor(status: EntryStatus): string {
   }
 }
 
-// X402-06/07 need a real settled payment and are never touched by the
-// read-only x402 action — listing them as "pending" would leave two rows
-// spinning forever after the run has already finished.
-const READ_ONLY_EXCLUDED_IDS = new Set(["X402-06", "X402-07"]);
+// The payment checks need a payer key and are never touched by the
+// read-only x402 action — listing them as "pending" would leave their rows
+// spinning forever after the run has already finished. Core owns the list,
+// so a new payment check cannot be missed here.
+const READ_ONLY_EXCLUDED_IDS = new Set(X402_PAYMENT_CHECK_IDS);
 
 export function RunView({ protocol, action, target, onBack }: RunViewProps) {
   const { exit } = useApp();

@@ -19,6 +19,9 @@ in every test report.
 | `X402-05` | Network Identifier Valid | x402 v2 spec §11.1; CAIP-2 | Every advertised network id is CAIP-2 | Every option's `network` is a CAIP-2 identifier, `namespace:reference` with a 3 to 8 character lowercase namespace and a reference of at most 32 characters, as x402 v2 requires. Where the namespace's own CAIP-2 definition fixes the reference, that is checked too: `stellar` is `testnet` or `pubnet`; `eip155` is the chain id in base 10 (`eip155:84532`, not `eip155:0x14a34`); `solana` is the first 32 characters of the base58 genesis hash. A well-formed id in another namespace passes, and the result says only the format was checked there: x402 v2 asks for CAIP-2 and nothing more, so failing it would report Wasit's own lack of rules as the target's defect. An option without a `network` is left to `X402-04`. |
 | `X402-06` | Signature Resubmit Accepted | x402 spec §payment-flow | A resubmitted request carrying a valid signature must be accepted | Response is no longer 402; a 2xx returns the original resource. The challenge is re-read immediately before signing, so the payment answers a challenge the target issued just now rather than a stale one. **Settles a real payment** — see the cost note below. A 2xx alone does not pass. The settlement the response reports in its `PAYMENT-RESPONSE` header (x402 v2 HTTP transport) must name a Stellar transaction hash, and that transaction is then looked up on Stellar RPC and held to the advertised terms exactly as `MPP-01` does: it must have succeeded and emitted exactly one `transfer` event, from this run's payer, to the advertised `payTo`, for the advertised `amount` of the advertised `asset`. A missing header, a reported failure, or a hash that does not match fails. A `settlement_pending` response, which the spec defines as broadcast but unconfirmed, is reconciled on chain rather than failed. Uses the same RPC wait as `MPP-01`. On Base Sepolia (`eip155:84532`) the reference is an EVM transaction hash, and the receipt's ERC-20 `Transfer` log is held to the same terms: the transaction succeeded and logged exactly one token transfer, from this run's payer, to `payTo`, for `amount` of `asset` (an ERC-721 transfer, which shares the event signature, is not counted). The receipt is awaited for 30 blocks before the transaction counts as missing; an RPC that stops advancing gives no verdict. |
 | `X402-07` | Invalid Signature Rejected *(negative)* | x402 spec §payment-flow; `exact` scheme on Stellar | A payment whose authorization signature is wrong must be REJECTED | The target answers with a non-2xx status. The payment is built exactly as for `X402-06`, then only the client's authorization signature is corrupted: in the `exact` scheme on Stellar the client signs a Soroban authorization entry rather than the envelope, and one byte of that entry's `signature` is flipped. The transaction still decodes and carries the same amount, payer and recipient, so a target can refuse it only by verifying the signature. Measured against the `x402.org` facilitator on 2026-09-30, the rejection is `invalid_exact_stellar_payload_simulation_failed`, reached at the Soroban simulation that checks authorization; the pre-0.6.0 corruption, which overwrote the base64 tail and broke XDR decoding, drew `invalid_exact_stellar_payload_malformed` instead, and a target that decoded the envelope without verifying the signature passed it. Rejection is established only by an answer: a target that cannot be reached, or whose challenge cannot be read, produces no verdict and is reported as ERROR or SKIP, and a payload with no authorization signature to corrupt reports `ERROR (setup)`. On Base Sepolia the client signs an EIP-3009 `transferWithAuthorization` off-chain; the first byte of that signature is flipped and the authorization left intact, so the signer it recovers to is no longer the payer and only signature verification can refuse it. Measured against the `x402.org` facilitator on 2026-10-05: refused with 402. |
+| `X402-08` | Payment Replay Rejected *(negative)* | x402 v2 spec §10.1; `exact` scheme, one-time use | A payment that was already accepted must not be accepted again | The headers `X402-06`'s accepted payment was sent with are sent again, byte for byte, and the target answers with a non-2xx status. Each authorization is single-use: once the payment settles, its EIP-3009 nonce, or its Soroban auth entry's nonce, is spent, and the facilitator's verify refuses it. A 2xx means one payment bought the resource twice. Nothing can settle twice, so this costs nothing. **Skipped** when the challenge advertises the `payment-identifier` extension, under which a server may legitimately answer a repeated payment with its cached response. |
+| `X402-09` | Underpayment Rejected *(negative)* | `exact` scheme verification: amount | A validly signed payment for less than the advertised amount must be rejected | The payment is signed for half the advertised amount, while its `accepted` still claims the advertised terms, so the signature is valid and only the amount is wrong; the target answers with a non-2xx status. On Stellar the facilitator must hold the transfer to `requirements.amount` exactly; on EVM, verification step 3 holds the authorization's value to it. **Skipped** when the price is 1 base unit, since nothing smaller can be offered. A target that accepts may settle the lower amount. |
+| `X402-10` | Expired Authorization Rejected *(negative)* | x402 v2 spec §10.1 (time constraints); `exact` scheme verification: validity window | A payment whose authorization has expired must be rejected | The payment is signed with a one-second lifetime, which both SDK clients derive from `maxTimeoutSeconds` (EVM `validBefore`, the Stellar auth entry's expiration ledger), held until that has passed (5 seconds on Base Sepolia, 20 on Stellar, three or more ledgers), and sent claiming the advertised terms. The target answers with a non-2xx status. An expired authorization cannot settle, so a target that serves it serves for nothing. |
 
 **Note on the x402 payment checks' cost (Week 2).** `X402-06` and `X402-07`
 are not free. `X402-06` settles a real payment against the target, and `X402-07`
@@ -29,6 +32,18 @@ exercised cannot be verified. `X402-01` through `X402-05` read the challenge
 only and cost nothing; `--read-only` (CLI) or `readOnly: true` (MCP) restricts a
 run to those. The payment checks are also skipped entirely when no payer key is
 present, so the default posture is the cheap one.
+
+**Note on the negative payment checks (0.7.0).** `X402-07` through `X402-10` each send a
+payment the target must refuse, and pass when it does. A refusal only means something
+from a target that accepts a valid payment: one that refuses everything would pass them
+all. So they run only after `X402-06`'s valid payment was answered with a 2xx, and are
+**skipped** otherwise, with that reason. They run in catalogue order after `X402-06`.
+
+**Note on settlement timing (0.7.0).** There is no check that a target settles before it
+serves, because the protocol does not require it. x402 v2's default `authorization` flow
+is verify, run the resource, settle, then respond (spec §6.1); only a flow declared as
+`upfront` or `escrow` in `extra.paymentFlow` settles first. What the client can observe,
+that the response arrives with a settlement that happened, `X402-06` already requires.
 
 **Note on cascading failures (Week 2).** The read-only checks inspect
 progressively deeper parts of one challenge: the status, then the header, then
@@ -173,7 +188,7 @@ arguments, so an agent never handles them.
 
 **Revision note (Week 2, corrected):** `MPP-11`/`MPP-12` pass criteria were first written as "server rejects", then briefly revised to "zero balance delta / silent no-op" after reading only the `stellar-experimental/one-way-channel` on-chain contract source (which is genuinely a silent no-op for stale `settle`/`close` calls). That revision was corrected after reading the `@stellar/mpp` channel server implementation directly: the HTTP-facing server — the actual artifact Wasit tests — rejects stale/replayed commitments explicitly via `ChannelVerificationError`, before the on-chain contract is ever invoked. The contract's own no-op behavior only applies if the contract is called directly, bypassing the server, which is out of scope for Wasit.
 
-**Status note (Week 2, corrected).** All thirteen checks in this catalogue are implemented
+**Status note (Week 2, corrected; 0.7.0).** All sixteen checks in this catalogue are implemented
 and reachable from both front ends. `X402-02` deliberately accepts either header
 name because Stellar's own official documentation is not yet internally
 consistent (`PAYMENT-REQUIRED` vs `X-Payment`); that divergence is a
@@ -307,6 +322,26 @@ that cites another transaction fails, even a real and successful one
 The target served a payment whose authorization signature was corrupted: it
 decoded the payment without verifying it. Pass every payment to the
 facilitator's verify step and refuse it when verification fails.
+
+### The same payment is accepted twice (`X402-08`)
+
+A target that serves a payment it has already been paid with sold the resource twice
+for one payment. Each authorization is single-use; the facilitator's verify refuses one
+whose nonce is spent, so verify every payment before serving and never serve a payload
+twice. A server that offers the `payment-identifier` extension may answer a repeat with
+its cached response, and `X402-08` is skipped for it.
+
+### A payment for less than the price is accepted (`X402-09`)
+
+The signature was valid; only the amount was short. A server that checks only the
+signature, or skips the facilitator's verify, sells for less than its price. Hold the
+signed amount to the advertised one before serving: on Stellar it must be exact.
+
+### An expired payment is accepted (`X402-10`)
+
+An authorization past its window (`validBefore` on EVM, the auth entry's expiration
+ledger on Stellar) can never settle, so a target that serves it serves for nothing.
+Verify with the facilitator before serving; it refuses expired authorizations.
 
 ### A charge to a muxed recipient is refused (`MPP-01`)
 

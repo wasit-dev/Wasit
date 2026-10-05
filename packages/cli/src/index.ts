@@ -226,7 +226,7 @@ program
     "Extra request header the endpoint needs before it will issue a challenge. Repeatable.",
     collectHeader,
   )
-  .option("--read-only", "Skip payment checks (X402-06/07)", false)
+  .option("--read-only", "Skip the payment checks (X402-06..10)", false)
   .option("--json", "Print results as JSON instead of formatted text", false)
   .addHelpText(
     "after",
@@ -236,10 +236,11 @@ Examples:
   $ wasit test --target https://api.example.com/paid-endpoint --payer-key S...
   $ wasit test --target https://api.example.com/paid-endpoint --read-only --json
 
-X402-01..05 (challenge/header checks) always run and cost nothing. X402-06/07
+X402-01..05 (challenge/header checks) always run and cost nothing. X402-06..10
 (real payment checks) run only when a payer key is available and --read-only
-is not set: X402-06 settles a payment, X402-07 attempts one with a corrupted
-signature. See docs/CHECKS.md for what each check ID verifies.`,
+is not set: X402-06 settles a payment; X402-07..10 send payments the target
+must refuse (a corrupted signature, a replay, an underpayment, an expired
+authorization). See docs/CHECKS.md for what each check ID verifies.`,
   )
   .action(async (opts) => {
     const jsonMode = opts.json === true;
@@ -265,7 +266,7 @@ signature. See docs/CHECKS.md for what each check ID verifies.`,
       note(
         jsonMode,
         `When the target offers a ${opts.network} option, X402-06 settles a real ` +
-          "payment and X402-07 attempts one. Testnet funds will move.\n",
+          "payment and X402-07..10 send payments it must refuse. Testnet funds will move.\n",
       );
       results.push(
         ...(await runX402PaymentChecks({

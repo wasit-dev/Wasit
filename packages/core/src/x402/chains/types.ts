@@ -2,8 +2,8 @@
  * What the x402 payment checks need that differs from chain to chain.
  *
  * X402-01 through X402-05 need none of it: they read the challenge only, and
- * apply to an x402 service on any chain. X402-06 and X402-07 build a real
- * payment, so they need a signer, a way to look the settlement up, and a way
+ * apply to an x402 service on any chain. X402-06 to X402-10 build real
+ * payments, so they need a signer, a way to look the settlement up, and a way
  * to forge only the payer's signature. One adapter per chain family supplies
  * those, and the checks themselves stay the same everywhere.
  */
@@ -21,6 +21,11 @@ export interface PaymentChain {
   readonly payerKeyEnv: string;
   /** What a settlement reference is on this chain, for a report ("a ... hash"). */
   readonly referenceKind: string;
+  /**
+   * How long X402-10 holds a payment signed with a one-second lifetime before
+   * sending it, so it has certainly expired on this chain.
+   */
+  readonly expiryWaitMs: number;
   /**
    * The RPC endpoint X402-06 verifies the settlement on. Throws
    * `ConfigurationError` when there is none, before any payment is made.

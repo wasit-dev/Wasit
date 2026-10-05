@@ -60,6 +60,25 @@ Sepolia, the lying modes fail both checks
 the default; MPP is Stellar only. Under the hood, the payment checks now go through a
 per-chain adapter, and the x402 SDK moves from 2.19 to 2.28.
 
+**Added — three negative payment checks: `X402-08` Payment Replay Rejected, `X402-09`
+Underpayment Rejected, `X402-10` Expired Authorization Rejected.** Each sends a payment the
+target must refuse: the exact payment `X402-06` was accepted for, sent again; a validly
+signed payment for half the price that still claims the full price; and a payment signed
+with a one-second lifetime, sent once it has expired. They run on Stellar and Base
+Sepolia. A refusal now shows the target's stated reason, when it gives one. Against
+Wasit's own fixtures all three pass on both chains, refused for the reason each is about
+(`invalid_exact_stellar_payload_wrong_amount`, `invalid_exact_evm_payload_authorization_value_mismatch`,
+`invalid_exact_evm_payload_authorization_valid_before`, ...); against `wasit serve
+--mode no-settle` all three fail. `X402-08` is skipped when the challenge advertises the
+`payment-identifier` extension, whose cached replies are legitimate. The catalogue grows
+from 13 to 16 checks. `X402-10` waits about 20 seconds on Stellar for the authorization
+to expire.
+
+**Changed — the negative payment checks need an accepted baseline.** When the target
+refuses `X402-06`'s valid payment, `X402-07` to `X402-10` are skipped rather than passed:
+a target that refuses everything proves nothing by refusing a bad payment. `X402-07` used
+to pass in that case.
+
 **Changed — a payer key for the wrong chain, or a malformed one, stops the run at
 preflight.** It used to surface mid-payment as a harness error. The message never
 echoes the key.
@@ -83,7 +102,9 @@ no option on the run's network and nothing was paid.
 passes `X402-05` where it failed. A challenge with a broken second option now
 fails `X402-04` or `X402-05` where it passed. A challenge without `scheme`,
 `asset` or `maxTimeoutSeconds`, or with a wrongly typed field, now fails
-`X402-04`.
+`X402-04`. A target that accepts replayed, underpaid or expired payments now fails
+`X402-08`, `X402-09` or `X402-10`; one that refuses even a valid payment now gets
+`X402-07` skipped instead of passed.
 
 ## [0.6.0] — 2026-09-30
 

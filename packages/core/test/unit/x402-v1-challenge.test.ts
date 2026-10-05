@@ -130,7 +130,7 @@ describe("payment checks when no payment can be built", () => {
     ["an x402 v1 challenge", v1Body("stellar-testnet"), /x402 v1 challenge/],
     ["an unreadable challenge", "payment required", /could not be read/],
   ] as const) {
-    it(`skips X402-06 and X402-07 for ${label}, and sends nothing`, async () => {
+    it(`skips every payment check for ${label}, and sends nothing`, async () => {
       const target = await serve(body);
       try {
         const results = await runX402PaymentChecks({
@@ -143,6 +143,9 @@ describe("payment checks when no payment can be built", () => {
           [
             ["X402-06", true],
             ["X402-07", true],
+            ["X402-08", true],
+            ["X402-09", true],
+            ["X402-10", true],
           ],
         );
         for (const result of results) assert.match(result.detail, reason);

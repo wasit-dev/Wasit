@@ -170,12 +170,14 @@ server.registerTool(
   {
     title: "Test x402 compliance",
     description:
-      "Runs the x402 conformance checks (X402-01..07) against a running service. " +
+      "Runs the x402 conformance checks (X402-01..10) against a running service. " +
       "Payment checks are included only when the network's payer key is set in " +
       "this server's environment (STELLAR_PRIVATE_KEY on Stellar, EVM_PRIVATE_KEY " +
       "on Base Sepolia); otherwise they are skipped. When they do run, "
-      + "X402-06 settles a real payment and X402-07 attempts one, so each call "
-      + "spends testnet funds and repeated calls spend repeatedly. Testnet only.",
+      + "X402-06 settles a real payment and X402-07..10 send payments the target "
+      + "must refuse, so each call spends testnet funds and repeated calls spend "
+      + "repeatedly. X402-10 waits for an authorization to expire (about 20 s on "
+      + "Stellar). Testnet only.",
     inputSchema: {
       target: z.string().describe("Full URL of the paid resource, including scheme"),
       network: z
@@ -189,7 +191,7 @@ server.registerTool(
       readOnly: z
         .boolean()
         .optional()
-        .describe("Skip the payment checks (X402-06/07) even if a payer key is set"),
+        .describe("Skip the payment checks (X402-06..10) even if a payer key is set"),
       rpcUrl: z
         .string()
         .optional()

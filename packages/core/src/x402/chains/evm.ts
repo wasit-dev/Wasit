@@ -295,6 +295,8 @@ export const evmChain: PaymentChain = {
   networks: Object.keys(NETWORKS),
   payerKeyEnv: "EVM_PRIVATE_KEY",
   referenceKind: "an EVM transaction hash",
+  // validBefore is now + 1 second; Base Sepolia blocks come every 2 seconds.
+  expiryWaitMs: 5_000,
   resolveRpcUrl(network, override) {
     const chain = NETWORKS[network];
     if (chain === undefined) {
