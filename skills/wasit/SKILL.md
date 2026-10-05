@@ -52,8 +52,10 @@ npx @wasit-dev/cli test --target https://your-service.example/paid --read-only
 ```
 
 That runs `X402-01` through `X402-05`, on a challenge from any chain. Add a
-payer key (`--payer-key`/`STELLAR_PRIVATE_KEY`, or `EVM_PRIVATE_KEY` with
-`--network eip155:84532` for Base Sepolia) to also run `X402-06`–`10`: `X402-06`
+payer key (`--payer-key`/`STELLAR_PRIVATE_KEY`, `EVM_PRIVATE_KEY` with
+`--network eip155:84532` for Base Sepolia, or `SVM_PRIVATE_KEY` with
+`--network solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` for Solana devnet) to also run
+`X402-06`–`10`: `X402-06`
 settles a real testnet payment and verifies it on-chain, and `X402-07`–`10` send
 payments the service must refuse. `wasit mpp-charge` and `wasit mpp-channel` cover MPP;
 channel mode is free except for the destructive close check, which is opt-in

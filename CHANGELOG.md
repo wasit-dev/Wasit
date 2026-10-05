@@ -63,16 +63,33 @@ Sepolia, the lying modes fail both checks
 the default; MPP is Stellar only. Under the hood, the payment checks now go through a
 per-chain adapter, and the x402 SDK moves from 2.19 to 2.28.
 
+**Added — the x402 payment checks pay on Solana devnet.** `--network
+solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` (MCP: `network`) runs `X402-06` to `X402-10`
+there, with the payer key in `SVM_PRIVATE_KEY` (base58 of the 64-byte keypair, as
+wallets export it). The payer signs a transaction with one `TransferChecked`, and the
+facilitator signs as fee payer, so a payer needs devnet USDC and no SOL. `X402-06` holds
+the settlement to the confirmed transaction's token balances: exactly one transfer, of
+the advertised amount and mint, to an account `payTo` owns, from this run's payer.
+`X402-07` forges only the payer's signature; `X402-10` builds the payment on a blockhash
+the RPC confirms has expired, since on Solana the blockhash, not `maxTimeoutSeconds`,
+sets a payment's lifetime. Against Wasit's own Solana fixture, all ten pass with the
+settlement read back independently and the payer holding no SOL; against `wasit serve`
+on devnet, the lying modes fail
+([evidence](docs/evidence/2026-10-05-solana-devnet-verification-run.md)). The payee's
+token account must exist before the payment. Library users with TypeScript 6 or 7 see
+npm peer warnings from `@solana/kit` 5 at install; the install succeeds and core runs.
+
 **Added — three negative payment checks: `X402-08` Payment Replay Rejected, `X402-09`
 Underpayment Rejected, `X402-10` Expired Authorization Rejected.** Each sends a payment the
 target must refuse: the exact payment `X402-06` was accepted for, sent again; a validly
 signed payment for half the price that still claims the full price; and a payment signed
-with a one-second lifetime, sent once it has expired. They run on Stellar and Base
-Sepolia. A refusal now shows the target's stated reason, when it gives one. Against
-Wasit's own fixtures all three pass on both chains, refused for the reason each is about
+with a one-second lifetime, sent once it has expired (on Solana, one built on an expired
+blockhash). They run on Stellar, Base Sepolia and Solana devnet. A refusal now shows the
+target's stated reason, when it gives one. Against Wasit's own fixtures all three pass on
+all three chains, refused for the reason each is about
 (`invalid_exact_stellar_payload_wrong_amount`, `invalid_exact_evm_payload_authorization_value_mismatch`,
-`invalid_exact_evm_payload_authorization_valid_before`, ...); against `wasit serve
---mode no-settle` all three fail. `X402-08` is skipped when the challenge advertises the
+`invalid_exact_evm_payload_authorization_valid_before`, `invalid_exact_svm_payload_amount_mismatch`,
+...); against `wasit serve --mode no-settle` all three fail. `X402-08` is skipped when the challenge advertises the
 `payment-identifier` extension, whose cached replies are legitimate. The catalogue grows
 from 13 to 16 checks. `X402-10` waits about 20 seconds on Stellar for the authorization
 to expire.
@@ -95,7 +112,8 @@ what the agent did. It never settles or forwards anything, so no funds move.
 Every mode's challenge is well-formed (`wasit test --read-only` passes it), and
 the two settlement modes reproduce the servers built for the 0.6.0 A/B:
 `X402-06` and `X402-07` fail against them. `--network eip155:84532` poses the same
-modes on Base Sepolia.
+modes on Base Sepolia, and `--network solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` on Solana
+devnet.
 
 **Changed — the CLI's payment warning says when it applies.** It said funds
 would move before every payment run, including runs where the target offered
