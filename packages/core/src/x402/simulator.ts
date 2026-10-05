@@ -443,11 +443,15 @@ function describeOffered(accepts: ReadonlyArray<{ readonly network: string }>): 
  * Shared by every payment check so each one starts from a challenge the
  * target issued just now, rather than reusing a stale one. With `altered`,
  * the payment is signed for those terms instead, and its `accepted` is set
- * back to what the target advertised.
+ * back to what the target advertised. `beforeSigning` runs once the option
+ * to pay is known and before the client builds anything: the Stellar client
+ * simulates the transfer while building, so a check placed later would never
+ * see an unfunded payer.
  */
 async function preparePayment(
   options: X402PaymentCheckOptions,
   alter?: (selected: PaymentRequirements) => AlteredSigning | Promise<AlteredSigning>,
+  beforeSigning?: (selected: PaymentRequirements) => Promise<void>,
 ) {
   const chain = chainFor(options.network);
   const { client, httpClient } = await buildX402Client(
@@ -508,6 +512,7 @@ async function preparePayment(
   // with its cached response (specs/extensions/payment_identifier.md).
   const idempotent = paymentRequired.extensions?.["payment-identifier"] !== undefined;
 
+  await beforeSigning?.(selected);
   if (alter === undefined) {
     const paymentPayload = await client.createPaymentPayload(paymentRequired);
     return { httpClient, paymentPayload, selected, idempotent };
@@ -592,12 +597,59 @@ interface HonestPayment {
   readonly idempotent: boolean;
 }
 
+/**
+ * Stops X402-06 before it pays when the payer certainly cannot cover the
+ * price.
+ *
+ * A payment the payer cannot fund is refused, and the refusal reads as the
+ * target's: on Solana devnet the facilitator answers
+ * `invalid_exact_svm_transaction_simulation_failed`, the reason a real defect
+ * gives too, so it cannot be told apart afterwards; the Stellar client fails
+ * earlier, simulating the transfer while it builds, with only the token's
+ * error code. Read before signing, so a target that settles and then refuses
+ * still shows as one. Only a balance the
+ * chain reported counts: when it cannot be read, the run pays as before, and
+ * a failed read never becomes a verdict either way.
+ */
+async function assertPayerCanPay(
+  options: X402PaymentCheckOptions,
+  selected: PaymentRequirements,
+): Promise<void> {
+  let price: bigint;
+  try {
+    price = BigInt(selected.amount);
+  } catch {
+    return;
+  }
+  const chain = chainFor(options.network);
+  let balance: bigint | undefined;
+  try {
+    balance = await chain.payerBalance(
+      options.network,
+      chain.resolveRpcUrl(options.network, options.rpcUrl),
+      chain.payerAddress(options.payerSecretKey),
+      selected.asset,
+    );
+  } catch {
+    balance = undefined;
+  }
+  if (balance !== undefined && balance < price) {
+    throw new CheckSetupError(
+      `This run's payer holds less of ${selected.asset} than the advertised ${price} ` +
+        `base units, so its payment cannot settle, and a refusal would say nothing ` +
+        `about the target. Fund the payer (${chain.payerKeyEnv}), then re-run.`,
+    );
+  }
+}
+
 async function checkSignatureAccepted(options: X402PaymentCheckOptions): Promise<HonestPayment> {
   const id = "X402-06";
   const name = "Signature Resubmit Accepted";
   const fail = (detail: string, hint: string): CheckResult => ({ id, name, pass: false, detail, hint });
 
-  const { httpClient, paymentPayload, idempotent } = await preparePayment(options);
+  const { httpClient, paymentPayload, idempotent } = await preparePayment(options, undefined, (selected) =>
+    assertPayerCanPay(options, selected),
+  );
   const paymentHeaders = httpClient.encodePaymentSignatureHeader(paymentPayload);
   const paid = await fetchTarget(
     options.target,

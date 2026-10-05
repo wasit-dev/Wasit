@@ -67,6 +67,14 @@ export interface PaymentChain {
   expiredSigning(selected: PaymentRequirements, rpcUrl: string): Promise<ExpiredSigning>;
   /** The payer's address, which the settlement must come from. */
   payerAddress(payerKey: string): string;
+  /**
+   * The payer's balance of `asset`, in base units, as the chain reports it,
+   * or at most what the payer can spend from (never more than it holds).
+   * Undefined, or a throw, when the chain gives no clear answer: X402-06 then
+   * pays as if the balance were enough, so a failed read never becomes a
+   * verdict.
+   */
+  payerBalance(network: string, rpcUrl: string, payer: string, asset: string): Promise<bigint | undefined>;
   /** Whether `reference` has the shape of a settlement on this chain. */
   isSettlementReference(reference: string): boolean;
   /**

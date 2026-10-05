@@ -18,7 +18,9 @@ import { ExactEvmScheme } from "@x402/evm/exact/client";
 import {
   TransactionReceiptNotFoundError,
   createPublicClient,
+  erc20Abi,
   http,
+  isAddress,
   isAddressEqual,
   toEventSelector,
   type Chain,
@@ -273,6 +275,15 @@ export const evmChain: PaymentChain = {
   // validBefore is now + 1 second; Base Sepolia blocks come every 2 seconds.
   expiredSigning: async () => ({ terms: { maxTimeoutSeconds: 1 }, holdMs: 5_000 }),
   payerAddress: (payerKey) => payerAccount(payerKey).address,
+  async payerBalance(_network, rpcUrl, payer, asset) {
+    if (!isAddress(asset) || !isAddress(payer)) return undefined;
+    return createPublicClient({ transport: http(rpcUrl) }).readContract({
+      address: asset,
+      abi: erc20Abi,
+      functionName: "balanceOf",
+      args: [payer],
+    });
+  },
   isSettlementReference: (reference) => TRANSACTION_HASH.test(reference),
   verifySettlement: verifyEvmSettlement,
   corruptPayload: corruptEvmSignature,

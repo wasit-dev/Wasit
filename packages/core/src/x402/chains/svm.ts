@@ -18,6 +18,7 @@ import { createPrivateKey } from "node:crypto";
 import { DEVNET_RPC_URL, SOLANA_DEVNET_CAIP2 } from "@x402/svm";
 import { ExactSvmScheme } from "@x402/svm/exact/client";
 import {
+  address,
   createKeyPairSignerFromBytes,
   createSolanaRpc,
   getBase58Decoder,
@@ -389,6 +390,25 @@ export const svmChain: PaymentChain = {
     };
   },
   payerAddress: (payerKey) => getBase58Decoder().decode(secretKeyBytes(payerKey).subarray(32)),
+  async payerBalance(_network, rpcUrl, payer, asset) {
+    // Every token account the payer holds for the mint, summed: the client
+    // pays from the associated one only, so this is never less than what it
+    // can spend, and a sum below the price means the payment cannot settle.
+    const { value } = await createSolanaRpc(rpcUrl)
+      .getTokenAccountsByOwner(address(payer), { mint: address(asset) }, {
+        encoding: "jsonParsed",
+        commitment: "confirmed",
+      })
+      .send();
+    let total = 0n;
+    for (const account of value) {
+      const amount = (account.account.data as { parsed?: { info?: { tokenAmount?: { amount?: unknown } } } })
+        .parsed?.info?.tokenAmount?.amount;
+      if (typeof amount !== "string" || !/^\d+$/.test(amount)) return undefined;
+      total += BigInt(amount);
+    }
+    return total;
+  },
   isSettlementReference(reference) {
     // kit's isSignature throws, rather than answering false, on a string of
     // the right length outside the base58 alphabet (an EVM hash, for one).
