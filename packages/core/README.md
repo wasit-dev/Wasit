@@ -51,7 +51,7 @@ Every check function returns `Promise<CheckResult[]>` and never rejects for a ta
 | Function | Checks | Cost |
 |---|---|---|
 | `runX402ReadChecks({ target, method?, body?, headers? })` | `X402-01`–`05` | Free |
-| `runX402PaymentChecks({ target, network, payerSecretKey, rpcUrl?, method?, body?, headers? })` | `X402-06`, `07` | **Settles a real payment every call** |
+| `runX402PaymentChecks({ target, network, payerSecretKey, rpcUrl?, method?, body?, headers? })` | `X402-06`–`10` | **Settles a real payment every call** |
 
 ### MPP — charge mode
 

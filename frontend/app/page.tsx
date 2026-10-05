@@ -16,7 +16,7 @@ import { CHECK_COUNT, WASIT_VERSION } from "@/lib/site-facts";
 
 // The one command on the page with a copy button, so it has to be the
 // safe one. --read-only is not optional here: without it the payment
-// checks X402-06/07 run as soon as a STELLAR_PRIVATE_KEY is in scope,
+// checks X402-06..10 run as soon as a STELLAR_PRIVATE_KEY is in scope,
 // and the CLI loads .env from whatever directory it was run in — so a
 // reader who has followed the configuration docs would settle a real
 // testnet payment from what the homepage sells as a first look. Matches
@@ -92,7 +92,7 @@ type McpTool = { name: string; checks: string; cost: string; warn?: boolean };
 // The MCP server's tools, as packages/server/README.md lists them. The
 // fourth is registered only with an explicit opt-in.
 const MCP_TOOLS: McpTool[] = [
-  { name: "wasit_x402_test", checks: "X402-01–07", cost: "06/07 settle real testnet payments" },
+  { name: "wasit_x402_test", checks: "X402-01–10", cost: "06 settles a real testnet payment; 07–10 must be refused" },
   { name: "wasit_mpp_charge_test", checks: "MPP-01", cost: "Settles a testnet payment every call" },
   { name: "wasit_mpp_channel_test", checks: "MPP-10–12, 14", cost: "Free" },
   { name: "wasit_mpp_channel_test_with_close", checks: "+ MPP-13", cost: "Opt-in only · closes a channel for good", warn: true },

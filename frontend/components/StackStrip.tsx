@@ -27,11 +27,11 @@ function MppLogo() {
 
 type Cell = { key: string; href: string; name: string; role: "checks" | "trusts"; meta: string; logo: React.ReactNode }
 
-// Check counts as docs/CHECKS.md lists them: seven for x402, one for MPP
+// Check counts as docs/CHECKS.md lists them: ten for x402, one for MPP
 // charge mode and five for channel mode. Links are the homepages the repo
 // already cites.
 const CELLS: Cell[] = [
-  { key: "x402", href: "https://x402.org", name: "x402", role: "checks", meta: "7 checks · exact scheme on Stellar", logo: <X402Logo /> },
+  { key: "x402", href: "https://x402.org", name: "x402", role: "checks", meta: "10 checks · exact scheme on Stellar and Base", logo: <X402Logo /> },
   { key: "mpp", href: "https://paymentauth.org", name: "Machine Payments Protocol", role: "checks", meta: "6 checks · charge and channel", logo: <MppLogo /> },
   {
     key: "stellar",

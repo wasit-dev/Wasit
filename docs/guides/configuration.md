@@ -11,8 +11,8 @@ keys in this file.
 | Checks | Required |
 |---|---|
 | `X402-01`–`05` | nothing |
-| `X402-06`, `07` on Stellar | `STELLAR_PRIVATE_KEY` |
-| `X402-06`, `07` on Base Sepolia (`--network eip155:84532`) | `EVM_PRIVATE_KEY` |
+| `X402-06`–`10` on Stellar | `STELLAR_PRIVATE_KEY` |
+| `X402-06`–`10` on Base Sepolia (`--network eip155:84532`) | `EVM_PRIVATE_KEY` |
 | `MPP-01` | `MPP_PAYER_SECRET`, `MPP_STELLAR_NETWORK` |
 | `MPP-10`–`12`, `14` | `COMMITMENT_SECRET_HEX`, `MPP_STELLAR_NETWORK` |
 | `MPP-13` | the above, plus `CHANNEL_CONTRACT_DISPOSABLE` and an explicit opt-in |

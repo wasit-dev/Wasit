@@ -22,7 +22,7 @@ wasit test --target <your-service-url> --read-only
 Requires Node.js `>=22`.
 
 Both lines carry `--read-only` deliberately: without it the payment checks
-`X402-06`/`07` run as soon as a `STELLAR_PRIVATE_KEY` is available, and the CLI
+`X402-06`–`10` run as soon as a `STELLAR_PRIVATE_KEY` is available, and the CLI
 reads `.env` from the directory you run it in — so on a machine already set up
 for a later suite, the first command in this README would settle a real testnet
 payment.
@@ -35,7 +35,7 @@ The default posture costs nothing — no keys required:
 wasit test --target https://your-service.example.com/paid --read-only
 ```
 
-That runs the read-only x402 checks (`X402-01`–`05`): whether the service issues a well-formed 402 challenge. Drop `--read-only` and set `STELLAR_PRIVATE_KEY` to also exercise the payment flow — `X402-06`/`07` settle a real testnet payment.
+That runs the read-only x402 checks (`X402-01`–`05`): whether the service issues a well-formed 402 challenge. Drop `--read-only` and set `STELLAR_PRIVATE_KEY` to also exercise the payment flow — `X402-06` settles a real testnet payment, and `X402-07`–`10` send payments the service must refuse.
 
 ## Commands
 

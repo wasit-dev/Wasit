@@ -116,7 +116,7 @@ export function McpSession() {
         {at >= RESULT_AT && (
           <p className="mcp-answer">
             <span className="mcp-ok">✓ 5 passed.</span> The 402 challenge is well formed and names a valid
-            network. X402-06/07 did not run: they settle a real payment, and you asked for none.
+            network. X402-06–10 did not run: they settle a real payment, and you asked for none.
           </p>
         )}
       </div>
