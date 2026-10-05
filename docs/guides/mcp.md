@@ -171,7 +171,8 @@ of every config file: `set -a; source .env; set +a`, then `copilot`.
 Any MCP client that runs stdio servers takes the same three things: `command`
 set to `npx`, `args` set to `["-y", "@wasit-dev/server"]`, and the environment
 variables `MPP_STELLAR_NETWORK`, `STELLAR_PRIVATE_KEY`, `MPP_PAYER_SECRET` and
-`COMMITMENT_SECRET_HEX`. Use absolute paths for `node packages/server/dist/index.js`
+`COMMITMENT_SECRET_HEX`, plus `EVM_PRIVATE_KEY` for x402 payment checks on Base
+Sepolia (`network: "eip155:84532"`). Use absolute paths for `node packages/server/dist/index.js`
 if launching from a local checkout instead of npx, since a client launches the
 server from a working directory you don't control.
 

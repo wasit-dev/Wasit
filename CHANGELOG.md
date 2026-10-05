@@ -48,6 +48,22 @@ type, such as a numeric `amount` or a `maxTimeoutSeconds` that is not a positive
 number, is reported as such instead of as missing. Challenges built with the
 official x402 server SDK carry every field, so they are unaffected.
 
+**Added — the x402 payment checks pay on Base Sepolia.** `--network
+eip155:84532` (MCP: `network`) runs `X402-06` and `X402-07` there, with the payer key
+in `EVM_PRIVATE_KEY`. Payment uses the `exact` scheme's EIP-3009 method, so the
+facilitator pays the gas and a payer needs Base Sepolia USDC and no ETH. `X402-06`
+holds the settlement to the receipt's ERC-20 `Transfer` log by the Stellar rules;
+`X402-07` forges only the EIP-3009 signature. Against Wasit's own Base Sepolia
+fixture, 7/7 with `X402-06` settled on-chain; against `wasit serve` posing on Base
+Sepolia, the lying modes fail both checks
+([evidence](docs/evidence/2026-10-05-base-sepolia-verification-run.md)). Stellar stays
+the default; MPP is Stellar only. Under the hood, the payment checks now go through a
+per-chain adapter, and the x402 SDK moves from 2.19 to 2.28.
+
+**Changed — a payer key for the wrong chain, or a malformed one, stops the run at
+preflight.** It used to surface mid-payment as a harness error. The message never
+echoes the key.
+
 **Added — `wasit serve`, a paywall that misbehaves on purpose.** The checks
 test a service that sells; this tests an agent that pays. It runs a local x402
 paywall in one of four modes: `no-settle` serves without settling,
@@ -56,7 +72,8 @@ asks for mainnet, `overprice` asks for one million USDC. The server reports
 what the agent did. It never settles or forwards anything, so no funds move.
 Every mode's challenge is well-formed (`wasit test --read-only` passes it), and
 the two settlement modes reproduce the servers built for the 0.6.0 A/B:
-`X402-06` and `X402-07` fail against them.
+`X402-06` and `X402-07` fail against them. `--network eip155:84532` poses the same
+modes on Base Sepolia.
 
 **Changed — the CLI's payment warning says when it applies.** It said funds
 would move before every payment run, including runs where the target offered
