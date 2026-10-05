@@ -2,8 +2,8 @@
 
 **Date:** 2026-10-05
 **Wasit:** builds of the local `release/0.7.0` branch (`282004c` for the EVM adapter,
-`fb21760` for `wasit serve` on Base Sepolia, `7d27551` for the fixture, and the
-Permit2 change for the second fixture), not yet published.
+`fb21760` for `wasit serve` on Base Sepolia, `7d27551` for the fixture, `384f0b8` for
+the Permit2 fixture), not yet published.
 **Targets:** `wasit serve --network eip155:84532`, the paywall that misbehaves on
 purpose, in three modes; and Wasit's own Base Sepolia x402 fixture
 (`packages/core/test/fixtures/x402-evm-server.ts`), settling through the public
@@ -120,9 +120,9 @@ The same day, on the same build, Wasit's Stellar fixtures were unchanged: x402 7
 
 ## Limits
 
-- One EVM network: Base Sepolia. Permit2 was run only with gas-sponsored approval. Ethereum Sepolia and BNB Smart Chain testnet get the
-  read-only checks only; no public facilitator settles them and the official SDK ships
-  no default token for either.
+- One EVM network: Base Sepolia. Permit2 was run only with a gas-sponsored approval.
+  Ethereum Sepolia and BNB Smart Chain testnet get the read-only checks only; no public
+  facilitator settles them and the official SDK ships no default token for either.
 - The honest target is Wasit's own fixture on the official SDK. No third-party Base
   Sepolia service was tested.
 - Unreleased: this ran from the branch, not from npm. Registry parity follows the 0.7.0
