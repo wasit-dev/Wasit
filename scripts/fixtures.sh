@@ -26,6 +26,7 @@ FIXTURES=(
   "charge:3002:packages/core/test/fixtures/mpp-charge-server.ts"
   "channel:3003:packages/core/test/fixtures/mpp-channel-server.ts"
   "refusing:3004:packages/core/test/fixtures/mpp-channel-refusing-server.ts"
+  "x402-evm:3005:packages/core/test/fixtures/x402-evm-server.ts"
 )
 
 field() { echo "$1" | cut -d: -f"$2"; }
@@ -78,13 +79,22 @@ cmd_start() {
     exit 1
   fi
   echo "Starting fixtures:"
-  for fixture in "${FIXTURES[@]}"; do start_one "$fixture"; done
+  for fixture in "${FIXTURES[@]}"; do
+    # The Base Sepolia fixture needs its own payee; without one it is skipped,
+    # not failed, so a Stellar-only setup starts as before.
+    if [ "$(field "$fixture" 1)" = "x402-evm" ] && ! grep -q '^EVM_PAYEE_ADDRESS=.' "$ROOT/.env"; then
+      printf "  %-9s skipped (EVM_PAYEE_ADDRESS not set in .env)\n" "x402-evm"
+      continue
+    fi
+    start_one "$fixture"
+  done
   echo
   echo "Targets:"
   echo "  x402     http://localhost:3001/protected"
   echo "  charge   http://localhost:3002/data"
   echo "  channel  http://localhost:3003/data"
   echo "  refusing http://localhost:3004/data   (always refuses, by design)"
+  echo "  x402-evm http://localhost:3005/protected   (Base Sepolia, needs EVM_PAYEE_ADDRESS)"
 }
 
 cmd_stop() {
