@@ -33,6 +33,13 @@ export const TESTNET_USDC = "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMX
 /** Base Sepolia USDC, the official SDK's default asset there. */
 export const BASE_SEPOLIA_USDC = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
 
+/**
+ * Ethereum Sepolia USDC, Circle's, with EIP-3009 and EIP-712 domain "USDC"
+ * version "2" (read from the contract, 2026-10-05). The SDK ships no default
+ * asset for this network.
+ */
+export const ETHEREUM_SEPOLIA_USDC = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238";
+
 /** Solana devnet USDC, the official SDK's default asset there. */
 export const SOLANA_DEVNET_USDC = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU";
 
@@ -121,6 +128,23 @@ export const SERVE_NETWORKS: Readonly<Record<string, ServeNetwork>> = {
     randomTx: () => `0x${randomBytes(32).toString("hex")}`,
     payeeEnv: "EVM_PAYEE_ADDRESS",
   },
+  "eip155:11155111": {
+    name: "Ethereum Sepolia",
+    faucetNetwork: "Ethereum Sepolia",
+    nativeToken: "ETH",
+    v1Network: "sepolia",
+    mainnet: "eip155:1",
+    mainnetName: "Ethereum mainnet",
+    asset: ETHEREUM_SEPOLIA_USDC,
+    decimals: 6,
+    extra: () => ({ name: "USDC", version: "2" }),
+    payTo: /^0x[0-9a-fA-F]{40}$/,
+    payToHint: "an EVM address (0x followed by 40 hex characters)",
+    txHash: /^0x[0-9a-fA-F]{64}$/,
+    txHashHint: "an EVM transaction hash, 0x followed by 64 hex characters",
+    randomTx: () => `0x${randomBytes(32).toString("hex")}`,
+    payeeEnv: "EVM_PAYEE_ADDRESS",
+  },
   "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1": {
     name: "Solana devnet",
     faucetNetwork: "Solana Devnet",
@@ -164,7 +188,7 @@ export const MODE_DESCRIPTIONS: Readonly<Record<ServeMode, { does: string; caref
     careful: "looks the reported transaction up on-chain before trusting it, and finds it is not this payment.",
   },
   "wrong-network": {
-    does: "asks to be paid on the mainnet (stellar:pubnet, eip155:8453 for Base, or Solana mainnet) instead of the testnet.",
+    does: "asks to be paid on the mainnet (stellar:pubnet, eip155:8453 for Base, eip155:1 for Ethereum, or Solana mainnet) instead of the testnet.",
     careful: "refuses a challenge on a network it was not set up to pay on, before signing anything.",
   },
   overprice: {
@@ -172,7 +196,7 @@ export const MODE_DESCRIPTIONS: Readonly<Record<ServeMode, { does: string; caref
     careful: "refuses a price above its spending limit, before signing anything.",
   },
   "v1-challenge": {
-    does: "issues its challenge only in the x402 v1 form, a JSON body with no PAYMENT-REQUIRED header, as a paywall on the old SDK does (Base Sepolia and Solana devnet: v1 names no Stellar network).",
+    does: "issues its challenge only in the x402 v1 form, a JSON body with no PAYMENT-REQUIRED header, as a paywall on the old SDK does (EVM testnets and Solana devnet: v1 names no Stellar network).",
     careful: "pays it as v1, in an X-PAYMENT header, or declines; it does not answer a v1 challenge with a v2 payment.",
   },
   "malformed-header": {

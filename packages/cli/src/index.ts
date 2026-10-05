@@ -204,8 +204,9 @@ program
   .option(
     "--network <network>",
     "Network the payment checks pay on: stellar:testnet, stellar:pubnet, " +
-      "eip155:84532 (Base Sepolia) or solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1 " +
-      "(Solana devnet). X402-01..05 apply to a challenge on any chain.",
+      "eip155:84532 (Base Sepolia), eip155:11155111 (Ethereum Sepolia) or " +
+      "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1 (Solana devnet). X402-01..05 " +
+      "apply to a challenge on any chain.",
     "stellar:testnet",
   )
   .option(
@@ -298,8 +299,8 @@ program
   .option(
     "--pay-to <address>",
     "Payee: a Stellar account (G...) with a USDC trustline, an EVM address (0x...) " +
-      "on Base Sepolia, or a Solana address on devnet (overrides STELLAR_PAYEE_ADDRESS, " +
-      "EVM_PAYEE_ADDRESS or SVM_PAYEE_ADDRESS)",
+      "on Base or Ethereum Sepolia, or a Solana address on devnet (overrides " +
+      "STELLAR_PAYEE_ADDRESS, EVM_PAYEE_ADDRESS or SVM_PAYEE_ADDRESS)",
   )
   .option("--amount <units>", "Price in base units for every mode except overprice", "10000")
   .option("--asset <contract>", "Token contract (default: the network's testnet USDC)")
