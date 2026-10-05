@@ -723,9 +723,13 @@ async function checkSignatureAccepted(options: X402PaymentCheckOptions): Promise
     return honest(fail(
       `Expected 2xx after a valid payment, got ${paid.status}` +
         `${reason === undefined ? "" : ` (${reason})`}.`,
-      "A valid payment was refused. Your server's log of the facilitator's " +
-        "verify or settle response says why; serve the resource with a 2xx once " +
-        "the payment settles.",
+      reason?.startsWith("settlement failed:")
+        ? "The payment verified, but the facilitator did not settle it, and said why. " +
+          "That is the facilitator's failure, or its RPC's, yet a valid payment was " +
+          "refused; check the facilitator's account and endpoint, then re-run."
+        : "A valid payment was refused. Your server's log of the facilitator's " +
+          "verify or settle response says why; serve the resource with a 2xx once " +
+          "the payment settles.",
     ), false);
   }
 
@@ -840,24 +844,44 @@ function served(status: number): boolean {
 }
 
 /**
- * Why the target refused a payment, when it says: x402 servers answer a
- * refused payment with a fresh challenge whose `error` names the reason
- * (often the facilitator's, e.g. `invalid_exact_evm_payload_signature`).
- * Shown with a PASS so a reader can tell the refusal came from the rule the
- * check is about, not from something else that also answers 402.
+ * Why the target refused a payment, when it says. A payment refused at
+ * verify comes back with a fresh challenge whose `error` names the reason
+ * (often the facilitator's, e.g. `invalid_exact_evm_payload_signature`). One
+ * that verified but did not settle comes back with a `PAYMENT-RESPONSE` whose
+ * `success` is false and whose `errorReason` says why, as the official SDK
+ * server sends it; that is read first, and named as a settlement failure, so
+ * an operator can tell their facilitator's failure from a refusal. Shown with
+ * a PASS so a reader can tell the refusal came from the rule the check is
+ * about, not from something else that also answers 402.
  */
 async function refusalReason(response: Response): Promise<string | undefined> {
-  const header = response.headers.get("PAYMENT-REQUIRED");
-  const fromJson = (text: string): string | undefined => {
+  const decode = (header: string): Record<string, unknown> | undefined => {
     try {
-      const parsed = JSON.parse(text) as { error?: unknown };
-      return typeof parsed.error === "string" && parsed.error.length > 0 ? parsed.error : undefined;
+      return asRecord(JSON.parse(Buffer.from(header, "base64").toString("utf-8")));
     } catch {
       return undefined;
     }
   };
-  if (header !== null) return fromJson(Buffer.from(header, "base64").toString("utf-8"));
-  return fromJson(await readText(response));
+  const settlement = response.headers.get("PAYMENT-RESPONSE");
+  if (settlement !== null) {
+    const parsed = decode(settlement);
+    const reason = parsed?.["errorReason"];
+    if (parsed?.["success"] === false && typeof reason === "string" && reason.length > 0) {
+      // The reason is a code; some facilitators append a long RPC message.
+      return `settlement failed: ${/^[\w.-]+/.exec(reason)?.[0] ?? reason}`;
+    }
+  }
+  const errorOf = (record: Record<string, unknown> | undefined): string | undefined => {
+    const error = record?.["error"];
+    return typeof error === "string" && error.length > 0 ? error : undefined;
+  };
+  const header = response.headers.get("PAYMENT-REQUIRED");
+  if (header !== null) return errorOf(decode(header));
+  try {
+    return errorOf(asRecord(JSON.parse(await readText(response))));
+  } catch {
+    return undefined;
+  }
 }
 
 function statusWithReason(status: number, reason: string | undefined): string {

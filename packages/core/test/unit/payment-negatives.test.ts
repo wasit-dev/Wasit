@@ -41,11 +41,13 @@ interface Received {
  * with 200 and no settlement (`accept`), or with 402 (`refuse`).
  */
 async function standIn(options: {
-  mode: "accept" | "refuse" | "permit2-allowance";
+  mode: "accept" | "refuse" | "permit2-allowance" | "settle-fail";
   amount?: string;
   paymentIdentifier?: boolean;
   network?: string;
   asset?: string;
+  /** settle-fail only: what its PAYMENT-RESPONSE claims. */
+  settled?: boolean;
 }): Promise<{ url: string; received: Received[]; close: () => Promise<void> }> {
   const received: Received[] = [];
   const challenge = {
@@ -79,6 +81,19 @@ async function standIn(options: {
       payload: JSON.parse(Buffer.from(paid, "base64").toString("utf-8")),
       atSeconds: Math.floor(Date.now() / 1000),
     });
+    if (options.mode === "settle-fail") {
+      // As the official SDK server answers a payment that verified but did
+      // not settle (measured with the public facilitator, 2026-10-06).
+      const failure = {
+        success: options.settled ?? false,
+        errorReason: "invalid_exact_evm_transaction_failed: Missing or invalid parameters.",
+        transaction: "",
+        network: options.network ?? NETWORK,
+      };
+      response.writeHead(402, { "payment-response": Buffer.from(JSON.stringify(failure)).toString("base64") });
+      response.end("{}");
+      return;
+    }
     if (options.mode === "permit2-allowance") {
       const refusal = { ...challenge, error: "permit2_allowance_required" };
       response.writeHead(412, { "payment-required": Buffer.from(JSON.stringify(refusal)).toString("base64") });
@@ -228,6 +243,47 @@ describe("a Permit2 target that needs an approval this payer never made", () => 
       assert.equal(r["X402-06"]?.error?.kind, "setup");
       assert.match(r["X402-06"]?.detail ?? "", /approved the Permit2 contract/);
       for (const id of ["X402-07", "X402-08", "X402-09", "X402-10"]) assert.equal(r[id]?.skipped, true, id);
+    } finally {
+      await target.close();
+    }
+  });
+});
+
+describe("a valid payment whose settlement failed", () => {
+  it("names the facilitator's reason from PAYMENT-RESPONSE, and says where to look", async () => {
+    const target = await standIn({ mode: "settle-fail" });
+    try {
+      const r = byId(
+        await runX402PaymentChecks({
+          target: target.url,
+          network: NETWORK,
+          payerSecretKey: generatePrivateKey(),
+          rpcUrl: funded.url,
+        }),
+      );
+      assert.equal(r["X402-06"]?.pass, false);
+      assert.match(
+        r["X402-06"]?.detail ?? "",
+        /^Expected 2xx after a valid payment, got 402 \(settlement failed: invalid_exact_evm_transaction_failed\)\.$/,
+      );
+      assert.match(r["X402-06"]?.hint ?? "", /the facilitator did not settle it/);
+    } finally {
+      await target.close();
+    }
+  });
+
+  it("does not call a refusal a failed settlement when PAYMENT-RESPONSE claims success", async () => {
+    const target = await standIn({ mode: "settle-fail", settled: true });
+    try {
+      const r = byId(
+        await runX402PaymentChecks({
+          target: target.url,
+          network: NETWORK,
+          payerSecretKey: generatePrivateKey(),
+          rpcUrl: funded.url,
+        }),
+      );
+      assert.match(r["X402-06"]?.detail ?? "", /^Expected 2xx after a valid payment, got 402\.$/);
     } finally {
       await target.close();
     }
