@@ -275,9 +275,9 @@ export async function runX402ReadChecks(
         ? "Payment header found."
         : v1Payload !== undefined
           ? `Neither PAYMENT-REQUIRED nor X-Payment header was present. The ` +
-            `response body carries an x402 v1 challenge instead; the \`exact\` ` +
-            `scheme on Stellar is defined for v2 only, which signals payment in ` +
-            `the PAYMENT-REQUIRED header.`
+            `response body carries an x402 v1 challenge instead; x402 v2 signals ` +
+            `payment in the PAYMENT-REQUIRED header, and the \`exact\` scheme on ` +
+            `Stellar is defined for v2 only.`
           : "Neither PAYMENT-REQUIRED nor X-Payment header was present.",
     ...(headerValue !== null
       ? {}
@@ -477,9 +477,9 @@ async function preparePayment(
     const v1 = readV1BodyChallenge(await readText(challenge)) !== undefined;
     throw new PaymentNotAttemptedError(
       v1
-        ? `the target issued an x402 v1 challenge, and Wasit pays through the ` +
-            `v2 \`exact\` scheme on Stellar, the only version the spec defines, ` +
-            `so no payment was attempted (see X402-02).`
+        ? `the target issued an x402 v1 challenge, and Wasit's payment checks ` +
+            `pay through x402 v2 only (on Stellar, the only version the \`exact\` ` +
+            `scheme defines), so no payment was attempted (see X402-02).`
         : `the challenge could not be read as x402 payment requirements ` +
             `(${(error as Error).message}), so no payment was attempted ` +
             `(see X402-02–04).`,
