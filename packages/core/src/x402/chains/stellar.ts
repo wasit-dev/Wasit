@@ -76,7 +76,7 @@ export const stellarChain: PaymentChain = {
   // every 5 to 6 seconds, so 20 seconds is three or more ledgers past it.
   expiryWaitMs: 20_000,
   resolveRpcUrl: (network, override) => resolveRpcUrl(network, override),
-  registerPayer(client, network, payerKey) {
+  registerPayer(client, network, payerKey, _rpcUrl) {
     const signer = createEd25519Signer(payerKey, network as `${string}:${string}`);
     client.register("stellar:*", new ExactStellarClientScheme(signer));
   },

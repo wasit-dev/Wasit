@@ -2,8 +2,8 @@
 
 **Date:** 2026-10-05
 **Wasit:** builds of the local `release/0.7.0` branch (`282004c` for the EVM adapter,
-`fb21760` for `wasit serve` on Base Sepolia, `7d27551` for the fixture), not yet
-published.
+`fb21760` for `wasit serve` on Base Sepolia, `7d27551` for the fixture, and the
+Permit2 change for the second fixture), not yet published.
 **Targets:** `wasit serve --network eip155:84532`, the paywall that misbehaves on
 purpose, in three modes; and Wasit's own Base Sepolia x402 fixture
 (`packages/core/test/fixtures/x402-evm-server.ts`), settling through the public
@@ -91,6 +91,27 @@ So the settlement Wasit verified is the one that happened, and a Base Sepolia pa
 needs the token and nothing else. `X402-07`'s forged signature was refused, and nothing
 settled for it.
 
+## The Permit2 method
+
+A second fixture (`x402-evm-permit2-server.ts`, port 3006) advertises
+`assetTransferMethod: "permit2"` and the `eip2612GasSponsoring` extension, which the
+public facilitator supports (its `/supported` list). The same payer, still with no ETH,
+ran all ten x402 checks against it: **10/10**, each refusal for its own reason:
+
+```
+PASS  X402-07  ... rejected (HTTP 402: invalid_permit2_signature).
+PASS  X402-08  ... refused (HTTP 412: permit2_allowance_required).
+PASS  X402-09  ... refused (HTTP 402: permit2_amount_mismatch).
+PASS  X402-10  ... refused (HTTP 402: permit2_deadline_expired).
+```
+
+Read back for the second run's settlement,
+[`0x860ca8cc…dcf7`](https://base-sepolia.blockscout.com/tx/0x860ca8cc7563e31fb9d95090369e527461bd3f614b15779f4124f30d71fbdcf7):
+`success` in block 47710896, sent by the facilitator's account to the x402 Permit2
+proxy, logging an `Approval` from the payer to the canonical Permit2 contract for 10000
+(the EIP-2612 permit) and exactly one `Transfer` from the payer to the payee for 10000.
+The payer was still at 0 ETH, and its Permit2 allowance back at 0.
+
 ## What did not change
 
 The same day, on the same build, Wasit's Stellar fixtures were unchanged: x402 7/7 with
@@ -99,7 +120,7 @@ The same day, on the same build, Wasit's Stellar fixtures were unchanged: x402 7
 
 ## Limits
 
-- One EVM network: Base Sepolia. Ethereum Sepolia and BNB Smart Chain testnet get the
+- One EVM network: Base Sepolia. Permit2 was run only with gas-sponsored approval. Ethereum Sepolia and BNB Smart Chain testnet get the
   read-only checks only; no public facilitator settles them and the official SDK ships
   no default token for either.
 - The honest target is Wasit's own fixture on the official SDK. No third-party Base

@@ -31,8 +31,12 @@ export interface PaymentChain {
    * `ConfigurationError` when there is none, before any payment is made.
    */
   resolveRpcUrl(network: string, override?: string): string;
-  /** Registers this chain's `exact` client scheme, signing with `payerKey`. */
-  registerPayer(client: x402Client, network: string, payerKey: string): void;
+  /**
+   * Registers this chain's `exact` client scheme, signing with `payerKey`.
+   * `rpcUrl` is for client schemes that read the chain while building a
+   * payment (EVM Permit2 checks the token allowance); others ignore it.
+   */
+  registerPayer(client: x402Client, network: string, payerKey: string, rpcUrl: string): void;
   /** The payer's address, which the settlement must come from. */
   payerAddress(payerKey: string): string;
   /** Whether `reference` has the shape of a settlement on this chain. */

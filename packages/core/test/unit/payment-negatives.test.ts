@@ -39,7 +39,7 @@ interface Received {
  * with 200 and no settlement (`accept`), or with 402 (`refuse`).
  */
 async function standIn(options: {
-  mode: "accept" | "refuse";
+  mode: "accept" | "refuse" | "permit2-allowance";
   amount?: string;
   paymentIdentifier?: boolean;
 }): Promise<{ url: string; received: Received[]; close: () => Promise<void> }> {
@@ -75,6 +75,12 @@ async function standIn(options: {
       payload: JSON.parse(Buffer.from(paid, "base64").toString("utf-8")),
       atSeconds: Math.floor(Date.now() / 1000),
     });
+    if (options.mode === "permit2-allowance") {
+      const refusal = { ...challenge, error: "permit2_allowance_required" };
+      response.writeHead(412, { "payment-required": Buffer.from(JSON.stringify(refusal)).toString("base64") });
+      response.end();
+      return;
+    }
     response.writeHead(options.mode === "accept" ? 200 : 402);
     response.end();
   });
@@ -142,6 +148,39 @@ describe("a target that refuses even the valid payment", () => {
         assert.match(r[id]?.skipReason ?? "", /refused X402-06's valid payment/, id);
       }
       assert.equal(target.received.length, 1);
+    } finally {
+      await target.close();
+    }
+  });
+});
+
+describe("a Permit2 target that needs an approval this payer never made", () => {
+  // The refusal is about Wasit's payer, not the target: no verdict, and no
+  // negative check runs without an accepted baseline.
+  it("reports X402-06 as a setup error and skips the negative checks", async () => {
+    const target = await standIn({ mode: "permit2-allowance" });
+    try {
+      const r = byId(
+        await runX402PaymentChecks({ target: target.url, network: NETWORK, payerSecretKey: generatePrivateKey() }),
+      );
+      assert.equal(r["X402-06"]?.error?.kind, "setup");
+      assert.match(r["X402-06"]?.detail ?? "", /approved the Permit2 contract/);
+      for (const id of ["X402-07", "X402-08", "X402-09", "X402-10"]) assert.equal(r[id]?.skipped, true, id);
+    } finally {
+      await target.close();
+    }
+  });
+});
+
+describe("a refused valid payment", () => {
+  // Earlier evidence quotes this wording; a reason is added only when given.
+  it("keeps X402-06's wording when the target gives no reason", async () => {
+    const target = await standIn({ mode: "refuse" });
+    try {
+      const r = byId(
+        await runX402PaymentChecks({ target: target.url, network: NETWORK, payerSecretKey: generatePrivateKey() }),
+      );
+      assert.match(r["X402-06"]?.detail ?? "", /^Expected 2xx after a valid payment, got 402\.$/);
     } finally {
       await target.close();
     }

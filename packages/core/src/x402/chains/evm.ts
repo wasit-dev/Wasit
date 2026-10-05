@@ -2,7 +2,10 @@
  * The `exact` scheme on EVM, with the EIP-3009 transfer method (USDC's
  * `transferWithAuthorization`): the payer signs an authorization off-chain,
  * the facilitator submits it and pays the gas (`scheme_exact_evm.md`). So a
- * payer needs the token and nothing else.
+ * payer needs the token and nothing else. A target that advertises the
+ * Permit2 method instead is paid through Permit2; with the
+ * `eip2612GasSponsoring` extension its one-time approval is a signed permit
+ * the facilitator submits, so that path needs no gas either.
  *
  * Settlement is read from the transaction receipt: the token contract's own
  * ERC-20 `Transfer` log is held to the advertised terms, as the Stellar
@@ -10,6 +13,7 @@
  * the official SDK ships its USDC and the public facilitator settles there.
  */
 
+import { toClientEvmSigner } from "@x402/evm";
 import { ExactEvmScheme } from "@x402/evm/exact/client";
 import {
   TransactionReceiptNotFoundError,
@@ -309,8 +313,14 @@ export const evmChain: PaymentChain = {
     }
     return fallback;
   },
-  registerPayer(client, _network, payerKey) {
-    client.register("eip155:*", new ExactEvmScheme(payerAccount(payerKey)));
+  registerPayer(client, _network, payerKey, rpcUrl) {
+    // The signer can read the chain: the SDK needs that only on the Permit2
+    // path (allowance, permit nonce). EIP-3009 signing stays offline.
+    const signer = toClientEvmSigner(
+      payerAccount(payerKey),
+      createPublicClient({ transport: http(rpcUrl) }),
+    );
+    client.register("eip155:*", new ExactEvmScheme(signer, { rpcUrl }));
   },
   payerAddress: (payerKey) => payerAccount(payerKey).address,
   isSettlementReference: (reference) => TRANSACTION_HASH.test(reference),

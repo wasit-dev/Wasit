@@ -411,9 +411,14 @@ function chainFor(network: string): PaymentChain {
   return chain;
 }
 
-function buildX402Client(chain: PaymentChain, network: string, payerSecretKey: string) {
+function buildX402Client(
+  chain: PaymentChain,
+  network: string,
+  payerSecretKey: string,
+  rpcUrl: string,
+) {
   const client = new x402Client();
-  chain.registerPayer(client, network, payerSecretKey);
+  chain.registerPayer(client, network, payerSecretKey, rpcUrl);
   client
     // A challenge may offer several networks, including both Stellar ones.
     // The client's default pick is the first it supports, which would sign
@@ -453,10 +458,12 @@ async function preparePayment(
   options: X402PaymentCheckOptions,
   alter?: (selected: PaymentRequirements) => AlteredSigning,
 ) {
+  const chain = chainFor(options.network);
   const { client, httpClient } = buildX402Client(
-    chainFor(options.network),
+    chain,
     options.network,
     options.payerSecretKey,
+    chain.resolveRpcUrl(options.network, options.rpcUrl),
   );
 
   const challenge = await fetchTarget(options.target, buildInit(options));
@@ -613,8 +620,20 @@ async function checkSignatureAccepted(options: X402PaymentCheckOptions): Promise
   });
 
   if (paid.status < 200 || paid.status >= 300) {
+    const reason = await refusalReason(paid);
+    // Permit2 needs the payer to have approved the Permit2 contract once. A
+    // target that offers no gas-sponsored approval leaves that to the payer,
+    // so this refusal is about Wasit's payer, not the target: no verdict.
+    if (reason === "permit2_allowance_required") {
+      throw new CheckSetupError(
+        "The target pays through Permit2 without a gas-sponsored approval, and this " +
+          "run's payer has not approved the Permit2 contract for the token. Approve it " +
+          "once (an on-chain transaction that needs gas), then re-run.",
+      );
+    }
     return honest(fail(
-      `Expected 2xx after a valid payment, got ${paid.status}.`,
+      `Expected 2xx after a valid payment, got ${paid.status}` +
+        `${reason === undefined ? "" : ` (${reason})`}.`,
       "A valid payment was refused. Your server's log of the facilitator's " +
         "verify or settle response says why; serve the resource with a 2xx once " +
         "the payment settles.",

@@ -53,8 +53,11 @@ eip155:84532` (MCP: `network`) runs `X402-06` and `X402-07` there, with the paye
 in `EVM_PRIVATE_KEY`. Payment uses the `exact` scheme's EIP-3009 method, so the
 facilitator pays the gas and a payer needs Base Sepolia USDC and no ETH. `X402-06`
 holds the settlement to the receipt's ERC-20 `Transfer` log by the Stellar rules;
-`X402-07` forges only the EIP-3009 signature. Against Wasit's own Base Sepolia
-fixture, 7/7 with `X402-06` settled on-chain; against `wasit serve` posing on Base
+`X402-07` forges only the payer's signature. Both EVM transfer methods are paid:
+EIP-3009, and Permit2 with its approval signed as a gas-sponsored EIP-2612 permit
+(a Permit2 target without sponsoring, where the payer never approved Permit2, is
+`ERROR (setup)`, not a failure). Against Wasit's own Base Sepolia fixtures, both
+methods pass with `X402-06` settled on-chain and the payer holding no ETH; against `wasit serve` posing on Base
 Sepolia, the lying modes fail both checks
 ([evidence](docs/evidence/2026-10-05-base-sepolia-verification-run.md)). Stellar stays
 the default; MPP is Stellar only. Under the hood, the payment checks now go through a
