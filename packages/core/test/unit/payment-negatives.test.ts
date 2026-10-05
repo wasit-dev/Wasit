@@ -279,7 +279,38 @@ describe("on Ethereum Sepolia", () => {
         );
         assert.equal(target.received.length, paid ? 1 : 0, amount);
         if (paid) assert.match(r["X402-06"]?.detail ?? "", /got 402/);
-        else assert.match(r["X402-06"]?.detail ?? "", /spendControls/);
+        else {
+          assert.equal(r["X402-06"]?.error?.kind, "setup");
+          assert.match(r["X402-06"]?.detail ?? "", /asks for 1000001 base units .* more than the \$1 a payment/);
+        }
+      } finally {
+        await target.close();
+      }
+    }
+  });
+});
+
+describe("a target the SDK client's spend controls refuse", () => {
+  // Not the target's fault, and nothing is sent: no verdict, saying why.
+  it("is a setup error on a price above $1, or on an asset the client does not pay in", async () => {
+    for (const [label, options, reason] of [
+      ["above $1", { amount: "1000001" }, /more than the \$1 a payment the official x402 client pays by default/],
+      ["other asset", { asset: "0x0000000000000000000000000000000000000Bad" }, /not an asset the official x402 client pays in by default/],
+    ] as const) {
+      const target = await standIn({ mode: "accept", ...options });
+      try {
+        const r = byId(
+          await runX402PaymentChecks({
+            target: target.url,
+            network: NETWORK,
+            payerSecretKey: generatePrivateKey(),
+            rpcUrl: funded.url,
+          }),
+        );
+        assert.equal(r["X402-06"]?.error?.kind, "setup", label);
+        assert.match(r["X402-06"]?.detail ?? "", reason, label);
+        for (const id of ["X402-07", "X402-08", "X402-09", "X402-10"]) assert.equal(r[id]?.skipped, true, `${label} ${id}`);
+        assert.equal(target.received.length, 0, label);
       } finally {
         await target.close();
       }

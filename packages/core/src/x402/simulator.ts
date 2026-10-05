@@ -437,6 +437,48 @@ function describeOffered(accepts: ReadonlyArray<{ readonly network: string }>): 
   return networks.length === 0 ? "none" : networks.join(", ");
 }
 
+/** What the SDK client's spend controls say when they refuse a payment. */
+const SPEND_CONTROLS_REFUSAL = "All payment requirements were rejected by spendControls";
+
+/**
+ * Builds a payment, turning a refusal by the SDK client's spend controls into
+ * no verdict that says why.
+ *
+ * The official client pays only its default assets (plus the ones an adapter
+ * allows, such as Circle's USDC on Ethereum Sepolia) and at most $1 a
+ * payment, so that a paywall cannot charge a payer more than it meant to.
+ * Wasit keeps those limits: it pays automatically, and on `stellar:pubnet`
+ * with real money. A target above them is not at fault, and nothing was
+ * sent, so this is `ERROR (setup)`, not a harness error. Matched on the SDK's
+ * message (`@x402/core` 2.28 `client/index.mjs`); a message it does not
+ * recognise passes through as before.
+ */
+async function withinSpendControls<T>(
+  network: string,
+  selected: PaymentRequirements,
+  build: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await build();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (!message.startsWith(SPEND_CONTROLS_REFUSAL)) throw error;
+    if (message.includes("only default assets")) {
+      throw new CheckSetupError(
+        `The target asks to be paid in ${selected.asset} on ${network}, which is not ` +
+          `an asset the official x402 client pays in by default, nor one Wasit allows, ` +
+          `so nothing was sent.`,
+      );
+    }
+    throw new CheckSetupError(
+      `The target asks for ${selected.amount} base units of ${selected.asset}, more ` +
+        `than the $1 a payment the official x402 client pays by default, so nothing ` +
+        `was sent. The cap keeps a paywall from charging a payer more than it meant ` +
+        `to; a target priced at $1 or less is checked as usual.`,
+    );
+  }
+}
+
 /**
  * Reads the challenge and produces a signed payment payload for it.
  *
@@ -514,15 +556,19 @@ async function preparePayment(
 
   await beforeSigning?.(selected);
   if (alter === undefined) {
-    const paymentPayload = await client.createPaymentPayload(paymentRequired);
+    const paymentPayload = await withinSpendControls(options.network, selected, () =>
+      client.createPaymentPayload(paymentRequired),
+    );
     return { httpClient, paymentPayload, selected, idempotent };
   }
 
   const altered = await alter(selected);
-  const signed = await client.createPaymentPayload({
-    ...paymentRequired,
-    accepts: [{ ...selected, ...altered }],
-  });
+  const signed = await withinSpendControls(options.network, selected, () =>
+    client.createPaymentPayload({
+      ...paymentRequired,
+      accepts: [{ ...selected, ...altered }],
+    }),
+  );
   const paymentPayload = { ...signed, accepted: selected };
   return { httpClient, paymentPayload, selected, idempotent };
 }
