@@ -1,9 +1,12 @@
 /**
  * `wasit wallet` — testnet-only convenience commands for the payer keys the
- * other subcommands already read from .env. Deliberately has no --network
- * flag: Friendbot, the printed USDC issuer, and the whole idea of a
- * throwaway generated key only make sense on testnet, so there is nothing
- * here that could be pointed at pubnet by mistake.
+ * other subcommands already read from .env. `--network` takes testnets only
+ * (the ones `wasit serve` poses on): Friendbot, the printed USDC issuer, and
+ * the whole idea of a throwaway generated key only make sense on testnet, so
+ * there is nothing here that could be pointed at a mainnet by mistake.
+ * Stellar testnet is the default and the only network for the MPP roles; on
+ * Base Sepolia and Solana devnet the x402 payer needs USDC from Circle's
+ * faucet and no native token, since the facilitator pays the fee.
  *
  * Every failure path here exits 2 (configuration) or 1 (the operation ran and
  * failed) with a single-line message, the same contract the check subcommands
@@ -19,6 +22,7 @@ import {
   generateCommitmentKey,
   generateTestnetWallet,
   getTestnetWalletStatus,
+  paymentChainFor,
   publicKeyFromSecret,
   sendUsdcFromDistributor,
   TESTNET_USDC_ISSUER,
@@ -26,6 +30,8 @@ import {
   type FriendbotOutcome,
   type WalletStatus,
 } from "@wasit-dev/core";
+
+import { DEFAULT_SERVE_NETWORK, SERVE_NETWORKS } from "./serve.js";
 
 type WalletRole = "x402" | "mpp-charge" | "mpp-channel";
 
@@ -100,6 +106,70 @@ function resolvePublicKey(role: WalletRole): { secret: string; publicKey: string
   }
 }
 
+/** The testnets `wasit wallet` takes: the ones `wasit serve` poses on. */
+export const WALLET_NETWORKS: readonly string[] = Object.keys(SERVE_NETWORKS);
+
+/**
+ * Checks --network against the testnets, and the role against the network:
+ * the MPP roles are Stellar only. Returns the problem, or undefined.
+ */
+export function walletNetworkProblem(network: string, role: WalletRole): string | undefined {
+  if (!WALLET_NETWORKS.includes(network)) {
+    return `Unknown --network "${network}". Expected a testnet: ${WALLET_NETWORKS.join(", ")}.`;
+  }
+  if (network !== DEFAULT_SERVE_NETWORK && role !== "x402") {
+    return `--role ${role} is Stellar only: MPP runs on Stellar. Only --role x402 takes --network ${network}.`;
+  }
+  return undefined;
+}
+
+function requireNetwork(value: string | undefined, role: WalletRole): string {
+  const network = value ?? DEFAULT_SERVE_NETWORK;
+  const problem = walletNetworkProblem(network, role);
+  if (problem !== undefined) {
+    console.error(problem);
+    process.exit(2);
+  }
+  return network;
+}
+
+/** Base units as a decimal amount, e.g. 19970000 with 6 decimals as 19.97. */
+export function formatUnits(units: bigint, decimals: number): string {
+  const scale = 10n ** BigInt(decimals);
+  const fraction = (units % scale).toString().padStart(decimals, "0").replace(/0+$/, "");
+  return `${units / scale}${fraction === "" ? "" : `.${fraction}`}`;
+}
+
+/** Where a payer on `network` gets its USDC, and what it does not need. */
+function faucetLines(network: string, address: string): string[] {
+  const profile = SERVE_NETWORKS[network]!;
+  return [
+    `Fund it with USDC at https://faucet.circle.com (network ${profile.faucetNetwork}),`,
+    `pasting ${address}.`,
+    `It needs no ${profile.nativeToken}: the facilitator pays the fee.`,
+  ];
+}
+
+/** What `wallet create --role x402 --network <not Stellar>` prints. */
+export function generatedKeyLines(network: string, secret: string): string[] {
+  const chain = paymentChainFor(network)!;
+  const address = chain.payerAddress(secret);
+  return [
+    `Generated a new ${SERVE_NETWORKS[network]!.name} key for x402:`,
+    "",
+    `Address: ${address}`,
+    `Secret:  ${secret}`,
+    "",
+    "Paste into .env:",
+    "",
+    `${chain.payerKeyEnv}=${secret}`,
+    "",
+    ...faucetLines(network, address),
+    "",
+    "Testnet only — never reuse this key, and never put a mainnet key here.",
+  ];
+}
+
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -153,6 +223,66 @@ function printWalletStatus(role: WalletRole, publicKey: string, status: WalletSt
   }
 }
 
+/**
+ * The configured x402 payer on a network other than Stellar testnet, exiting
+ * 2 when its key is unset or is not a key for that chain. The message never
+ * echoes the key.
+ */
+function resolvePayer(network: string): { address: string } {
+  const chain = paymentChainFor(network)!;
+  const secret = process.env[chain.payerKeyEnv];
+  if (!secret) {
+    console.error(
+      `${chain.payerKeyEnv} is not set. Run \`wasit wallet create --role x402 --network ${network}\` first.`,
+    );
+    process.exit(2);
+  }
+  try {
+    return { address: chain.payerAddress(secret) };
+  } catch {
+    console.error(`${chain.payerKeyEnv} is not a ${chain.name} key.`);
+    process.exit(2);
+  }
+}
+
+/**
+ * Prints the x402 payer's USDC balance on a network other than Stellar
+ * testnet, and returns the exit code: 2 when it could not be read, since
+ * `wallet status` must not pass on a balance it never saw.
+ */
+async function printPayerStatus(network: string, jsonMode: boolean): Promise<0 | 2> {
+  const chain = paymentChainFor(network)!;
+  const profile = SERVE_NETWORKS[network]!;
+  const { address } = resolvePayer(network);
+  let balance: bigint | undefined;
+  let error: string | undefined;
+  try {
+    const read = chain.payerBalance(network, chain.resolveRpcUrl(network), address, profile.asset);
+    balance = jsonMode ? await read : await oraPromise(read, `Checking x402 on ${profile.name}...`);
+    if (balance === undefined) error = "the chain gave no balance";
+  } catch (caught) {
+    error = messageOf(caught);
+  }
+  if (jsonMode) {
+    console.log(
+      JSON.stringify(
+        [{ role: "x402", network, address, usdc: balance === undefined ? undefined : formatUnits(balance, profile.decimals), error }],
+        null,
+        2,
+      ),
+    );
+  } else {
+    console.log(`x402  ${address}  (${profile.name})`);
+    console.log(
+      balance === undefined
+        ? `    Could not check: ${error}`
+        : `    ${"USDC".padEnd(10)} ${formatUnits(balance, profile.decimals)}`,
+    );
+    if (balance === 0n) for (const line of faucetLines(network, address)) console.log(`    ${line}`);
+  }
+  return balance === undefined ? 2 : 0;
+}
+
 export function registerWalletCommand(program: Command): void {
   const wallet = program
     .command("wallet")
@@ -162,6 +292,7 @@ export function registerWalletCommand(program: Command): void {
     .command("status")
     .description("Show balances for the configured payer role(s)")
     .option("--role <role>", `One of: ${ACCOUNT_ROLES.join(", ")}. Default: check both.`)
+    .option("--network <network>", `Testnet: ${WALLET_NETWORKS.join(", ")}`, DEFAULT_SERVE_NETWORK)
     .option("--json", "Print as JSON instead of formatted text", false)
     .addHelpText(
       "after",
@@ -169,16 +300,23 @@ export function registerWalletCommand(program: Command): void {
 Examples:
   $ wasit wallet status
   $ wasit wallet status --role mpp-charge --json
+  $ wasit wallet status --network eip155:84532
 
 With --role, exits 2 if that role could not be checked (key not set,
 unreadable, or lookup failed); without it, every role is a row and it exits 0.
 
-Testnet only — there is no --network flag. mpp-channel is not accepted here
+Testnet only. On a network other than Stellar testnet it shows the x402
+payer's USDC balance. mpp-channel is not accepted here
 even when configured: COMMITMENT_SECRET_HEX only ever signs off-chain (see
 docs/guides/configuration.md) and has no on-chain balance of its own.`,
     )
     .action(async (opts) => {
       const jsonMode = opts.json === true;
+      if (opts.network !== DEFAULT_SERVE_NETWORK) {
+        const role = opts.role === undefined ? "x402" : requireRole(opts.role, ACCOUNT_ROLES);
+        const network = requireNetwork(opts.network, role);
+        process.exit(await printPayerStatus(network, jsonMode));
+      }
       const roles: readonly WalletRole[] =
         opts.role !== undefined ? [requireRole(opts.role, ACCOUNT_ROLES)] : ACCOUNT_ROLES;
 
@@ -247,13 +385,16 @@ docs/guides/configuration.md) and has no on-chain balance of its own.`,
     .command("create")
     .description("Generate a new testnet key for a payer role")
     .requiredOption("--role <role>", `One of: ${ROLES.join(", ")}`)
-    .option("--fund", "Immediately fund the new key with testnet XLM", false)
+    .option("--network <network>", `Testnet: ${WALLET_NETWORKS.join(", ")}`, DEFAULT_SERVE_NETWORK)
+    .option("--fund", "Immediately fund the new key with testnet XLM (Stellar only)", false)
     .addHelpText(
       "after",
       `
 Examples:
   $ wasit wallet create --role mpp-charge --fund
   $ wasit wallet create --role mpp-channel
+  $ wasit wallet create --role x402 --network eip155:84532
+  $ wasit wallet create --role x402 --network solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1
 
 Testnet only. Prints the exact .env line(s) to paste — never writes to .env
 itself, so it can never silently overwrite something already there.
@@ -263,6 +404,21 @@ are recording, and never paste a pubnet key into these variables.`,
     )
     .action(async (opts) => {
       const role = requireRole(opts.role, ROLES);
+      const network = requireNetwork(opts.network, role);
+
+      if (network !== DEFAULT_SERVE_NETWORK) {
+        if (opts.fund === true) {
+          console.error(
+            `--fund is Stellar only (Friendbot). On ${SERVE_NETWORKS[network]!.name} the payer ` +
+              "needs USDC from https://faucet.circle.com and nothing else.",
+          );
+          process.exit(2);
+        }
+        for (const line of generatedKeyLines(network, paymentChainFor(network)!.generatePayerKey())) {
+          console.log(line);
+        }
+        return;
+      }
 
       if (role === "mpp-channel") {
         const key = generateCommitmentKey();
@@ -307,6 +463,7 @@ are recording, and never paste a pubnet key into these variables.`,
     .command("fund")
     .description("Fund a configured payer role with testnet XLM or USDC")
     .requiredOption("--role <role>", `One of: ${ACCOUNT_ROLES.join(", ")}`)
+    .option("--network <network>", `Testnet: ${WALLET_NETWORKS.join(", ")}`, DEFAULT_SERVE_NETWORK)
     .option("--asset <asset>", "xlm or usdc", "xlm")
     .option("--amount <amount>", "USDC amount to request from the distributor account", "50")
     .addHelpText(
@@ -321,10 +478,20 @@ Examples:
 actually receiving a balance needs either a manual visit to
 https://faucet.circle.com (paste the printed public key) or
 WASIT_USDC_DISTRIBUTOR_SECRET set in .env, naming an account you already
-funded that way once — there is no scriptable USDC faucet for Stellar.`,
+funded that way once — there is no scriptable USDC faucet for Stellar.
+
+On another network (--network) there is nothing to do on-chain first: it
+prints where to get USDC for the configured x402 payer.`,
     )
     .action(async (opts) => {
       const role = requireRole(opts.role, ACCOUNT_ROLES);
+      const network = requireNetwork(opts.network, role);
+      if (network !== DEFAULT_SERVE_NETWORK) {
+        const { address } = resolvePayer(network);
+        console.log(`No faucet can be called for ${SERVE_NETWORKS[network]!.name} from here.`);
+        for (const line of faucetLines(network, address)) console.log(line);
+        return;
+      }
       const { secret, publicKey } = resolvePublicKey(role);
       const asset: string = opts.asset;
 

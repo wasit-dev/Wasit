@@ -123,6 +123,14 @@ the two settlement modes reproduce the servers built for the 0.6.0 A/B:
 modes on Base Sepolia, and `--network solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` on Solana
 devnet.
 
+**Added — `wasit wallet --network` for the Base Sepolia and Solana devnet payers.**
+`wasit wallet create --role x402 --network eip155:84532` (or Solana devnet) generates the
+payer key in the form the payment checks read and prints its `.env` line and the
+address to fund at faucet.circle.com; `status --network` shows that payer's USDC
+balance, and `fund --network` prints the faucet step, since the payer needs nothing
+else. Testnets only; the MPP roles stay on Stellar. The dashboard's environment panel
+lists `EVM_PRIVATE_KEY` and `SVM_PRIVATE_KEY`.
+
 **Changed — the CLI's payment warning says when it applies.** It said funds
 would move before every payment run, including runs where the target offered
 no option on the run's network and nothing was paid.

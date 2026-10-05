@@ -69,15 +69,16 @@ menu — it falls back to printing help, exactly as before this existed.
 ## Wallet setup
 
 ```bash
-wasit wallet status [--role x402|mpp-charge] [--json]
-wasit wallet create --role x402|mpp-charge|mpp-channel [--fund]
-wasit wallet fund --role x402|mpp-charge [--asset xlm|usdc] [--amount <n>]
+wasit wallet status [--role x402|mpp-charge] [--network <testnet>] [--json]
+wasit wallet create --role x402|mpp-charge|mpp-channel [--network <testnet>] [--fund]
+wasit wallet fund --role x402|mpp-charge [--network <testnet>] [--asset xlm|usdc] [--amount <n>]
 ```
 
 Testnet-only convenience commands for the payer keys the other subcommands
-read from `.env` — none of them take a `--network` flag, since Friendbot, the
-printed USDC issuer, and the whole idea of a disposable generated key only
-make sense on testnet.
+read from `.env`. `--network` takes testnets only, `stellar:testnet` (the
+default), `eip155:84532` (Base Sepolia) or `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1`
+(Solana devnet), since Friendbot, the printed USDC issuer, and the whole idea
+of a disposable generated key only make sense on testnet.
 
 `status` shows each configured role's on-chain balances (or "not yet created"
 for a key that has never been funded). `create` generates a new key and
@@ -107,6 +108,16 @@ Stellar. Either visit https://faucet.circle.com once yourself (paste the
 public key `wasit wallet fund` prints), or set
 `WASIT_USDC_DISTRIBUTOR_SECRET` in `.env` to an account you already funded
 that way — every run after that sends automatically from it.
+
+On Base Sepolia and Solana devnet only `--role x402` applies: MPP runs on
+Stellar. `create --role x402 --network eip155:84532` prints an
+`EVM_PRIVATE_KEY=0x...` line, and `--network solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1`
+an `SVM_PRIVATE_KEY=...` line (base58 of the 64-byte keypair), each with the
+address to paste into https://faucet.circle.com. That faucet is the only step:
+the payer needs USDC and no ETH or SOL, since the facilitator pays the fee, so
+`--fund` is Stellar only and `fund` prints the faucet step. `status --network`
+shows the configured payer's USDC balance of the SDK's default asset, and exits
+2 when it could not be read.
 
 ## Exit codes
 

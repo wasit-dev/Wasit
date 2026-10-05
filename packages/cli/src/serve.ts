@@ -47,7 +47,13 @@ function base58(bytes: Uint8Array): string {
 }
 
 /** What changes from one network to another; the modes stay the same. */
-interface ServeNetwork {
+export interface ServeNetwork {
+  /** The network's name, for messages. */
+  readonly name: string;
+  /** The network as faucet.circle.com lists it. */
+  readonly faucetNetwork: string;
+  /** The chain's native token, which an x402 payer does not need. */
+  readonly nativeToken: string;
   /** The mainnet `wrong-network` asks for instead, and its name. */
   readonly mainnet: string;
   readonly mainnetName: string;
@@ -72,6 +78,9 @@ interface ServeNetwork {
  */
 export const SERVE_NETWORKS: Readonly<Record<string, ServeNetwork>> = {
   "stellar:testnet": {
+    name: "Stellar testnet",
+    faucetNetwork: "Stellar Testnet",
+    nativeToken: "XLM",
     mainnet: "stellar:pubnet",
     mainnetName: "Stellar mainnet",
     asset: TESTNET_USDC,
@@ -87,6 +96,9 @@ export const SERVE_NETWORKS: Readonly<Record<string, ServeNetwork>> = {
     payeeEnv: "STELLAR_PAYEE_ADDRESS",
   },
   "eip155:84532": {
+    name: "Base Sepolia",
+    faucetNetwork: "Base Sepolia",
+    nativeToken: "ETH",
     mainnet: "eip155:8453",
     mainnetName: "Base mainnet",
     asset: BASE_SEPOLIA_USDC,
@@ -100,6 +112,9 @@ export const SERVE_NETWORKS: Readonly<Record<string, ServeNetwork>> = {
     payeeEnv: "EVM_PAYEE_ADDRESS",
   },
   "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1": {
+    name: "Solana devnet",
+    faucetNetwork: "Solana Devnet",
+    nativeToken: "SOL",
     mainnet: "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
     mainnetName: "Solana mainnet",
     asset: SOLANA_DEVNET_USDC,

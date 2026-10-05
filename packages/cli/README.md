@@ -108,12 +108,12 @@ Lists every check by ID with the subcommand that runs it, and flags the ones tha
 ### `wasit wallet` — testnet keys
 
 ```bash
-wasit wallet status [--role x402|mpp-charge] [--json]
-wasit wallet create --role x402|mpp-charge|mpp-channel [--fund]
-wasit wallet fund   --role x402|mpp-charge [--asset xlm|usdc] [--amount <n>]
+wasit wallet status [--role x402|mpp-charge] [--network <testnet>] [--json]
+wasit wallet create --role x402|mpp-charge|mpp-channel [--network <testnet>] [--fund]
+wasit wallet fund   --role x402|mpp-charge [--network <testnet>] [--asset xlm|usdc] [--amount <n>]
 ```
 
-Testnet-only helpers for the keys the subcommands above read from `.env`. There is deliberately no `--network` flag. `create` prints the exact `.env` lines to paste and never writes the file itself; `fund --asset xlm` uses Stellar's public Friendbot and is fully automatic.
+Testnet-only helpers for the keys the subcommands above read from `.env`. `--network` takes testnets only: `stellar:testnet` (default), `eip155:84532` or `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1`, where `create --role x402` prints an `EVM_PRIVATE_KEY` or `SVM_PRIVATE_KEY` line and the address to fund at [faucet.circle.com](https://faucet.circle.com); that payer needs USDC and no ETH or SOL. `create` prints the exact `.env` lines to paste and never writes the file itself; `fund --asset xlm` uses Stellar's public Friendbot and is fully automatic.
 
 `fund --asset usdc` opens the Circle testnet USDC trustline automatically, but **receiving a balance always needs one human step**: there is no scriptable USDC faucet for Stellar. Visit [faucet.circle.com](https://faucet.circle.com) once, or set `WASIT_USDC_DISTRIBUTOR_SECRET` to an account you funded that way and every later run sends from it automatically.
 
