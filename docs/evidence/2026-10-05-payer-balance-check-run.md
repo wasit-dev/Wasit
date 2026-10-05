@@ -73,8 +73,19 @@ One Permit2 run (port 3006), started a few seconds after an EIP-3009 run from th
 payer, drew `FAIL X402-06 Expected 2xx after a valid payment, got 402.`, with no reason
 given. The payer's USDC transfers on Base Sepolia show no settlement at that time, so the
 payment was refused, not taken. Five Permit2 runs followed, three of them right after an
-EIP-3009 run, as the failing one was: all passed 10/10. The cause was not found; it was
-the target's facilitator refusing once, which Wasit reported as it happened.
+EIP-3009 run, as the failing one was: all passed 10/10. The cause was not found that day.
+
+*Added 2026-10-06:* found. With the Permit2 fixture logging its facilitator's answers,
+the same failure recurred on both Base Sepolia fixtures (five of sixteen runs on
+2026-10-06), and each time its cause could be seen (the Permit2 fixture's log twice,
+Wasit's own report once) it was the public facilitator's settlement failing as it
+broadcast its own transaction: `settle failed: invalid_exact_evm_transaction_failed: Missing or invalid
+parameters ... "method":"eth_sendRawTransaction"`. The payment verified; the
+facilitator's submission failed; the payer was not charged. The official SDK server
+says so in a `PAYMENT-RESPONSE` with `success: false`, which Wasit did not read; since
+`178b8a6` it does, and the failure reads `got 402 (settlement failed:
+invalid_exact_evm_transaction_failed)`
+([Ethereum Sepolia run](2026-10-06-ethereum-sepolia-verification-run.md#settlement-failures-are-named-now)).
 
 ## Limits
 

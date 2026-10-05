@@ -48,8 +48,8 @@ wasit test --target <url> [options]
 | Option | Default | Notes |
 |---|---|---|
 | `--target <url>` | required | Must include the scheme |
-| `--network <id>` | `stellar:testnet` | Network the payment checks pay on (`stellar:testnet`, `stellar:pubnet`, `eip155:84532` for Base Sepolia, or `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` for Solana devnet); `X402-01`–`05` apply on any chain |
-| `--payer-key <key>` | `STELLAR_PRIVATE_KEY`, `EVM_PRIVATE_KEY` on Base Sepolia, or `SVM_PRIVATE_KEY` on Solana devnet | A Stellar secret (`S...`), an EVM private key (`0x` + 64 hex), or a Solana keypair (base58 of its 64 bytes) |
+| `--network <id>` | `stellar:testnet` | Network the payment checks pay on (`stellar:testnet`, `stellar:pubnet`, `eip155:84532` for Base Sepolia, `eip155:11155111` for Ethereum Sepolia, or `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` for Solana devnet); `X402-01`–`05` apply on any chain |
+| `--payer-key <key>` | `STELLAR_PRIVATE_KEY`, `EVM_PRIVATE_KEY` on Base or Ethereum Sepolia, or `SVM_PRIVATE_KEY` on Solana devnet | A Stellar secret (`S...`), an EVM private key (`0x` + 64 hex), or a Solana keypair (base58 of its 64 bytes) |
 | `--rpc-url <url>` | testnet default | Soroban RPC used to verify `X402-06`'s settlement |
 | `--method <verb>` | `GET` | HTTP method the paid endpoint uses |
 | `--body <json>` | — | Request body; implies `Content-Type: application/json` |
@@ -113,7 +113,7 @@ wasit wallet create --role x402|mpp-charge|mpp-channel [--network <testnet>] [--
 wasit wallet fund   --role x402|mpp-charge [--network <testnet>] [--asset xlm|usdc] [--amount <n>]
 ```
 
-Testnet-only helpers for the keys the subcommands above read from `.env`. `--network` takes testnets only: `stellar:testnet` (default), `eip155:84532` or `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1`, where `create --role x402` prints an `EVM_PRIVATE_KEY` or `SVM_PRIVATE_KEY` line and the address to fund at [faucet.circle.com](https://faucet.circle.com); that payer needs USDC and no ETH or SOL. `create` prints the exact `.env` lines to paste and never writes the file itself; `fund --asset xlm` uses Stellar's public Friendbot and is fully automatic.
+Testnet-only helpers for the keys the subcommands above read from `.env`. `--network` takes testnets only: `stellar:testnet` (default), `eip155:84532`, `eip155:11155111` or `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1`, where `create --role x402` prints an `EVM_PRIVATE_KEY` or `SVM_PRIVATE_KEY` line and the address to fund at [faucet.circle.com](https://faucet.circle.com); that payer needs USDC and no ETH or SOL. `create` prints the exact `.env` lines to paste and never writes the file itself; `fund --asset xlm` uses Stellar's public Friendbot and is fully automatic.
 
 `fund --asset usdc` opens the Circle testnet USDC trustline automatically, but **receiving a balance always needs one human step**: there is no scriptable USDC faucet for Stellar. Visit [faucet.circle.com](https://faucet.circle.com) once, or set `WASIT_USDC_DISTRIBUTOR_SECRET` to an account you funded that way and every later run sends from it automatically.
 
@@ -171,7 +171,7 @@ A run with both a failure and an error exits `1` — a real finding outranks a m
 | Env var | Used by |
 |---|---|
 | `STELLAR_PRIVATE_KEY` | `test` (x402 payment checks on Stellar) |
-| `EVM_PRIVATE_KEY` | `test --network eip155:84532` (x402 payment checks on Base Sepolia) |
+| `EVM_PRIVATE_KEY` | `test --network eip155:84532` or `eip155:11155111` (x402 payment checks on Base or Ethereum Sepolia) |
 | `SVM_PRIVATE_KEY` | `test --network solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` (x402 payment checks on Solana devnet) |
 | `MPP_PAYER_SECRET` | `mpp-charge` |
 | `MPP_STELLAR_NETWORK` | `mpp-charge`, `mpp-channel` |

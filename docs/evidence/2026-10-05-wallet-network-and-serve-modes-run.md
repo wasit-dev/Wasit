@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-05
 **Wasit:** builds of the local `release/0.7.0` branch (`4c3ca55` for `wallet --network`,
-and the commit after it for the two modes), not yet published.
+and `d82555a` for the two modes), not yet published.
 **Targets:** none operated by anyone else. `wasit wallet` read balances from each
 chain's public RPC; `wasit serve` ran on our machine, and the official x402 SDK client
 was pointed at it as the agent.
