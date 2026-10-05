@@ -116,6 +116,16 @@ for evm in "x402-evm:3005" "x402-permit2:3006"; do
     fi
   fi
 done
+# Solana devnet, likewise only when its fixture is up (SVM_PAYEE_ADDRESS);
+# the payment checks read SVM_PRIVATE_KEY.
+SOLANA_DEVNET="solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1"
+if lsof -nP -iTCP:3007 -sTCP:LISTEN -t >/dev/null 2>&1; then
+  if [ "$FULL" = 1 ]; then
+    SUITES+=("x402-svm|test --target http://localhost:3007/protected --network $SOLANA_DEVNET")
+  else
+    SUITES+=("x402-svm|test --target http://localhost:3007/protected --network $SOLANA_DEVNET --read-only")
+  fi
+fi
 SUITES+=("mpp-channel|mpp-channel --target http://localhost:3003/data")
 
 # The CLI reads .env from its working directory.

@@ -364,6 +364,7 @@ import { x402Client, x402HTTPClient } from "@x402/fetch";
 import type { PaymentRequirements } from "@x402/core/types";
 
 import { paymentChainFor, paymentNetworks, type PaymentChain } from "./chains/index.js";
+import type { AlteredSigning } from "./chains/types.js";
 import { stellarChain } from "./chains/stellar.js";
 
 export { corruptAuthSignature } from "./chains/stellar.js";
@@ -411,14 +412,14 @@ function chainFor(network: string): PaymentChain {
   return chain;
 }
 
-function buildX402Client(
+async function buildX402Client(
   chain: PaymentChain,
   network: string,
   payerSecretKey: string,
   rpcUrl: string,
 ) {
   const client = new x402Client();
-  chain.registerPayer(client, network, payerSecretKey, rpcUrl);
+  await chain.registerPayer(client, network, payerSecretKey, rpcUrl);
   client
     // A challenge may offer several networks, including both Stellar ones.
     // The client's default pick is the first it supports, which would sign
@@ -437,16 +438,6 @@ function describeOffered(accepts: ReadonlyArray<{ readonly network: string }>): 
 }
 
 /**
- * What a negative check signs differently from the honest payment. The
- * payload still claims, in `accepted`, the terms the target advertised, so the
- * only thing wrong with it is what was signed.
- */
-interface AlteredSigning {
-  readonly amount?: string;
-  readonly maxTimeoutSeconds?: number;
-}
-
-/**
  * Reads the challenge and produces a signed payment payload for it.
  *
  * Shared by every payment check so each one starts from a challenge the
@@ -456,10 +447,10 @@ interface AlteredSigning {
  */
 async function preparePayment(
   options: X402PaymentCheckOptions,
-  alter?: (selected: PaymentRequirements) => AlteredSigning,
+  alter?: (selected: PaymentRequirements) => AlteredSigning | Promise<AlteredSigning>,
 ) {
   const chain = chainFor(options.network);
-  const { client, httpClient } = buildX402Client(
+  const { client, httpClient } = await buildX402Client(
     chain,
     options.network,
     options.payerSecretKey,
@@ -522,7 +513,7 @@ async function preparePayment(
     return { httpClient, paymentPayload, selected, idempotent };
   }
 
-  const altered = alter(selected);
+  const altered = await alter(selected);
   const signed = await client.createPaymentPayload({
     ...paymentRequired,
     accepts: [{ ...selected, ...altered }],
@@ -901,15 +892,23 @@ export function underpaymentVerdict(
  * X402-10 (negative): a payment whose authorization has expired must be
  * rejected.
  *
- * The payment is signed with a one-second lifetime (EVM `validBefore`, or the
- * Stellar auth entry's expiration ledger, both derived from
- * `maxTimeoutSeconds`), then held until that has passed, and sent claiming the
- * advertised terms. An expired authorization cannot settle, so a target that
- * serves it serves for nothing.
+ * Each chain says how the payment is made to expire (`expiredSigning`): on
+ * Stellar and EVM it is signed with a one-second lifetime (the auth entry's
+ * expiration ledger, or `validBefore`, both derived from `maxTimeoutSeconds`)
+ * and held until that has passed; on Solana it is built on a blockhash already
+ * past its lifetime. It is sent claiming the advertised terms. An expired
+ * authorization cannot settle, so a target that serves it serves for nothing.
  */
 async function checkExpiredRejected(options: X402PaymentCheckOptions): Promise<CheckResult> {
-  const { httpClient, paymentPayload } = await preparePayment(options, () => ({ maxTimeoutSeconds: 1 }));
-  await new Promise<void>((done) => setTimeout(done, chainFor(options.network).expiryWaitMs));
+  const chain = chainFor(options.network);
+  const rpcUrl = chain.resolveRpcUrl(options.network, options.rpcUrl);
+  let holdMs = 0;
+  const { httpClient, paymentPayload } = await preparePayment(options, async (selected) => {
+    const expired = await chain.expiredSigning(selected, rpcUrl);
+    holdMs = expired.holdMs;
+    return expired.terms;
+  });
+  await new Promise<void>((done) => setTimeout(done, holdMs));
   const response = await fetchTarget(
     options.target,
     withPaymentHeaders(options, httpClient.encodePaymentSignatureHeader(paymentPayload)),
@@ -933,7 +932,7 @@ export function expiredVerdict(status: number, reason?: string): CheckResult {
           hint:
             "Verify each payment with the facilitator before serving: it refuses an " +
             "authorization past its window (validBefore on EVM, the auth entry's " +
-            "expiration ledger on Stellar).",
+            "expiration ledger on Stellar, the recent blockhash on Solana).",
         }
       : {}),
   };
