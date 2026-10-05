@@ -13,7 +13,7 @@
  * USDC and the public facilitator settles there.
  */
 
-import { createPrivateKey } from "node:crypto";
+import { createPrivateKey, generateKeyPairSync } from "node:crypto";
 
 import { DEVNET_RPC_URL, SOLANA_DEVNET_CAIP2 } from "@x402/svm";
 import { ExactSvmScheme } from "@x402/svm/exact/client";
@@ -390,6 +390,13 @@ export const svmChain: PaymentChain = {
     };
   },
   payerAddress: (payerKey) => getBase58Decoder().decode(secretKeyBytes(payerKey).subarray(32)),
+  generatePayerKey() {
+    // The wallet export form: base58 of the seed followed by the public key.
+    const { d, x } = generateKeyPairSync("ed25519").privateKey.export({ format: "jwk" });
+    return getBase58Decoder().decode(
+      new Uint8Array([...Buffer.from(d!, "base64url"), ...Buffer.from(x!, "base64url")]),
+    );
+  },
   async payerBalance(_network, rpcUrl, payer, asset) {
     // Every token account the payer holds for the mint, summed: the client
     // pays from the associated one only, so this is never less than what it

@@ -180,6 +180,7 @@ export const stellarChain: PaymentChain = {
   expiredSigning: async () => ({ terms: { maxTimeoutSeconds: 1 }, holdMs: 20_000 }),
   payerAddress: (payerKey) => Keypair.fromSecret(payerKey).publicKey(),
   payerBalance: stellarTokenBalance,
+  generatePayerKey: () => Keypair.random().secret(),
   isSettlementReference: (reference) => TRANSACTION_HASH.test(reference),
   verifySettlement,
   corruptPayload: (payload) => ({

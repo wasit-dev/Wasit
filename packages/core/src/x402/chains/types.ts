@@ -67,6 +67,8 @@ export interface PaymentChain {
   expiredSigning(selected: PaymentRequirements, rpcUrl: string): Promise<ExpiredSigning>;
   /** The payer's address, which the settlement must come from. */
   payerAddress(payerKey: string): string;
+  /** A new random payer key, in the form `payerKeyEnv` takes. */
+  generatePayerKey(): string;
   /**
    * The payer's balance of `asset`, in base units, as the chain reports it,
    * or at most what the payer can spend from (never more than it holds).

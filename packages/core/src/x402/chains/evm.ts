@@ -26,7 +26,7 @@ import {
   type Chain,
   type Hex,
 } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
+import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
 
 import { CheckSetupError, ConfigurationError } from "../../errors.js";
@@ -275,6 +275,7 @@ export const evmChain: PaymentChain = {
   // validBefore is now + 1 second; Base Sepolia blocks come every 2 seconds.
   expiredSigning: async () => ({ terms: { maxTimeoutSeconds: 1 }, holdMs: 5_000 }),
   payerAddress: (payerKey) => payerAccount(payerKey).address,
+  generatePayerKey: () => generatePrivateKey(),
   async payerBalance(_network, rpcUrl, payer, asset) {
     if (!isAddress(asset) || !isAddress(payer)) return undefined;
     return createPublicClient({ transport: http(rpcUrl) }).readContract({
