@@ -159,6 +159,29 @@ describe("parseChargeChallenge", () => {
     assert.throws(() => parseChargeChallenge(challengeWith(undefined)), /no request object/);
   });
 
+  // The network the SDK's client would sign for: the challenge's own, or
+  // testnet when it names none (resolveNetworkId in @stellar/mpp 0.7.1).
+  it("reads the network the SDK would sign for", () => {
+    const terms = { amount: "1", currency: "C1", recipient: "G1" };
+    assert.equal(parseChargeChallenge(challengeWith(terms)).network, "stellar:testnet");
+    assert.equal(parseChargeChallenge(challengeWith({ ...terms, methodDetails: {} })).network, "stellar:testnet");
+    assert.equal(
+      parseChargeChallenge(challengeWith({ ...terms, methodDetails: { network: "stellar:pubnet" } })).network,
+      "stellar:pubnet",
+    );
+  });
+
+  it("rejects a network that is not a Stellar CAIP-2 identifier", () => {
+    const terms = { amount: "1", currency: "C1", recipient: "G1" };
+    for (const network of ["stellar:mainnet", "eip155:8453", 7]) {
+      assert.throws(
+        () => parseChargeChallenge(challengeWith({ ...terms, methodDetails: { network } })),
+        /names network .*"stellar:testnet" or "stellar:pubnet"/,
+        String(network),
+      );
+    }
+  });
+
   // An operator fixing one field at a time needs the whole list, not the first
   // thing that happened to be checked.
   it("names every missing field, not just the first", () => {

@@ -4,7 +4,10 @@
  * The target's own 402 challenge is the source of truth for what should be
  * paid. Verifying against it rather than against this run's configuration is
  * what makes the check meaningful against a third-party service: it asks
- * whether the service settled what it advertised, not what we assumed.
+ * whether the service settled what it advertised, not what we assumed. The
+ * one term it does not get to choose is the network: Wasit signs only for the
+ * network the run names, so a target cannot redirect the payer's key to
+ * mainnet by asking for it.
  *
  * Settlement is verified from the CAP-46 `transfer` contract event rather than
  * the transaction envelope, because those can disagree. The envelope records
@@ -26,7 +29,7 @@ import {
   assertHttpUrl,
   fetchTarget,
 } from "../errors.js";
-import { assertMppNetwork, resolveRpcUrl } from "./network.js";
+import { type MppNetwork, assertMppNetwork, isMppNetwork, resolveRpcUrl } from "./network.js";
 import { verifySettlement } from "../settlement.js";
 
 const CHECK_ID = "MPP-01";
@@ -44,7 +47,12 @@ export interface ChargeChallenge {
   readonly amount: bigint;
   readonly currency: string;
   readonly recipient: string;
+  /** The network the SDK's charge client would sign this challenge for. */
+  readonly network: MppNetwork;
 }
+
+/** The SDK's charge client, as `charge()` from @stellar/mpp builds it. */
+type ChargeClient = ReturnType<typeof charge>;
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return typeof value === "object" && value !== null
@@ -133,7 +141,76 @@ export function parseChargeChallenge(
     );
   }
 
-  return { amount, currency, recipient };
+  return { amount, currency, recipient, network: chargeNetwork(request) };
+}
+
+/**
+ * The network @stellar/mpp's charge client signs a challenge for.
+ *
+ * The client takes it from the challenge, `methodDetails.network`, and signs a
+ * challenge that names none for testnet (`resolveNetworkId`,
+ * dist/shared/validation.js in 0.7.1). This reads it the same way, because
+ * what matters is the network the signature will be valid on.
+ */
+function chargeNetwork(request: Record<string, unknown>): MppNetwork {
+  const network = asRecord(request["methodDetails"])?.["network"];
+  if (network === undefined || network === null) return "stellar:testnet";
+  if (typeof network === "string" && isMppNetwork(network)) return network;
+  throw new MalformedResponseError(
+    `Charge challenge names network ${JSON.stringify(network)}. A Stellar ` +
+      `network is "stellar:testnet" or "stellar:pubnet" (CAIP-2).`,
+  );
+}
+
+/** Refuses a challenge for any network but the run's, before anything is signed. */
+function assertRunNetwork(asked: MppNetwork, network: MppNetwork): void {
+  if (asked !== network) {
+    throw new ConfigurationError(
+      `The target asks to be paid on ${asked}, and this run pays on ${network} ` +
+        `only, so nothing was signed.`,
+    );
+  }
+}
+
+/**
+ * `method`, refusing to sign a challenge for any network but `network`.
+ *
+ * Checking the unpaid challenge is not enough on its own: mppx requests the
+ * target again and pays the challenge in that answer, which the target is
+ * free to change. So the check also sits here, on the exact challenge about to
+ * be signed. Without it a target asking for `stellar:pubnet` gets a mainnet
+ * transfer signed, sent through the SDK's own default pubnet RPC endpoint.
+ */
+function onNetwork(method: ChargeClient, network: MppNetwork): ChargeClient {
+  return {
+    ...method,
+    createCredential: async (parameters) => {
+      assertRunNetwork(chargeNetwork(asRecord(parameters.challenge.request) ?? {}), network);
+      return method.createCredential(parameters);
+    },
+  };
+}
+
+/**
+ * Pays `target` through `method` once at most, and only a challenge for
+ * `network`.
+ *
+ * mppx answers a 402 that follows a payment by paying the new challenge, up to
+ * `maxPaymentRetries` attempts (3 by default, dist/client/internal/Fetch.js in
+ * 0.8.14). MPP-01 judges one payment: a target that answers 402 after being
+ * paid has that 402 reported, rather than being paid twice more.
+ */
+export async function payCharge(
+  target: string,
+  network: MppNetwork,
+  method: ChargeClient,
+): Promise<Response> {
+  const mppx = Mppx.create({
+    methods: [onNetwork(method, network)],
+    polyfill: false,
+    maxPaymentRetries: 1,
+  });
+  return mppx.fetch(target);
 }
 
 function fail(detail: string): CheckResult[] {
@@ -150,7 +227,8 @@ function pass(detail: string): CheckResult[] {
  * Runs a real payment against the target every time it is called. See
  * docs/CHECKS.md — this check spends funds by design.
  *
- * @throws {ConfigurationError} Invalid target URL, network, or missing key.
+ * @throws {ConfigurationError} Invalid target URL, network, or missing key, or
+ *   a challenge for another network than the run's (nothing is signed).
  * @throws {TargetUnreachableError} The target never answered.
  * @throws {MalformedResponseError} The target answered, non-conformantly.
  * @throws {Error} RPC failure — reported as `harness`, never as a target defect.
@@ -161,7 +239,7 @@ export async function runMppChargeChecks(
   const { target, network, payerSecretKey, rpcUrl } = options;
 
   assertHttpUrl(target);
-  assertMppNetwork(network);
+  const runNetwork = assertMppNetwork(network);
 
   if (!payerSecretKey) {
     throw new ConfigurationError(
@@ -181,15 +259,28 @@ export async function runMppChargeChecks(
   // Resolve the endpoint before spending anything: a bad RPC URL discovered
   // after settlement would leave money moved and no verdict to show for it.
   const endpoint = resolveRpcUrl(network, rpcUrl);
+  // The SDK's charge client builds its RPC client without `allowHttp`, so it
+  // cannot pay through an http endpoint, though settlement could be read from
+  // one. Say so before paying, instead of reporting the SDK's refusal as the
+  // target's failure.
+  if (endpoint.startsWith("http://")) {
+    throw new ConfigurationError(
+      `MPP-01 pays through @stellar/mpp's charge client, which accepts only an ` +
+        `https RPC endpoint, and ${endpoint} is http. Nothing was sent.`,
+    );
+  }
 
   const advertised = await fetchChargeChallenge(target);
-
-  const mppx = Mppx.create({ methods: [charge({ secretKey: payerSecretKey })], polyfill: false });
+  assertRunNetwork(advertised.network, runNetwork);
 
   let paid: Response;
   try {
-    paid = await mppx.fetch(target);
+    // The payment goes through the run's endpoint too. Left to itself the SDK
+    // picks its own per network, so `--rpc-url` would cover only the
+    // settlement read, and pubnet would get a default endpoint after all.
+    paid = await payCharge(target, runNetwork, charge({ secretKey: payerSecretKey, rpcUrl: endpoint }));
   } catch (error) {
+    if (error instanceof ConfigurationError) throw error;
     // The target was reachable moments ago, so this is the payment path
     // failing, not the network. Report it as a conformance failure.
     throw new MalformedResponseError(
