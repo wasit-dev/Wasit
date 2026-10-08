@@ -286,7 +286,9 @@ async function printPayerStatus(network: string, jsonMode: boolean): Promise<0 |
 export function registerWalletCommand(program: Command): void {
   const wallet = program
     .command("wallet")
-    .description("Generate, fund, and inspect disposable Stellar testnet wallets");
+    .description(
+      "Generate, fund, and inspect disposable testnet wallets: Stellar's payers, and the x402 payer on Base Sepolia, Ethereum Sepolia and Solana devnet",
+    );
 
   wallet
     .command("status")
