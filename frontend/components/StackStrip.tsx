@@ -38,15 +38,17 @@ const CELLS: Cell[] = [
     href: "https://stellar.org",
     name: "Stellar",
     role: "trusts",
-    meta: "settlement read from Stellar RPC",
+    meta: "settlement read from Stellar RPC; for x402 also Base, Ethereum and Solana",
     logo: <Image src="/brand/stellar-white.png" alt="Stellar" width={1200} height={300} className="stack-logo stack-logo--stellar" />,
   },
 ]
 
 /**
  * The stack Wasit works on, as a logo strip under the hero: the two
- * payment protocols it checks and the one chain it trusts. Each cell links
- * to that project's own site.
+ * payment protocols it checks and the chain it trusts for the settlement.
+ * Stellar has the cell because both protocols run there; the x402 chains
+ * beyond it are named in its line rather than given logos of their own.
+ * Each cell links to that project's own site.
  */
 export function StackStrip() {
   return (
@@ -55,7 +57,7 @@ export function StackStrip() {
         <div className="stack-intro" data-reveal>
           <span className="stack-kicker">The stack</span>
           <p id="stack-title" className="stack-title">
-            Two protocols it <span className="hl-2">checks</span>. One chain it <span className="hl-2">trusts</span>.
+            Two protocols it <span className="hl-2">checks</span>. Only the chain it <span className="hl-2">trusts</span>.
           </p>
         </div>
         {CELLS.map((cell, i) => (

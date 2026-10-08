@@ -33,6 +33,9 @@ Every check assumes testnet. `MPP-01`, `X402-06`, and `MPP-13` move real value,
 and `MPP-13` destroys a channel. Nothing about the tool prevents a pubnet
 network identifier from parsing, but pubnet deliberately has no default RPC
 endpoint, so such a run must be configured deliberately rather than by accident.
+A target cannot choose the network for the run either: the payment checks sign
+only for the network the run names, and `MPP-01` refuses a challenge for any
+other before anything is signed.
 
 Do not run destructive or costly checks against infrastructure you do not own.
 

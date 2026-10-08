@@ -7,16 +7,18 @@
 
 # Wasit
 
-**Protocol-compliance testing for x402 and MPP on Stellar.**
+**Protocol-compliance testing for x402 and MPP.**
 
 Wasit runs the real payment flow against a live service, not a mock of it, and
 it is not a schema validator: a response can have every field in the right place
-and still take money without settling it. Settlement is verified on-chain — from
-the token contract's own transfer event rather than the service's own response —
-for both MPP charge payments and x402 payments.
+and still take money without settling it. Settlement is verified on-chain, from
+the chain's own record of the transfer rather than the service's response: the
+token contract's transfer event on Stellar, the token's `Transfer` log on Base
+and Ethereum, the token balances on Solana. x402 is tested on Stellar testnet,
+Base Sepolia, Ethereum Sepolia and Solana devnet; MPP on Stellar testnet.
 
 [![CI](https://github.com/wasit-dev/wasit/actions/workflows/ci.yml/badge.svg)](https://github.com/wasit-dev/wasit/actions/workflows/ci.yml)
-[![Stellar](https://img.shields.io/badge/Stellar-Testnet-7c3aed)](https://stellar.org)
+[![Testnets](https://img.shields.io/badge/Testnets-Stellar%20%C2%B7%20Base%20%C2%B7%20Ethereum%20%C2%B7%20Solana-7c3aed)](docs/guides/cli.md)
 [![x402](https://img.shields.io/badge/Protocol-x402%20v2-0891b2)](https://x402.org)
 [![MPP](https://img.shields.io/badge/Protocol-MPP-111827)](https://paymentauth.org)
 [![MCP](https://img.shields.io/badge/Interface-CLI%20%2B%20MCP-16a34a)](https://modelcontextprotocol.io)
@@ -31,24 +33,6 @@ for both MPP charge payments and x402 payments.
 [Design Notes](#design-notes)
 
 </div>
-
-<table>
-  <tr>
-    <td width="50%" valign="top" align="center">
-      <a href="docs/media/x402-0.6.0.gif"><img src="docs/media/x402-0.6.0.gif" width="380" alt="The wasit CLI running the x402 checks against a local fixture: five read-only, then all seven, with the payment's settlement verified on-chain" /></a>
-      <br />
-      <sub><b>CLI</b> &middot; <code>npx @wasit-dev/cli@0.6.0</code><br />catalogue, read-only 5/5, then 7/7 with the settlement verified on-chain</sub>
-    </td>
-    <td width="50%" valign="top" align="center">
-      <a href="docs/media/mcp-0.6.0.gif"><img src="docs/media/mcp-0.6.0.gif" width="380" alt="The same checks run as MCP tool calls from Claude Code: x402 7/7 with the settlement verified on-chain, then MPP charge and channel conformant" /></a>
-      <br />
-      <sub><b>MCP</b> &middot; the same checks from Claude Code<br />x402, then MPP charge and channel in one session</sub>
-    </td>
-  </tr>
-</table>
-
-<p align="center"><sub>Both ran the published 0.6.0 packages against the local fixtures in
-<a href="#trying-it">Trying It</a>. Click either one for full size.</sub></p>
 
 ---
 
@@ -69,8 +53,9 @@ for both MPP charge payments and x402 payments.
 
 ## How It Works
 
-Wasit talks to two things: the service under test, over HTTP, and the Stellar
-network, over RPC. It never trusts the first about what happened on the second.
+Wasit talks to two things: the service under test, over HTTP, and the chain the
+payment settles on, over RPC. It never trusts the first about what happened on
+the second.
 
 ```mermaid
 flowchart TB
@@ -85,7 +70,7 @@ flowchart TB
         SVC["Your running service"]
     end
 
-    CHAIN["Stellar RPC<br/>settlement, contract events"]
+    CHAIN["Chain RPC<br/>Stellar, Base, Ethereum, Solana testnets"]
 
     CLI --> CORE
     MCP --> CORE
@@ -100,8 +85,8 @@ flowchart TB
 
 Step 5 is the point of the tool. The challenge in step 2 states what the service
 wants paid; the receipt in step 4 states what it claims happened. Wasit compares
-both against what the chain actually recorded — including the token contract's
-own transfer event, not just the transaction it was asked to make.
+both against what the chain actually recorded — including the token's own
+record of the transfer, not just the transaction it was asked to make.
 
 The CLI and the MCP server are thin adapters over the same suite functions. They
 cannot disagree about the same target, because there is only one implementation
@@ -175,7 +160,7 @@ surface.
 returns an identical HTTP 402 body. The SDK defines precise error types for each
 of these and none are reachable, because of a class-hierarchy mismatch between
 two packages. An operator debugging a rejected payment cannot tell which rule
-they broke. See [docs/CHECKS.md](docs/CHECKS.md#note-on-error-granularity-week-2)
+they broke. See [docs/CHECKS.md](docs/CHECKS.md#mpp--channel-mode)
 and the full write-up in [docs/findings/upstream-sdk.md](docs/findings/upstream-sdk.md).
 Filed upstream as [stellar-mpp-sdk#66](https://github.com/stellar/stellar-mpp-sdk/issues/66);
 independently confirmed by [RouteDock's fix](https://github.com/winsznx/routedock/pull/241)
@@ -196,12 +181,12 @@ Wasit exists so these are found by a tool, before they are found by a user.
 
 | Area                                   | Status                                                                                                                                                                                                       |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| x402 read-only checks (`X402-01`–`05`) | Done, verified against a real facilitator                                                                                                                                                                    |
-| x402 payment checks (`X402-06`–`10`)  | Done, settlement verified from contract events                                                                                                                                                               |
-| MPP charge mode (`MPP-01`)             | Done, settlement verified from contract events                                                                                                                                                               |
+| x402 read-only checks (`X402-01`–`05`) | Done, on a challenge from any chain; verified against a real facilitator                                                                                                                                     |
+| x402 payment checks (`X402-06`–`10`)  | Done on Stellar testnet, Base Sepolia, Ethereum Sepolia and Solana devnet, settlement verified from each chain's own record                                                                                    |
+| MPP charge mode (`MPP-01`)             | Done, settlement verified from contract events; pays only on the run's network                                                                                                                               |
 | MPP channel mode (`MPP-10`–`14`)       | Done, including destructive close                                                                                                                                                                            |
-| CLI                                    | Done — five subcommands plus an interactive dashboard                                                                                                                                                        |
-| Testnet wallet tooling                 | Done — `wasit wallet` create/fund/status, testnet only                                                                                                                                                       |
+| CLI                                    | Done — six subcommands, `wasit serve` among them, plus an interactive dashboard                                                                                                                              |
+| Testnet wallet tooling                 | Done — `wasit wallet` create/fund/status on Stellar testnet, and for the x402 payer on Base Sepolia, Ethereum Sepolia and Solana devnet                                                                      |
 | MCP server                             | Done, three tools + one behind an opt-in                                                                                                                                                                     |
 | Error taxonomy and exit codes          | Done                                                                                                                                                                                                         |
 | Wasit's own test suite                 | Done — offline (no keys, no target, no network); type-check and tests both run in CI                                                                                                                          |
@@ -210,7 +195,7 @@ Wasit exists so these are found by a tool, before they are found by a user.
 | Published to npm                       | Yes — `@wasit-dev/core`, `@wasit-dev/cli`, `@wasit-dev/server`                                                                                                                                               |
 | Mainnet                                | Out of scope — see [Design Notes](#design-notes)                                                                                                                                                             |
 
-Thirteen checks are implemented and reachable from both front ends. Every one is
+Sixteen checks are implemented and reachable from both front ends. Every one is
 traced to a written spec clause in [docs/CHECKS.md](docs/CHECKS.md); a check that
 cannot be traced is out of scope by construction.
 
@@ -237,12 +222,15 @@ Running `wasit` with no arguments in a terminal opens an interactive dashboard
 — the same checks, plus a check catalogue browser and a testnet wallet screen,
 driven by arrow keys. Piped or in CI it prints help instead, so nothing that
 scripts Wasit today changes behaviour. `wasit wallet create|fund|status`
-is the same wallet tooling as plain subcommands: it generates testnet keys,
-funds them through Friendbot, and opens a USDC trustline. Both are covered in
+is the same wallet tooling as plain subcommands: on Stellar it generates
+testnet keys, funds them through Friendbot, and opens a USDC trustline; with
+`--network` it generates the x402 payer for Base Sepolia, Ethereum Sepolia or
+Solana devnet and shows its USDC. `wasit serve` runs a local x402 paywall that
+misbehaves on purpose, to test an agent that pays. All of it is covered in
 [docs/guides/cli.md](docs/guides/cli.md).
 
-The checks that settle a real testnet payment — `X402-06`, `X402-07`, `MPP-01`,
-and the channel suite — need a funded testnet account.
+The checks that settle a real testnet payment — `X402-06` to `X402-10`,
+`MPP-01`, and the channel suite — need a funded testnet account.
 [docs/guides/configuration.md](docs/guides/configuration.md) explains each value
 and where to get it. For the MCP server, see
 [docs/guides/mcp.md](docs/guides/mcp.md).
@@ -250,7 +238,7 @@ and where to get it. For the MCP server, see
 ## Building from source
 
 Only needed to change Wasit itself, or to run the bundled fixture servers below.
-Developed and verified on Node **v24.18.0**.
+Developed and verified on Node **v26.8.1**; CI runs Node 22 and 24.
 
 ```bash
 git clone https://github.com/wasit-dev/wasit.git
@@ -279,10 +267,14 @@ would: the CLI's own binary and the MCP server over stdio. It runs in CI too.
 
 ## Trying It
 
-Four fixture servers are bundled. Three are real servers built on the official
+Eight fixture servers are bundled. Seven are real servers built on the official
 SDKs, not mocks — testing against a mock would mean testing against our own
 assumptions, and one of the defects listed above was found precisely because the
-fixtures are real. The fourth is a deliberate misbehaver, described below.
+fixtures are real. The other is a deliberate misbehaver, described below. The
+Base Sepolia, Ethereum Sepolia and Solana devnet fixtures start only when `.env`
+names their payee (`EVM_PAYEE_ADDRESS`, `SVM_PAYEE_ADDRESS`). The Ethereum Sepolia
+one also needs `EVM_FACILITATOR_PRIVATE_KEY`: it runs the official SDK's
+facilitator itself, which pays the gas from that key.
 
 Start them all at once:
 
@@ -309,9 +301,13 @@ npx tsx packages/core/test/fixtures/x402-real-server.ts             # :3001/prot
 npx tsx packages/core/test/fixtures/mpp-charge-server.ts            # :3002/data
 npx tsx packages/core/test/fixtures/mpp-channel-server.ts           # :3003/data
 npx tsx packages/core/test/fixtures/mpp-channel-refusing-server.ts  # :3004/data
+npx tsx packages/core/test/fixtures/x402-evm-server.ts              # :3005/protected, Base Sepolia, EIP-3009
+npx tsx packages/core/test/fixtures/x402-evm-permit2-server.ts      # :3006/protected, Base Sepolia, Permit2
+npx tsx packages/core/test/fixtures/x402-svm-server.ts              # :3007/protected, Solana devnet
+npx tsx packages/core/test/fixtures/x402-evm-sepolia-server.ts      # :3008/protected, Ethereum Sepolia
 ```
 
-The fourth issues valid channel challenges and then refuses every credential. It
+The refusing one (`:3004`) issues valid channel challenges and then refuses every credential. It
 is not a conformance target and must never be used as one. It exists to
 reproduce, on demand, a run where the precondition a channel check needs cannot
 be established, so the reporting path for that case can be exercised without
@@ -327,6 +323,9 @@ node packages/cli/dist/index.js test --target http://localhost:3001/protected --
 # x402 — full flow, settles a real testnet payment
 node packages/cli/dist/index.js test --target http://localhost:3001/protected
 
+# x402 on Base Sepolia — the same checks, paid in Base Sepolia USDC
+node packages/cli/dist/index.js test --target http://localhost:3005/protected --network eip155:84532
+
 # MPP charge — settles a real testnet payment
 node packages/cli/dist/index.js mpp-charge --target http://localhost:3002/data
 
@@ -335,45 +334,37 @@ node packages/cli/dist/index.js mpp-channel --target http://localhost:3003/data
 ```
 
 
-The two captures at the top of this README ran against these fixtures, from the
-published packages rather than a local build: the CLI capture opens with
-`--version` printing `0.6.0`, and the MCP session started the server through
-`npx -y @wasit-dev/server@0.6.0`. The
-raw asciinema captures are [`docs/media/x402-0.6.0.cast`](docs/media/x402-0.6.0.cast)
-and [`docs/media/mcp-0.6.0.cast`](docs/media/mcp-0.6.0.cast), replayable with
-`asciinema play`. The 0.4.0 captures submitted as SOW evidence stay available:
-the CLI at [`docs/media/d1-x402.gif`](docs/media/d1-x402.gif), the MCP session in
-the [v0.4.0 release](https://github.com/wasit-dev/wasit/releases/tag/v0.4.0).
-
-The MCP session is worth a second look. It calls `wasit_mpp_charge_test`
-and then `wasit_mpp_channel_test` back to back in a single server process. Until
-0.4.0 that sequence failed every time, for a reason that had nothing to do with
-the target being tested:
-[the write-up](docs/evidence/2026-09-17-cross-check-isolation-run.md).
-
-A passing run looks like this:
+A passing run looks like this, from the Stellar fixture on 0.7.0:
 
 ```
 PASS  X402-01  402 Response Status
       Server responded with 402 as required.
 ...
 PASS  X402-06  Signature Resubmit Accepted
-      Valid payment accepted (HTTP 200) and settled on-chain for exactly the advertised 100000 base units of CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA to GALVZ57VAY6BE33WYPJMUJ27PFAUDRQ6ATTVMIIF4STTGQTXDBEIBXUI, verified from the transfer event (tx 741c155b620641a7f8845c14e7857201aed67763ea7ca087a7adf921b550a474).
+      Valid payment accepted (HTTP 200) and settled on-chain for exactly the advertised 100000 base units of CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA to GDPAPDZWAKBXUPCNMI4YHAZ7DS7UOUTPGXAFDSWZG4URRMWHFSQTDQBM, verified from the transfer event (tx 1b569989e64253c8fd4714400e7aa08b126db4b049573e88fa7febe0e9f1792d).
 PASS  X402-07  Invalid Signature Rejected
-      Payment with a corrupted authorization signature correctly rejected (HTTP 402).
+      Payment with a corrupted authorization signature correctly rejected (HTTP 402: invalid_exact_stellar_payload_simulation_failed).
+PASS  X402-08  Payment Replay Rejected
+      The same payment, sent again, was refused (HTTP 402: invalid_exact_stellar_payload_simulation_failed).
+PASS  X402-09  Underpayment Rejected
+      A validly signed payment for 50000 of the advertised 100000 base units was refused (HTTP 402: invalid_exact_stellar_payload_wrong_amount).
+PASS  X402-10  Expired Authorization Rejected
+      A payment whose authorization had expired was refused (HTTP 402: invalid_exact_stellar_payload_simulation_failed).
 
-7 passed.
+10 passed.
 ```
 
-A failing one distinguishes what broke from what was never tested:
+A failing one distinguishes what broke from what was never tested, and says what
+to change:
 
 ```
 FAIL  X402-01  402 Response Status
       Expected status 402, got 404.
+      Fix: A 404 usually means the wrong path or method. Check the URL, and pass the method the endpoint uses (--method POST, MCP `method`).
+      Docs: https://usewasit.dev/docs/checks/x402
 
 SKIP  X402-02  Payment Header Present
-      Skipped: the target answered 404 rather than 402, so it issued no
-      payment challenge to inspect.
+      Skipped: the target answered 404 rather than 402, so it issued no payment challenge to inspect.
 ...
 0 passed, 1 failed, 4 skipped.
 ```
@@ -412,8 +403,7 @@ users actually experience. The revision notes in
 
 ## Roadmap
 
-- Run the suite against a third-party service with the operator's explicit
-  authorization — the existing evidence runs don't qualify, see Status above
+- x402 payments on BNB Smart Chain testnet (its read checks already apply)
 - Expand the catalogue as the x402 and MPP specs stabilise
 - Evidence documents under `docs/evidence/` for each verified run
 

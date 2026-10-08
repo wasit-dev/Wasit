@@ -192,8 +192,8 @@ wasit mpp-charge --target <url> [options]
 |---|---|---|
 | `--target <url>` | required | The paid resource |
 | `--payer-key <key>` | `MPP_PAYER_SECRET` | Secret key, `S...` |
-| `--network <id>` | `MPP_STELLAR_NETWORK` | CAIP-2 |
-| `--rpc-url <url>` | testnet default | Required for pubnet |
+| `--network <id>` | `MPP_STELLAR_NETWORK` | CAIP-2. Only a challenge on this network is paid |
+| `--rpc-url <url>` | testnet default | Used for the payment and the settlement read; https only. Required for pubnet |
 | `--json` | off | Machine-readable output (see below) instead of formatted text |
 
 **Every run settles a real payment.** There is no read-only mode: charge mode
@@ -293,7 +293,7 @@ about the challenge itself: `v1-challenge` is a complete v1 challenge
 `X402-03`. They answer any payment with 402 and log which header it came in.
 The official x402 SDK client pays `v1-challenge` as v1 and refuses
 `malformed-header` without paying
-([evidence](../evidence/2026-10-05-wallet-network-and-serve-modes-run.md)).
+([evidence](../evidence/2026-10-05-0.7.0-verification-runs.md#part-5-payer-keys-for-base-sepolia-and-solana-and-two-new-serve-modes)).
 
 ## Reading output
 

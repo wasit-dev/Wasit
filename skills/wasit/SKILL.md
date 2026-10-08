@@ -17,7 +17,9 @@ that gap the way `stellar-anchor-tests` fills it for SEP-24/31 anchors, and in
 doing so has already surfaced three reproducible defects in the official SDKs
 (`stellar-mpp-sdk#66`, `#67`, `#70`), not hypothetical bugs.
 
-Testnet only. Mainnet is explicitly out of scope. Not a security audit: no
+Testnet only. Mainnet is explicitly out of scope, and a target cannot opt a run
+into it: Wasit signs only for the network the run names, and a challenge for
+any other gets nothing signed. Not a security audit: no
 source or bytecode is read. Complementary to Scout, the Certora Sunbeam
 Prover, Komet, and OpenZeppelin's Soroban detectors, not a replacement for any
 of them.

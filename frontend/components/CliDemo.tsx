@@ -35,13 +35,15 @@ interface Script {
 // a target that conforms. Illustrative numbers (channel balance, ledger)
 // stand in for values that are only known at run time, the same way
 // "https://api.example.com/paid-endpoint" stands in for a real target URL.
-// X402-06's amount, addresses and transaction come from a real testnet run
-// of 0.6.0 against Stellar's reference paywall.
+// Every x402 line, including X402-06's amount, addresses and transaction and
+// the refusal reasons of X402-07..10, is copied from a real testnet run of
+// 0.7.0 against Wasit's own Stellar fixture (2026-10-06,
+// docs/evidence/2026-10-06-0.7.0-verification-runs.md).
 
 const X402_SCRIPT: Script = {
   command: "wasit test --target https://api.example.com/paid-endpoint",
   ariaLabel:
-    "Example wasit test run against a paid endpoint: all seven x402 checks pass, including a payment whose settlement is verified on-chain and a check that a payment with a corrupted authorization signature is refused with HTTP 402.",
+    "Example wasit test run against a paid endpoint: all ten x402 checks pass, including a payment whose settlement is verified on-chain and four payments the endpoint must refuse (a corrupted signature, a replay, an underpayment and an expired authorization), each refused with HTTP 402 and its reason.",
   results: [
     {
       status: "PASS",
@@ -78,13 +80,38 @@ const X402_SCRIPT: Script = {
       id: "X402-06",
       name: "Signature Resubmit Accepted",
       detail:
-        "Valid payment accepted (HTTP 200) and settled on-chain for exactly the advertised 100000 base units of CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA to GALVZ57VAY6BE33WYPJMUJ27PFAUDRQ6ATTVMIIF4STTGQTXDBEIBXUI, verified from the transfer event (tx 741c155b620641a7f8845c14e7857201aed67763ea7ca087a7adf921b550a474).",
+        "Valid payment accepted (HTTP 200) and settled on-chain for exactly the advertised 100000 base units of CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA to GDPAPDZWAKBXUPCNMI4YHAZ7DS7UOUTPGXAFDSWZG4URRMWHFSQTDQBM, verified from the transfer event (tx 19a00c3f0f8ad80d6245cf4431c968b4b5b2f91c78ad037538ed3cce7a53b56f).",
     },
     {
       status: "PASS",
       id: "X402-07",
       name: "Invalid Signature Rejected",
-      detail: "Payment with a corrupted authorization signature correctly rejected (HTTP 402).",
+      detail:
+        "Payment with a corrupted authorization signature correctly rejected (HTTP 402: invalid_exact_stellar_payload_simulation_failed).",
+      negative: true,
+    },
+    {
+      status: "PASS",
+      id: "X402-08",
+      name: "Payment Replay Rejected",
+      detail:
+        "The same payment, sent again, was refused (HTTP 402: invalid_exact_stellar_payload_simulation_failed).",
+      negative: true,
+    },
+    {
+      status: "PASS",
+      id: "X402-09",
+      name: "Underpayment Rejected",
+      detail:
+        "A validly signed payment for 50000 of the advertised 100000 base units was refused (HTTP 402: invalid_exact_stellar_payload_wrong_amount).",
+      negative: true,
+    },
+    {
+      status: "PASS",
+      id: "X402-10",
+      name: "Expired Authorization Rejected",
+      detail:
+        "A payment whose authorization had expired was refused (HTTP 402: invalid_exact_stellar_payload_simulation_failed).",
       negative: true,
     },
   ],

@@ -20,7 +20,7 @@ In a project on TypeScript 6 or 7, npm prints `ERESOLVE overriding peer dependen
 warnings while installing: they come from `@solana/kit` 5, which the Solana support
 depends on through `@x402/svm`, and which declares an optional peer `typescript ^5`.
 The install succeeds and core runs; measured with TypeScript 5.8, 6.0 and 7.0
-([evidence](https://github.com/wasit-dev/wasit/blob/main/docs/evidence/2026-10-05-solana-devnet-verification-run.md#installing-alongside-typescript)).
+([evidence](https://github.com/wasit-dev/wasit/blob/main/docs/evidence/2026-10-05-0.7.0-verification-runs.md#installing-alongside-typescript)).
 
 ## Usage
 

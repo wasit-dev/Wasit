@@ -2,7 +2,44 @@
 
 All notable changes to Wasit are recorded here. Versions follow [Semantic Versioning](https://semver.org/): patch releases are fixes, minor releases add checks or features without breaking existing usage, major releases break something.
 
-## [Unreleased]
+## [0.7.0] — 2026-10-08
+
+All three packages, versioned together as usual. The x402 payment checks now
+pay on Base Sepolia, Ethereum Sepolia and Solana devnet as well as Stellar
+testnet, and three negative payment checks join them (`X402-08` to `X402-10`),
+for sixteen checks in all. `X402-04` and `X402-05` read every payment option, on
+any chain, and every FAIL says what to change. `MPP-01` now signs only for the
+network the run names. New in the CLI: `wasit serve`, a paywall that misbehaves
+on purpose, and `wasit wallet --network`.
+
+**Results can change on upgrade.** A service on a chain other than Stellar now
+passes `X402-05` where it failed. A challenge with a broken second option now
+fails `X402-04` or `X402-05` where it passed. A challenge without `scheme`,
+`asset` or `maxTimeoutSeconds`, or with a wrongly typed field, now fails
+`X402-04`. A target that accepts replayed, underpaid or expired payments now fails
+`X402-08`, `X402-09` or `X402-10`; one that refuses even a valid payment now gets
+`X402-07` skipped instead of passed. A payer whose balance is below the price now
+gets no verdict from `X402-06`, and nothing is sent. A target that asks `MPP-01`
+to pay on a network other than the run's now gets no verdict and is not paid,
+an http `--rpc-url` now stops `MPP-01` before anything is sent, and a target
+that answers 402 after being paid has that 402 reported instead of being paid
+again.
+
+**Fixed — `MPP-01` signs only for the network the run names, and pays once.**
+`MPP-01` read the amount, currency and recipient from the target's challenge
+but not its network, and the SDK's charge client signs for whichever network
+the challenge names, through its own default RPC endpoint for it. A target
+asking for `stellar:pubnet` could therefore have a mainnet transfer, for the
+amount it chose, signed by the payer key if that account holds mainnet funds.
+This is read from the SDK's source (`@stellar/mpp` 0.7.1), not run: it would
+need mainnet funds. A challenge for any network but the run's is now refused before anything
+is signed, on the unpaid read and on the request actually paid, with no verdict
+(`ERROR (configuration)`); a network that is not `stellar:testnet` or
+`stellar:pubnet` fails. The payment now goes through the run's RPC endpoint
+(`--rpc-url`, MCP: `rpcUrl`) rather than the SDK's default, so an http endpoint,
+which the SDK's client refuses, now stops the run before anything is sent. And
+it is made once: the SDK's client paid up to three times when a target kept
+answering 402 after being paid.
 
 **Changed — `X402-04` and `X402-05` read every payment option, on any chain.**
 Both read only `accepts[0]`, and `X402-05` accepted only `stellar:testnet` and
@@ -59,7 +96,7 @@ EIP-3009, and Permit2 with its approval signed as a gas-sponsored EIP-2612 permi
 `ERROR (setup)`, not a failure). Against Wasit's own Base Sepolia fixtures, both
 methods pass with `X402-06` settled on-chain and the payer holding no ETH; against `wasit serve` posing on Base
 Sepolia, the lying modes fail both checks
-([evidence](docs/evidence/2026-10-05-base-sepolia-verification-run.md)). Stellar stays
+([evidence](docs/evidence/2026-10-05-0.7.0-verification-runs.md#part-1-x402-payment-checks-on-base-sepolia-eip-3009-and-permit2)). Stellar stays
 the default; MPP is Stellar only. Under the hood, the payment checks now go through a
 per-chain adapter, and the x402 SDK moves from 2.19 to 2.28.
 
@@ -72,7 +109,7 @@ for a settled transaction is now per network: 10 blocks on Sepolia, whose blocks
 seconds apart. No public facilitator settles Ethereum Sepolia, so Wasit's own fixture
 runs the SDK's facilitator itself. Against it, all ten pass with the settlement read back
 independently; against `wasit serve` there, the lying modes fail
-([evidence](docs/evidence/2026-10-06-ethereum-sepolia-verification-run.md)). BNB Smart
+([evidence](docs/evidence/2026-10-06-0.7.0-verification-runs.md#part-1-x402-payment-checks-on-ethereum-sepolia)). BNB Smart
 Chain testnet stays read-only.
 
 **Added — the x402 payment checks pay on Solana devnet.** `--network
@@ -87,7 +124,7 @@ the RPC confirms has expired, since on Solana the blockhash, not `maxTimeoutSeco
 sets a payment's lifetime. Against Wasit's own Solana fixture, all ten pass with the
 settlement read back independently and the payer holding no SOL; against `wasit serve`
 on devnet, the lying modes fail
-([evidence](docs/evidence/2026-10-05-solana-devnet-verification-run.md)). The payee's
+([evidence](docs/evidence/2026-10-05-0.7.0-verification-runs.md#part-3-x402-payment-checks-on-solana-devnet)). The payee's
 token account must exist before the payment. Library users with TypeScript 6 or 7 see
 npm peer warnings from `@solana/kit` 5 at install; the install succeeds and core runs.
 
@@ -101,7 +138,8 @@ target's stated reason, when it gives one. Against Wasit's own fixtures all thre
 all three chains, refused for the reason each is about
 (`invalid_exact_stellar_payload_wrong_amount`, `invalid_exact_evm_payload_authorization_value_mismatch`,
 `invalid_exact_evm_payload_authorization_valid_before`, `invalid_exact_svm_payload_amount_mismatch`,
-...); against `wasit serve --mode no-settle` all three fail. `X402-08` is skipped when the challenge advertises the
+...); against `wasit serve --mode no-settle` all three fail
+([evidence](docs/evidence/2026-10-05-0.7.0-verification-runs.md#part-2-three-new-negative-checks-replay-underpayment-expired-authorization)). `X402-08` is skipped when the challenge advertises the
 `payment-identifier` extension, whose cached replies are legitimate. The catalogue grows
 from 13 to 16 checks. `X402-10` waits about 20 seconds on Stellar for the authorization
 to expire.
@@ -131,7 +169,7 @@ payer's balance of the advertised asset before it signs; below the price, it rep
 unfunded payer used to fail `X402-06` on Solana devnet, for a reason real defects give
 too, and to stop on Stellar with only the token's error code. A balance that cannot be
 read pays as before. Measured on all three chains with fresh payers
-([evidence](docs/evidence/2026-10-05-payer-balance-check-run.md)).
+([evidence](docs/evidence/2026-10-05-0.7.0-verification-runs.md#part-4-x402-06-reads-the-payers-balance-before-paying)).
 
 **Changed — a payer key for the wrong chain, or a malformed one, stops the run at
 preflight.** It used to surface mid-payment as a harness error. The message never
@@ -152,7 +190,7 @@ challenge (Base Sepolia and Solana devnet; v1 names no Stellar network), and
 `malformed-header` a `PAYMENT-REQUIRED` header that does not decode; both answer a
 payment with 402 and log which header it came in. The official SDK client pays the
 first as v1 and refuses the second without paying
-([evidence](docs/evidence/2026-10-05-wallet-network-and-serve-modes-run.md)).
+([evidence](docs/evidence/2026-10-05-0.7.0-verification-runs.md#part-5-payer-keys-for-base-sepolia-and-solana-and-two-new-serve-modes)).
 
 **Added — `wasit wallet --network` for the Base Sepolia and Solana devnet payers.**
 `wasit wallet create --role x402 --network eip155:84532` (or Solana devnet) generates the
@@ -165,14 +203,6 @@ lists `EVM_PRIVATE_KEY` and `SVM_PRIVATE_KEY`.
 **Changed — the CLI's payment warning says when it applies.** It said funds
 would move before every payment run, including runs where the target offered
 no option on the run's network and nothing was paid.
-
-**Results can change on upgrade.** A service on a chain other than Stellar now
-passes `X402-05` where it failed. A challenge with a broken second option now
-fails `X402-04` or `X402-05` where it passed. A challenge without `scheme`,
-`asset` or `maxTimeoutSeconds`, or with a wrongly typed field, now fails
-`X402-04`. A target that accepts replayed, underpaid or expired payments now fails
-`X402-08`, `X402-09` or `X402-10`; one that refuses even a valid payment now gets
-`X402-07` skipped instead of passed.
 
 ## [0.6.0] — 2026-09-30
 

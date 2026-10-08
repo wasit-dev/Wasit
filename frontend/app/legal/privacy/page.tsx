@@ -5,7 +5,7 @@ import { DocsToc } from "@/components/docs-toc"
 
 export const metadata: Metadata = {
   title: "Privacy Policy — Wasit",
-  description: "Privacy Policy for Wasit, an open-source protocol-compliance tester for the x402 and MPP protocols on Stellar.",
+  description: "Privacy Policy for Wasit, an open-source protocol-compliance tester for the x402 and MPP payment protocols.",
 }
 
 export default function PrivacyPage() {
