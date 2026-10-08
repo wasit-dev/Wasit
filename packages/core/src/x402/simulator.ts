@@ -6,6 +6,7 @@ import {
   assertHttpUrl,
   fetchTarget,
 } from "../errors.js";
+import { checkNetworkIdentifier, checkRequiredFields } from "./requirements.js";
 
 export type { CheckResult };
 
@@ -125,6 +126,29 @@ const READ_CHECKS: ReadonlyArray<readonly [string, string]> = [
   ["X402-05", "Network Identifier Valid"],
 ];
 
+/** What a wrong status on an unpaid request usually means, and what to do. */
+function statusHint(status: number): string {
+  if (status >= 200 && status < 300) {
+    return (
+      `The route served HTTP ${status} without payment: put the x402 payment ` +
+      `middleware in front of it, so unpaid requests get 402 and a challenge.`
+    );
+  }
+  if (status === 401 || status === 403) {
+    return (
+      `Answer an unpaid request with 402, not ${status}: authentication errors ` +
+      `and payment challenges are different signals, and x402 clients act only on 402.`
+    );
+  }
+  if (status === 404 || status === 405) {
+    return (
+      `A ${status} usually means the wrong path or method. Check the URL, and ` +
+      `pass the method the endpoint uses (--method POST, MCP \`method\`).`
+    );
+  }
+  return "Answer an unpaid request with 402 Payment Required and the challenge in a PAYMENT-REQUIRED header.";
+}
+
 /** Skips every check after `id`, naming the one cause they all depend on. */
 function skipAfter(id: string, reason: string): CheckResult[] {
   const index = READ_CHECKS.findIndex(([candidate]) => candidate === id);
@@ -137,85 +161,6 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
   return typeof value === "object" && value !== null
     ? (value as Record<string, unknown>)
     : undefined;
-}
-
-/** x402 v2 nests the payment terms inside `accepts[]`, not at the top level. */
-function firstAccept(payload: unknown): Record<string, unknown> | undefined {
-  const accepts = asRecord(payload)?.["accepts"];
-  return Array.isArray(accepts) ? asRecord(accepts[0]) : undefined;
-}
-
-/**
- * The field carrying the price, per protocol version.
- *
- * x402 v2 renamed `maxAmountRequired` to `amount` and dropped the embedded
- * resource object. Checking for whichever name happens to be present would
- * hide a real conformance failure: a service advertising `x402Version: 2`
- * while emitting the v1 field name is not conformant to the version it claims.
- */
-const PRICE_FIELD: Readonly<Record<1 | 2, "maxAmountRequired" | "amount">> = {
-  1: "maxAmountRequired",
-  2: "amount",
-};
-
-function isSupportedVersion(value: unknown): value is 1 | 2 {
-  return value === 1 || value === 2;
-}
-
-function nonEmptyString(value: unknown): boolean {
-  return typeof value === "string" && value.length > 0;
-}
-
-/** X402-04: the challenge must carry price, network, and payTo. */
-function checkRequiredFields(payload: unknown): CheckResult {
-  const version = asRecord(payload)?.["x402Version"];
-  const accept = firstAccept(payload);
-
-  if (!isSupportedVersion(version)) {
-    return {
-      id: "X402-04",
-      name: "Required Fields Present",
-      pass: false,
-      detail:
-        `Challenge advertises x402Version ${JSON.stringify(version)}, which is ` +
-        `neither 1 nor 2. The payment terms use different field names per ` +
-        `version, so they cannot be checked against an unknown one.`,
-    };
-  }
-
-  const expected = PRICE_FIELD[version];
-  const wrongVersionField = version === 2 ? "maxAmountRequired" : "amount";
-
-  // A v2 challenge carrying the v1 field name is a specific, actionable
-  // failure — say which name was found and which one the version requires,
-  // rather than reporting the price as simply absent.
-  if (!nonEmptyString(accept?.[expected]) && accept?.[wrongVersionField] !== undefined) {
-    return {
-      id: "X402-04",
-      name: "Required Fields Present",
-      pass: false,
-      detail:
-        `Challenge advertises x402Version ${version} but carries ` +
-        `\`${wrongVersionField}\`, which is the v${version === 2 ? 1 : 2} field ` +
-        `name. v${version} requires \`${expected}\`.`,
-    };
-  }
-
-  const missing = [
-    nonEmptyString(accept?.[expected]) ? null : expected,
-    nonEmptyString(accept?.["network"]) ? null : "network",
-    nonEmptyString(accept?.["payTo"]) ? null : "payTo",
-  ].filter((entry): entry is string => entry !== null);
-
-  return {
-    id: "X402-04",
-    name: "Required Fields Present",
-    pass: missing.length === 0,
-    detail:
-      missing.length === 0
-        ? `All required v${version} fields present.`
-        : `Missing: ${missing.join(", ")}.`,
-  };
 }
 
 /**
@@ -244,31 +189,6 @@ async function readText(response: Response): Promise<string> {
   } catch {
     return "";
   }
-}
-
-/** X402-05: the network identifier must be CAIP-2. */
-function checkNetworkIdentifier(payload: unknown): CheckResult {
-  const network = firstAccept(payload)?.["network"];
-
-  // Absent is X402-04's finding, not a second one: report it there only.
-  if (typeof network !== "string" || network.length === 0) {
-    return skipped(
-      "X402-05",
-      "Network Identifier Valid",
-      "the challenge carries no network field to validate (see X402-04).",
-    );
-  }
-
-  const pass = /^stellar:(testnet|pubnet)$/.test(network);
-  return {
-    id: "X402-05",
-    name: "Network Identifier Valid",
-    pass,
-    detail: pass
-      ? `Network identifier "${network}" is valid.`
-      : `"${network}" does not match stellar:testnet or stellar:pubnet, the CAIP-2 ` +
-        `identifiers the \`exact\` scheme on Stellar defines.`,
-  };
 }
 
 /**
@@ -320,6 +240,7 @@ export async function runX402ReadChecks(
     detail: statusPass
       ? "Server responded with 402 as required."
       : `Expected status 402, got ${response.status}.`,
+    ...(statusPass ? {} : { hint: statusHint(response.status) }),
   };
 
   if (!statusPass) {
@@ -358,6 +279,17 @@ export async function runX402ReadChecks(
             `scheme on Stellar is defined for v2 only, which signals payment in ` +
             `the PAYMENT-REQUIRED header.`
           : "Neither PAYMENT-REQUIRED nor X-Payment header was present.",
+    ...(headerValue !== null
+      ? {}
+      : {
+          hint:
+            v1Payload !== undefined
+              ? "Move to x402 v2: send the challenge base64-encoded in a " +
+                "PAYMENT-REQUIRED response header instead of the body, with " +
+                "x402Version 2 and v2 field names."
+              : "Send the challenge as base64-encoded JSON in a PAYMENT-REQUIRED " +
+                "response header, as the x402 v2 HTTP transport defines.",
+        }),
   };
 
   if (headerValue === null && v1Payload !== undefined) {
@@ -401,6 +333,9 @@ export async function runX402ReadChecks(
         name: "Header Payload Decodable",
         pass: false,
         detail: `Failed to decode/parse: ${(error as Error).message}`,
+        hint:
+          "Base64-encode the JSON PaymentRequired object for the header; raw " +
+          "JSON or a truncated value does not decode.",
       },
       ...skipAfter(
         "X402-03",
@@ -453,11 +388,22 @@ class PaymentNotAttemptedError extends Error {
 
 function buildX402Client(network: string, payerSecretKey: string) {
   const signer = createEd25519Signer(payerSecretKey, network as `${string}:${string}`);
-  const client = new x402Client().register(
-    "stellar:*",
-    new ExactStellarClientScheme(signer),
-  );
+  const client = new x402Client()
+    .register("stellar:*", new ExactStellarClientScheme(signer))
+    // A challenge may offer several networks, including both Stellar ones.
+    // The client's default pick is the first it supports, which would sign
+    // for one network with a signer built for another; pay only on the
+    // network this run was asked to use.
+    .registerPolicy((_version, requirements) =>
+      requirements.filter((requirement) => requirement.network === network),
+    );
   return { client, httpClient: new x402HTTPClient(client) };
+}
+
+/** The networks a challenge offers, for a report. */
+function describeOffered(accepts: ReadonlyArray<{ readonly network: string }>): string {
+  const networks = [...new Set(accepts.map((requirement) => requirement.network))];
+  return networks.length === 0 ? "none" : networks.join(", ");
 }
 
 /**
@@ -497,6 +443,27 @@ async function preparePayment(options: X402PaymentCheckOptions) {
     );
   }
 
+  // A target that offers no option Wasit can pay has not refused anything:
+  // there is no payment to judge, so neither check gets a verdict. X402-05
+  // already reports which networks it advertises.
+  const onNetwork = paymentRequired.accepts.filter(
+    (requirement) => requirement.network === options.network,
+  );
+  if (onNetwork.length === 0) {
+    throw new PaymentNotAttemptedError(
+      `the target offers no payment option on ${options.network} (it offers ` +
+        `${describeOffered(paymentRequired.accepts)}), so no payment was ` +
+        `attempted (see X402-05).`,
+    );
+  }
+  if (!onNetwork.some((requirement) => requirement.scheme === "exact")) {
+    throw new PaymentNotAttemptedError(
+      `the target's ${options.network} option uses the ` +
+        `"${onNetwork[0]!.scheme}" scheme, and Wasit pays through the \`exact\` ` +
+        `scheme only, so no payment was attempted.`,
+    );
+  }
+
   const paymentPayload = await client.createPaymentPayload(paymentRequired);
   return { httpClient, paymentPayload };
 }
@@ -518,7 +485,7 @@ export function readSettlementReference(
     readonly transaction?: string;
     readonly errorReason?: string;
   },
-): { readonly reference: string } | { readonly failure: string } {
+): { readonly reference: string } | { readonly failure: string; readonly hint: string } {
   let settlement;
   try {
     settlement = readSettlement();
@@ -528,6 +495,9 @@ export function readSettlementReference(
         `Valid payment accepted (HTTP ${status}), but the response carried no ` +
         `PAYMENT-RESPONSE header, which the x402 v2 HTTP transport uses to ` +
         `report settlement. Whether the payment settled cannot be verified.`,
+      hint:
+        "After settling, return the facilitator's settle result base64-encoded " +
+        "in a PAYMENT-RESPONSE header; the official x402 middleware does this.",
     };
   }
 
@@ -541,6 +511,9 @@ export function readSettlementReference(
         `Valid payment accepted (HTTP ${status}), but its PAYMENT-RESPONSE ` +
         `reports ${settlement.success ? "success" : "failure"} with transaction ` +
         `${JSON.stringify(reference)}, not a settled Stellar transaction hash.`,
+      hint:
+        "PAYMENT-RESPONSE must report `success: true` and carry the settlement " +
+        "transaction's hash in `transaction`.",
     };
   }
   return { reference };
@@ -561,7 +534,7 @@ async function checkSignatureAccepted(
 ): Promise<CheckResult> {
   const id = "X402-06";
   const name = "Signature Resubmit Accepted";
-  const fail = (detail: string): CheckResult => ({ id, name, pass: false, detail });
+  const fail = (detail: string, hint: string): CheckResult => ({ id, name, pass: false, detail, hint });
 
   const { httpClient, paymentPayload } = await preparePayment(options);
   const paymentHeaders = httpClient.encodePaymentSignatureHeader(paymentPayload);
@@ -571,13 +544,18 @@ async function checkSignatureAccepted(
   );
 
   if (paid.status < 200 || paid.status >= 300) {
-    return fail(`Expected 2xx after a valid payment, got ${paid.status}.`);
+    return fail(
+      `Expected 2xx after a valid payment, got ${paid.status}.`,
+      "A valid payment was refused. Your server's log of the facilitator's " +
+        "verify or settle response says why; serve the resource with a 2xx once " +
+        "the payment settles.",
+    );
   }
 
   const read = readSettlementReference(paid.status, () =>
     httpClient.getPaymentSettleResponse((header) => paid.headers.get(header)),
   );
-  if ("failure" in read) return fail(read.failure);
+  if ("failure" in read) return fail(read.failure, read.hint);
   const reference = read.reference;
 
   const accepted = paymentPayload.accepted;
@@ -606,7 +584,12 @@ async function checkSignatureAccepted(
         pass: true,
         detail: `Valid payment accepted (HTTP ${paid.status}) and ${verdict.detail}.`,
       }
-    : fail(verdict.detail);
+    : fail(
+        verdict.detail,
+        "PAYMENT-RESPONSE must name the transaction that settled this payment, " +
+          "and that transaction must move exactly `amount` of `asset` from the " +
+          "payer to `payTo`, in a single transfer.",
+      );
 }
 
 /**
@@ -691,16 +674,32 @@ async function checkInvalidSignatureRejected(
     withPaymentHeaders(options, paymentHeaders),
   );
 
-  const accepted = response.status >= 200 && response.status < 300;
+  return signatureRejectionVerdict(response.status);
+}
+
+/**
+ * X402-07's verdict from the status a corrupted payment drew. Split out so
+ * the verdict can be tested without building a payment.
+ */
+export function signatureRejectionVerdict(status: number): CheckResult {
+  const accepted = status >= 200 && status < 300;
   return {
     id: "X402-07",
     name: "Invalid Signature Rejected",
     pass: !accepted,
     detail: accepted
       ? `A payment with a corrupted authorization signature was accepted with ` +
-        `HTTP ${response.status} — security-relevant failure.`
+        `HTTP ${status} — security-relevant failure.`
       : `Payment with a corrupted authorization signature correctly rejected ` +
-        `(HTTP ${response.status}).`,
+        `(HTTP ${status}).`,
+    ...(accepted
+      ? {
+          hint:
+            "Verify every payment before serving: pass it to the facilitator's " +
+            "verify step and refuse it when verification fails. Never serve on a " +
+            "payload that was only decoded.",
+        }
+      : {}),
   };
 }
 
@@ -715,6 +714,11 @@ export async function runX402PaymentChecks(
   try {
     assertHttpUrl(options.target);
     buildInit(options);
+    // Payment checks pay on Stellar only, and X402-06 can only verify a
+    // settlement it can look up. Resolving the RPC endpoint establishes both
+    // (it rejects any other network) before any money moves, so a run that
+    // could not finish is stopped here rather than after paying.
+    resolveRpcUrl(options.network, options.rpcUrl);
   } catch (error) {
     const preflight = errored("PREFLIGHT", "Run Preflight", error);
     options.onResult?.(preflight);

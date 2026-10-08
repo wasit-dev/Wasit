@@ -15,8 +15,8 @@ in every test report.
 | `X402-01` | 402 Response Status | x402 spec, HTTP semantics | An unpaid request must be answered with status code `402` | Response status is exactly `402`, not `401`/`403`/other |
 | `X402-02` | Payment Header Present | x402 built-on-stellar guide | The 402 response must include a payment header | Either `PAYMENT-REQUIRED` or `X-Payment` header is present (both are checked — the spec itself is not yet consistent, see note in README). An x402 v1 challenge in the response body fails this check, and `X402-03`–`05` still inspect it; see the note on v1 below |
 | `X402-03` | Header Payload Decodable | x402 spec §payment-required-object | The header value must be valid base64 that decodes to JSON | `atob()` + `JSON.parse()` succeed without error |
-| `X402-04` | Required Fields Present | x402 spec §payment-required-object | The payload must include the core payment terms, under the field names its own advertised version requires | `network` and `payTo` are present and non-empty, and the price field matches the advertised `x402Version`: `maxAmountRequired` for v1, `amount` for v2 (renamed in v2, which also drops the embedded resource object). The version is read from the challenge rather than accepting whichever name happens to appear, because a service advertising `x402Version: 2` while emitting the v1 field name is not conformant to the version it claims — and reporting that as a merely absent price would hide the actual defect. An unrecognised version fails: the field names cannot be checked against a version whose schema is unknown. |
-| `X402-05` | Network Identifier Valid | x402 built-on-stellar guide | Network id format follows CAIP-2 | Matches the pattern `stellar:testnet` or `stellar:pubnet` |
+| `X402-04` | Required Fields Present | x402 spec §payment-required-object | The payload must include the core payment terms, under the field names its own advertised version requires | Checked in **every** payment option in `accepts`, each reported by its index when the challenge offers more than one; a challenge with no options fails. In each option, every field the advertised `x402Version` requires is present: for v2 `scheme`, `network`, `amount`, `asset`, `payTo` and `maxTimeoutSeconds` (spec 5.1.2); for v1 `scheme`, `network`, `maxAmountRequired`, `asset`, `payTo`, `resource`, `description` and `maxTimeoutSeconds` (v1 spec 5.1). Each is a non-empty string, except `maxTimeoutSeconds`, a positive number of seconds; a field present with the wrong type is reported as such rather than as missing. The price field follows the version: `maxAmountRequired` for v1, `amount` for v2 (renamed in v2, which also moves the resource out of the option). The version is read from the challenge rather than accepting whichever name happens to appear, because a service advertising `x402Version: 2` while emitting the v1 field name is not conformant to the version it claims — and reporting that as a merely absent price would hide the actual defect. An unrecognised version fails: the field names cannot be checked against a version whose schema is unknown. |
+| `X402-05` | Network Identifier Valid | x402 v2 spec §11.1; CAIP-2 | Every advertised network id is CAIP-2 | Every option's `network` is a CAIP-2 identifier, `namespace:reference` with a 3 to 8 character lowercase namespace and a reference of at most 32 characters, as x402 v2 requires. Where the namespace's own CAIP-2 definition fixes the reference, that is checked too: `stellar` is `testnet` or `pubnet`; `eip155` is the chain id in base 10 (`eip155:84532`, not `eip155:0x14a34`); `solana` is the first 32 characters of the base58 genesis hash. A well-formed id in another namespace passes, and the result says only the format was checked there: x402 v2 asks for CAIP-2 and nothing more, so failing it would report Wasit's own lack of rules as the target's defect. An option without a `network` is left to `X402-04`. |
 | `X402-06` | Signature Resubmit Accepted | x402 spec §payment-flow | A resubmitted request carrying a valid signature must be accepted | Response is no longer 402; a 2xx returns the original resource. The challenge is re-read immediately before signing, so the payment answers a challenge the target issued just now rather than a stale one. **Settles a real payment** — see the cost note below. A 2xx alone does not pass. The settlement the response reports in its `PAYMENT-RESPONSE` header (x402 v2 HTTP transport) must name a Stellar transaction hash, and that transaction is then looked up on Stellar RPC and held to the advertised terms exactly as `MPP-01` does: it must have succeeded and emitted exactly one `transfer` event, from this run's payer, to the advertised `payTo`, for the advertised `amount` of the advertised `asset`. A missing header, a reported failure, or a hash that does not match fails. A `settlement_pending` response, which the spec defines as broadcast but unconfirmed, is reconciled on chain rather than failed. Uses the same RPC wait as `MPP-01`. |
 | `X402-07` | Invalid Signature Rejected *(negative)* | x402 spec §payment-flow; `exact` scheme on Stellar | A payment whose authorization signature is wrong must be REJECTED | The target answers with a non-2xx status. The payment is built exactly as for `X402-06`, then only the client's authorization signature is corrupted: in the `exact` scheme on Stellar the client signs a Soroban authorization entry rather than the envelope, and one byte of that entry's `signature` is flipped. The transaction still decodes and carries the same amount, payer and recipient, so a target can refuse it only by verifying the signature. Measured against the `x402.org` facilitator on 2026-09-30, the rejection is `invalid_exact_stellar_payload_simulation_failed`, reached at the Soroban simulation that checks authorization; the pre-0.6.0 corruption, which overwrote the base64 tail and broke XDR decoding, drew `invalid_exact_stellar_payload_malformed` instead, and a target that decoded the envelope without verifying the signature passed it. Rejection is established only by an answer: a target that cannot be reached, or whose challenge cannot be read, produces no verdict and is reported as ERROR or SKIP, and a payload with no authorization signature to corrupt reports `ERROR (setup)`. |
 
@@ -49,12 +49,24 @@ identifiers ([scheme_exact_stellar.md](https://github.com/x402-foundation/x402/b
 Stellar service fails `X402-02`, and the failure says a v1 challenge was found
 in the body. Its terms are still worth reading, so `X402-03`–`05` inspect the
 body instead of being skipped: `X402-04` applies the v1 field names, and
-`X402-05` reports whether the network is a CAIP-2 identifier. `X402-06` and
+`X402-05` reports whether the network is a CAIP-2 identifier (v1 used plain
+names such as `base-sepolia`, and the failure says so). `X402-06` and
 `X402-07` are **skipped**: Wasit pays through the v2 `exact` scheme, so no
 payment is built or sent, and neither check has a verdict. The same holds for
 any challenge the payment client cannot read. Before 0.5.0 both reported FAIL
 in that case, contradicting the `X402-07` row above, and a v1 challenge left
 `X402-03`–`05` skipped.
+
+**Note on networks (0.7.0).** `X402-01`–`05` read the challenge only, so they
+apply to an x402 service on any chain. The payment checks pay through the
+`exact` scheme on Stellar, on the network the run names (`stellar:testnet` by
+default). When a challenge offers several options, the payment is built for
+the option on that network; a challenge with no such option, or only one in
+another scheme, gets `X402-06` and `X402-07` **skipped** with the networks it
+does offer, since nothing was paid and nothing refused. Asking for a network
+other than `stellar:testnet` or `stellar:pubnet`, or for pubnet without an RPC
+endpoint, stops the run before any payment, as no settlement could be
+verified.
 
 ## MPP — Charge Mode
 
@@ -194,3 +206,141 @@ payment rather than authorisation; configuring it with the funder's key produces
 a transaction that reaches the chain and fails there with an opaque
 `scecInvalidAction`, which the SDK surfaces as `[object Object]`. By contrast,
 `close_start()` requires `from.require_auth()` — the funder. Both details are documented in [docs/findings/upstream-sdk.md](findings/upstream-sdk.md) for upstream reporting.
+
+## Common failures and fixes
+
+The failures builders hit most often, what each looks like in a run, and what
+fixes it. Every FAIL in a run already carries its own `Fix` line; this page
+collects them by check, with the reasoning. Where a failure was met in a real
+implementation, it links the write-up.
+
+### The unpaid request does not get a 402 (`X402-01`)
+
+- **200**: the route serves without payment. The payment middleware is not in
+  front of it, or protects a different path.
+- **401 or 403**: the endpoint asks for authentication instead of payment.
+  x402 clients act only on 402.
+- **404 or 405**: usually the wrong path or method. An endpoint that computes
+  something often takes POST: `wasit test --method POST --body '{...}'` (MCP:
+  `method` and `body`).
+
+### There is no payment header (`X402-02`)
+
+x402 v2 carries the challenge base64-encoded in the `PAYMENT-REQUIRED` response
+header. A service that puts an x402 v1 challenge in the response body fails
+here, and the result says it found one; its terms are still checked. The
+`exact` scheme on Stellar is defined for v2 only. This is the divergence Wasit
+has met in a real implementation
+([conformance findings](findings/conformance-findings.md), class 1).
+
+### The header does not decode (`X402-03`)
+
+The header value must be the base64 of the JSON `PaymentRequired` object. Raw
+JSON, or a value cut short, does not decode.
+
+### A field is missing or has the wrong type (`X402-04`)
+
+Every option in `accepts` needs every field its `x402Version` requires: for v2,
+`scheme`, `network`, `amount`, `asset`, `payTo` and `maxTimeoutSeconds`. The
+usual slips in a challenge built by hand:
+
+- `maxTimeoutSeconds` left out. The official x402 server SDK sets it to 300
+  when you do not.
+- `amount` sent as a number. It is a string of the token's smallest units,
+  such as `"10000"`.
+- The v1 price name `maxAmountRequired` in a v2 challenge. v2 calls it
+  `amount`.
+
+A challenge built with the official server SDK carries every field.
+
+### The network id is rejected (`X402-05`)
+
+x402 v2 names each network with a CAIP-2 id, `namespace:reference`:
+
+| Network | CAIP-2 id |
+|---|---|
+| Stellar testnet | `stellar:testnet` |
+| Stellar mainnet | `stellar:pubnet` |
+| Base Sepolia | `eip155:84532` |
+| Base | `eip155:8453` |
+| BNB Smart Chain testnet | `eip155:97` |
+| BNB Smart Chain | `eip155:56` |
+| Solana devnet | `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` |
+| Solana mainnet | `solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp` |
+
+The Stellar ids come from the `exact` scheme on Stellar, the Base and Solana ids
+are the x402 v2 specification's own examples (§11.1), and the BNB Smart Chain
+ids are its EIP-155 chain ids. The usual slips:
+
+- A v1 name such as `stellar-testnet` or `base-sepolia`
+  ([conformance findings](findings/conformance-findings.md), class 2).
+- A hex chain id. `eth_chainId` returns hex; the CAIP-2 reference is base 10,
+  so `eip155:0x14a34` is `eip155:84532`.
+- `stellar:mainnet`. Stellar's mainnet is `stellar:pubnet`.
+- A Solana cluster name. The reference is the first 32 characters of the
+  cluster's genesis hash.
+
+### A valid payment is refused (`X402-06`)
+
+Wasit built the payment with the official client, for exactly the advertised
+terms, and the target refused it. The target's own log of the facilitator's
+verify or settle response says why.
+
+### The paid response has no `PAYMENT-RESPONSE` (`X402-06`)
+
+After settling, the server returns the facilitator's settle result,
+base64-encoded, in `PAYMENT-RESPONSE`; it names the settlement transaction.
+Without it a client cannot tell whether the payment settled, so `X402-06`
+fails. The official x402 middleware sends it. A server that serves without
+settling looks exactly like this, and `wasit serve --mode no-settle` is one,
+for testing an agent against it.
+
+### The settlement does not match (`X402-06`)
+
+The transaction `PAYMENT-RESPONSE` names must have succeeded and moved exactly
+`amount` of `asset` from this run's payer to `payTo`, in one transfer. A server
+that cites another transaction fails, even a real and successful one
+([0.6.0 verification run](evidence/2026-09-30-x402-0.6.0-verification-run.md)).
+
+### A forged signature is accepted (`X402-07`)
+
+The target served a payment whose authorization signature was corrupted: it
+decoded the payment without verifying it. Pass every payment to the
+facilitator's verify step and refuse it when verification fails.
+
+### A charge to a muxed recipient is refused (`MPP-01`)
+
+A charge server on `@stellar/mpp` 0.7.1 configured with a muxed (`M...`)
+recipient cannot verify the payment and refuses it. Since CAP-67, a transfer
+to a muxed address reports its amount in a form the SDK does not read. Use a
+`G...` recipient until the SDK handles it
+([Finding 5](findings/upstream-sdk.md), reported as
+[stellar/stellar-mpp-sdk#89](https://github.com/stellar/stellar-mpp-sdk/issues/89)).
+Wasit reads both forms.
+
+### A stale or replayed voucher is accepted, or refused with 500 (`MPP-11`, `MPP-12`, `MPP-14`)
+
+The server must refuse with 402: a commitment that does not exceed the stored
+cumulative or does not cover the price, a second credential for a challenge
+already used, and an accepted commitment presented under a new challenge. The
+`@stellar/mpp` channel server enforces all three. Refusals reported as HTTP 500
+instead of 402 were seen on the SDK's `main` branch between its `mppx` 0.10.1
+upgrade and the fix in #83, never in a release
+([Finding 4](findings/upstream-sdk.md)).
+
+### No verdict on the channel checks (`ERROR (setup)`)
+
+`MPP-11`, `MPP-12` and `MPP-14` each need one correctly advancing commitment
+accepted first. When three attempts are refused, the run reports no verdict
+rather than a failure, because a channel another payer is advancing at the same
+time looks the same from the client. Re-run against a channel nothing else is
+paying through.
+
+### The payment checks cannot pay
+
+The payment checks need a testnet payer holding testnet USDC.
+`wasit wallet create --role x402 --fund` generates the key and funds it with
+testnet XLM, and `wasit wallet fund --role x402 --asset usdc` adds the USDC
+trustline; the
+balance itself needs one visit to https://faucet.circle.com, since there is no
+scriptable USDC faucet for Stellar (see the CLI guide's wallet setup).

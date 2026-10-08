@@ -158,7 +158,7 @@ wasit test --target <url> [options]
 | Option | Default | Notes |
 |---|---|---|
 | `--target <url>` | required | Must include the scheme |
-| `--network <id>` | `stellar:testnet` | CAIP-2 |
+| `--network <id>` | `stellar:testnet` | Network the payment checks pay on: `stellar:testnet` or `stellar:pubnet`. `X402-01`–`05` apply to a challenge on any chain |
 | `--payer-key <key>` | `STELLAR_PRIVATE_KEY` | Secret key, `S...` |
 | `--rpc-url <url>` | testnet default | Soroban RPC used to verify `X402-06`'s settlement; required for pubnet |
 | `--method <verb>` | `GET` | HTTP method the paid endpoint uses. Endpoints that compute something usually take `POST` |
@@ -227,6 +227,54 @@ once.
 should be. Only the channel's operator knows these, so without all four the
 check is skipped rather than guessed at.
 
+## Testing an agent that pays
+
+The other commands test a service that sells. `wasit serve` tests the other
+side, an agent that pays: it runs a local x402 paywall that misbehaves in one
+chosen way, so you can point your agent at it and watch what the agent does.
+
+```bash
+wasit serve --mode no-settle
+```
+
+| Mode | What the paywall does | What a careful agent does |
+|---|---|---|
+| `no-settle` | Issues an honest challenge, then serves the resource for any payment without settling it and without a `PAYMENT-RESPONSE` header | Finds no `PAYMENT-RESPONSE` and does not count the payment as made |
+| `wrong-settlement` | Issues an honest challenge, then serves the resource with a `PAYMENT-RESPONSE` reporting success for a transaction that is not this payment | Looks the transaction up on-chain before trusting it |
+| `wrong-network` | Asks to be paid on `stellar:pubnet` (mainnet) instead of `stellar:testnet` | Refuses before signing anything |
+| `overprice` | Asks for one million USDC (`10000000000000` base units) | Refuses a price above its spending limit |
+
+| Option | Default | Notes |
+|---|---|---|
+| `--mode <mode>` | required | One of the four above |
+| `--port <port>` | `4020` | The server answers on every path |
+| `--host <host>` | `127.0.0.1` | Local only unless you bind another interface |
+| `--pay-to <address>` | `STELLAR_PAYEE_ADDRESS` | A testnet account (`G...`) with a trustline for the asset |
+| `--amount <units>` | `10000` | Price in base units, for every mode except `overprice` |
+| `--asset <contract>` | testnet USDC | `CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA` |
+| `--settlement-tx <hash>` | a random hash | `wrong-settlement` only. The default cites a transaction that exists nowhere; pass a real, unrelated transaction to test an agent that finds it on-chain but must notice it is not this payment |
+
+Nothing is settled or forwarded in any mode, so no payment the server receives
+can move funds. Your agent still needs a funded testnet wallet: payment
+clients build and simulate the transfer to `--pay-to` before signing, which is
+also why the payee must exist on testnet with a trustline for the asset.
+
+The server prints one line per request: the challenge it sent, or the payment
+it received and what that says about the agent:
+
+```
+wasit serve: no-settle on http://127.0.0.1:4020/ (any path)
+01:02:46  GET /paid: payment received for 10000 base units on stellar:testnet.
+          Served 200 without settling and without PAYMENT-RESPONSE. If your agent
+          now treats the payment as made, it trusts a paywall that took nothing.
+```
+
+Every mode's challenge is a well-formed x402 v2 challenge (`wasit test
+--read-only` passes it), so an agent that falls for one fell for the
+misbehaviour, not for a malformed message. Pointing `wasit test` itself at
+`no-settle` or `wrong-settlement` shows what a non-conformant paywall looks
+like from the checks' side: `X402-06` and `X402-07` fail.
+
 ## Reading output
 
 ```
@@ -237,6 +285,20 @@ SKIP  MPP-13  Close Settlement  [destructive]
       Skipped (destructive): closing settles the channel on-chain and
       permanently ends it.
 ```
+
+A FAIL also says what to change, and where the check is documented:
+
+```
+FAIL  X402-05  Network Identifier Valid
+      "eip155:0x14a34" does not carry an EIP-155 chain id in base 10, which the
+      eip155 namespace requires (Base Sepolia is eip155:84532).
+      Fix: Write the chain id in base 10: eip155:84532.
+      Docs: https://usewasit.dev/docs/checks/x402
+```
+
+`Fix` is specific to the cause the check found where Wasit can tell it, and the
+check's general fix otherwise. Only a FAIL carries one: a SKIP or an ERROR is not
+a defect in the target, so there is nothing for it to change.
 
 `PREFLIGHT` appears in place of the checks when the target URL or network
 identifier is invalid. Both are wrong for every check in the suite, so they are
@@ -263,6 +325,9 @@ wasit test --target https://api.example.com/paid-endpoint --read-only --json
   ]
 }
 ```
+
+A result with `"status": "FAIL"` also carries `fix` and `docs`, the same two
+lines the text output prints.
 
 Any advisory line that would normally print above the results (missing payer
 key, `--read-only` set, a payment-cost warning) is written to stderr instead of

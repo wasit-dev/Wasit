@@ -48,7 +48,7 @@ wasit test --target <url> [options]
 | Option | Default | Notes |
 |---|---|---|
 | `--target <url>` | required | Must include the scheme |
-| `--network <id>` | `stellar:testnet` | CAIP-2 network id |
+| `--network <id>` | `stellar:testnet` | Network the payment checks pay on (`stellar:testnet` or `stellar:pubnet`); `X402-01`–`05` apply on any chain |
 | `--payer-key <key>` | `STELLAR_PRIVATE_KEY` | Testnet secret key, `S...` |
 | `--rpc-url <url>` | testnet default | Soroban RPC used to verify `X402-06`'s settlement |
 | `--method <verb>` | `GET` | HTTP method the paid endpoint uses |
@@ -118,6 +118,19 @@ Testnet-only helpers for the keys the subcommands above read from `.env`. There 
 `fund --asset usdc` opens the Circle testnet USDC trustline automatically, but **receiving a balance always needs one human step**: there is no scriptable USDC faucet for Stellar. Visit [faucet.circle.com](https://faucet.circle.com) once, or set `WASIT_USDC_DISTRIBUTOR_SECRET` to an account you funded that way and every later run sends from it automatically.
 
 `create` prints a secret key to stdout — don't run it on a screen you're recording.
+
+### `wasit serve` — a paywall that misbehaves, for testing an agent that pays
+
+```bash
+wasit serve --mode no-settle            # also: wrong-settlement, wrong-network, overprice
+```
+
+Runs a local x402 paywall that lies in one chosen way: serves without settling,
+cites someone else's settlement, asks for mainnet, or asks for one million USDC.
+Point your agent at `http://127.0.0.1:4020/` and the server reports what the
+agent did. Nothing is settled or forwarded, so no funds move; the agent still
+needs a funded testnet wallet, and `--pay-to` (default `STELLAR_PAYEE_ADDRESS`)
+must be a testnet account with a USDC trustline. See `wasit serve --help`.
 
 ### The interactive dashboard
 

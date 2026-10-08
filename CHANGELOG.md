@@ -2,6 +2,72 @@
 
 All notable changes to Wasit are recorded here. Versions follow [Semantic Versioning](https://semver.org/): patch releases are fixes, minor releases add checks or features without breaking existing usage, major releases break something.
 
+## [Unreleased]
+
+**Changed — `X402-04` and `X402-05` read every payment option, on any chain.**
+Both read only `accepts[0]`, and `X402-05` accepted only `stellar:testnet` and
+`stellar:pubnet`, so a conformant x402 service on another chain failed it, and
+a challenge offering several networks was judged on whichever came first. Both
+now check every option and name the one at fault by its index. `X402-05`
+requires CAIP-2, as x402 v2 does, and applies each namespace's own rules where
+its CAIP-2 definition fixes them: `stellar` is `testnet` or `pubnet`, `eip155`
+is a base-10 chain id, `solana` is the first 32 characters of the base58
+genesis hash. A well-formed id in another namespace passes, and the result says
+only the format was checked. A challenge with no options now fails `X402-04`
+with that reason instead of three missing fields.
+
+**Changed — the payment checks pay only on the network the run names.** A
+challenge offering several options is paid on the option for `--network`
+(MCP: `network`), instead of the first option the client supports, which could
+be the other Stellar network. A challenge with no option on that network, or
+only one in a scheme other than `exact`, gets `X402-06` and `X402-07` skipped
+with the networks it offers; nothing is sent. A `--network` other than
+`stellar:testnet` or `stellar:pubnet`, or pubnet without `--rpc-url`, now stops
+the run at preflight, before any payment, rather than after paying with no way
+to verify the settlement.
+
+**Added — every failure says what to change.** A FAIL now carries a `Fix`
+line and a `Docs` link, in the CLI's text output, in `--json` and in the MCP
+server's `structuredContent` (`fix`, `docs`). Where a check can tell the cause,
+the fix is specific to it: `eip155:0x14a34` is told to write `eip155:84532`, a
+200 on an unpaid request is told to put the payment middleware in front of the
+route, a missing `PAYMENT-RESPONSE` is told what to return. Otherwise it is the
+check's general fix, now part of every catalogue entry (`fix`). Only a FAIL
+carries one; a skip or a no-verdict is not a defect. New in core: `fixFor()`,
+`catalogueEntry()`, `docsUrlFor()`, and an optional `hint` on `CheckResult`.
+The check catalogue gains "Common failures and fixes"
+(`/docs/checks/common-failures`): the failures builders hit most, by check, with
+the reasoning, the CAIP-2 ids of common networks, and links to where each was
+met in a real implementation.
+
+**Changed — `X402-04` checks every field the advertised version requires.**
+It checked three: the price, `network` and `payTo`. x402 v2 requires `scheme`,
+`network`, `amount`, `asset`, `payTo` and `maxTimeoutSeconds` in every option;
+v1 also requires `resource` and `description`. A field present with the wrong
+type, such as a numeric `amount` or a `maxTimeoutSeconds` that is not a positive
+number, is reported as such instead of as missing. Challenges built with the
+official x402 server SDK carry every field, so they are unaffected.
+
+**Added — `wasit serve`, a paywall that misbehaves on purpose.** The checks
+test a service that sells; this tests an agent that pays. It runs a local x402
+paywall in one of four modes: `no-settle` serves without settling,
+`wrong-settlement` cites a transaction that is not the payment, `wrong-network`
+asks for mainnet, `overprice` asks for one million USDC. The server reports
+what the agent did. It never settles or forwards anything, so no funds move.
+Every mode's challenge is well-formed (`wasit test --read-only` passes it), and
+the two settlement modes reproduce the servers built for the 0.6.0 A/B:
+`X402-06` and `X402-07` fail against them.
+
+**Changed — the CLI's payment warning says when it applies.** It said funds
+would move before every payment run, including runs where the target offered
+no option on the run's network and nothing was paid.
+
+**Results can change on upgrade.** A service on a chain other than Stellar now
+passes `X402-05` where it failed. A challenge with a broken second option now
+fails `X402-04` or `X402-05` where it passed. A challenge without `scheme`,
+`asset` or `maxTimeoutSeconds`, or with a wrongly typed field, now fails
+`X402-04`.
+
 ## [0.6.0] — 2026-09-30
 
 All three packages, versioned together as usual. The two x402 payment checks
