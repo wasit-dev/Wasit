@@ -16,6 +16,7 @@ import { runX402ReadChecks } from "@wasit-dev/core";
 import {
   BASE_SEPOLIA_USDC,
   BROKEN_CHALLENGE_MODES,
+  ETHEREUM_SEPOLIA_USDC,
   OVERPRICE_AMOUNT,
   SERVE_MODES,
   SOLANA_DEVNET_USDC,
@@ -473,4 +474,34 @@ describe("malformed-header", () => {
       await stop(server);
     }
   });
+});
+
+describe("on Ethereum Sepolia", () => {
+  const SEPOLIA = { network: "eip155:11155111", payTo: EVM_PAY_TO };
+  const accept = (mode: ServeMode) =>
+    (challengeFor({ mode, ...SEPOLIA }, "http://x/paid")["accepts"] as Array<Record<string, unknown>>)[0]!;
+
+  it("poses with Circle's Sepolia USDC and its EIP-712 domain, and asks for Ethereum mainnet", () => {
+    assert.equal(accept("no-settle")["asset"], ETHEREUM_SEPOLIA_USDC);
+    assert.deepEqual(accept("no-settle")["extra"], { name: "USDC", version: "2" });
+    assert.equal(accept("wrong-network")["network"], "eip155:1");
+    assert.equal(accept("overprice")["amount"], "1000000000000");
+    const v1 = (v1ChallengeFor({ mode: "v1-challenge", ...SEPOLIA }, "http://x/paid")["accepts"] as Array<
+      Record<string, unknown>
+    >)[0]!;
+    assert.equal(v1["network"], "sepolia");
+  });
+
+  for (const mode of WELL_FORMED_MODES) {
+    it(`${mode}: Wasit's read checks pass the Ethereum Sepolia challenge`, async () => {
+      const { url, server } = await start(mode, SEPOLIA);
+      try {
+        for (const result of await runX402ReadChecks({ target: url })) {
+          assert.equal(result.pass, true, `${mode} ${result.id}: ${result.detail}`);
+        }
+      } finally {
+        await stop(server);
+      }
+    });
+  }
 });

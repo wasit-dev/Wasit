@@ -437,6 +437,48 @@ function describeOffered(accepts: ReadonlyArray<{ readonly network: string }>): 
   return networks.length === 0 ? "none" : networks.join(", ");
 }
 
+/** What the SDK client's spend controls say when they refuse a payment. */
+const SPEND_CONTROLS_REFUSAL = "All payment requirements were rejected by spendControls";
+
+/**
+ * Builds a payment, turning a refusal by the SDK client's spend controls into
+ * no verdict that says why.
+ *
+ * The official client pays only its default assets (plus the ones an adapter
+ * allows, such as Circle's USDC on Ethereum Sepolia) and at most $1 a
+ * payment, so that a paywall cannot charge a payer more than it meant to.
+ * Wasit keeps those limits: it pays automatically, and on `stellar:pubnet`
+ * with real money. A target above them is not at fault, and nothing was
+ * sent, so this is `ERROR (setup)`, not a harness error. Matched on the SDK's
+ * message (`@x402/core` 2.28 `client/index.mjs`); a message it does not
+ * recognise passes through as before.
+ */
+async function withinSpendControls<T>(
+  network: string,
+  selected: PaymentRequirements,
+  build: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await build();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (!message.startsWith(SPEND_CONTROLS_REFUSAL)) throw error;
+    if (message.includes("only default assets")) {
+      throw new CheckSetupError(
+        `The target asks to be paid in ${selected.asset} on ${network}, which is not ` +
+          `an asset the official x402 client pays in by default, nor one Wasit allows, ` +
+          `so nothing was sent.`,
+      );
+    }
+    throw new CheckSetupError(
+      `The target asks for ${selected.amount} base units of ${selected.asset}, more ` +
+        `than the $1 a payment the official x402 client pays by default, so nothing ` +
+        `was sent. The cap keeps a paywall from charging a payer more than it meant ` +
+        `to; a target priced at $1 or less is checked as usual.`,
+    );
+  }
+}
+
 /**
  * Reads the challenge and produces a signed payment payload for it.
  *
@@ -514,15 +556,19 @@ async function preparePayment(
 
   await beforeSigning?.(selected);
   if (alter === undefined) {
-    const paymentPayload = await client.createPaymentPayload(paymentRequired);
+    const paymentPayload = await withinSpendControls(options.network, selected, () =>
+      client.createPaymentPayload(paymentRequired),
+    );
     return { httpClient, paymentPayload, selected, idempotent };
   }
 
   const altered = await alter(selected);
-  const signed = await client.createPaymentPayload({
-    ...paymentRequired,
-    accepts: [{ ...selected, ...altered }],
-  });
+  const signed = await withinSpendControls(options.network, selected, () =>
+    client.createPaymentPayload({
+      ...paymentRequired,
+      accepts: [{ ...selected, ...altered }],
+    }),
+  );
   const paymentPayload = { ...signed, accepted: selected };
   return { httpClient, paymentPayload, selected, idempotent };
 }
@@ -677,9 +723,13 @@ async function checkSignatureAccepted(options: X402PaymentCheckOptions): Promise
     return honest(fail(
       `Expected 2xx after a valid payment, got ${paid.status}` +
         `${reason === undefined ? "" : ` (${reason})`}.`,
-      "A valid payment was refused. Your server's log of the facilitator's " +
-        "verify or settle response says why; serve the resource with a 2xx once " +
-        "the payment settles.",
+      reason?.startsWith("settlement failed:")
+        ? "The payment verified, but the facilitator did not settle it, and said why. " +
+          "That is the facilitator's failure, or its RPC's, yet a valid payment was " +
+          "refused; check the facilitator's account and endpoint, then re-run."
+        : "A valid payment was refused. Your server's log of the facilitator's " +
+          "verify or settle response says why; serve the resource with a 2xx once " +
+          "the payment settles.",
     ), false);
   }
 
@@ -704,7 +754,7 @@ async function checkSignatureAccepted(options: X402PaymentCheckOptions): Promise
   }
 
   const rpcUrl = chain.resolveRpcUrl(options.network, options.rpcUrl);
-  const verdict = await chain.verifySettlement(rpcUrl, reference, {
+  const verdict = await chain.verifySettlement(options.network, rpcUrl, reference, {
     amount,
     token: accepted.asset,
     recipient: accepted.payTo,
@@ -794,24 +844,44 @@ function served(status: number): boolean {
 }
 
 /**
- * Why the target refused a payment, when it says: x402 servers answer a
- * refused payment with a fresh challenge whose `error` names the reason
- * (often the facilitator's, e.g. `invalid_exact_evm_payload_signature`).
- * Shown with a PASS so a reader can tell the refusal came from the rule the
- * check is about, not from something else that also answers 402.
+ * Why the target refused a payment, when it says. A payment refused at
+ * verify comes back with a fresh challenge whose `error` names the reason
+ * (often the facilitator's, e.g. `invalid_exact_evm_payload_signature`). One
+ * that verified but did not settle comes back with a `PAYMENT-RESPONSE` whose
+ * `success` is false and whose `errorReason` says why, as the official SDK
+ * server sends it; that is read first, and named as a settlement failure, so
+ * an operator can tell their facilitator's failure from a refusal. Shown with
+ * a PASS so a reader can tell the refusal came from the rule the check is
+ * about, not from something else that also answers 402.
  */
 async function refusalReason(response: Response): Promise<string | undefined> {
-  const header = response.headers.get("PAYMENT-REQUIRED");
-  const fromJson = (text: string): string | undefined => {
+  const decode = (header: string): Record<string, unknown> | undefined => {
     try {
-      const parsed = JSON.parse(text) as { error?: unknown };
-      return typeof parsed.error === "string" && parsed.error.length > 0 ? parsed.error : undefined;
+      return asRecord(JSON.parse(Buffer.from(header, "base64").toString("utf-8")));
     } catch {
       return undefined;
     }
   };
-  if (header !== null) return fromJson(Buffer.from(header, "base64").toString("utf-8"));
-  return fromJson(await readText(response));
+  const settlement = response.headers.get("PAYMENT-RESPONSE");
+  if (settlement !== null) {
+    const parsed = decode(settlement);
+    const reason = parsed?.["errorReason"];
+    if (parsed?.["success"] === false && typeof reason === "string" && reason.length > 0) {
+      // The reason is a code; some facilitators append a long RPC message.
+      return `settlement failed: ${/^[\w.-]+/.exec(reason)?.[0] ?? reason}`;
+    }
+  }
+  const errorOf = (record: Record<string, unknown> | undefined): string | undefined => {
+    const error = record?.["error"];
+    return typeof error === "string" && error.length > 0 ? error : undefined;
+  };
+  const header = response.headers.get("PAYMENT-REQUIRED");
+  if (header !== null) return errorOf(decode(header));
+  try {
+    return errorOf(asRecord(JSON.parse(await readText(response))));
+  } catch {
+    return undefined;
+  }
 }
 
 function statusWithReason(status: number, reason: string | undefined): string {

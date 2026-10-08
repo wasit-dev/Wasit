@@ -106,13 +106,14 @@ else
 fi
 # Base Sepolia, only when its fixture is up: fixtures.sh starts it only when
 # .env has EVM_PAYEE_ADDRESS. The payment checks read EVM_PRIVATE_KEY.
-for evm in "x402-evm:3005" "x402-permit2:3006"; do
-  name="${evm%%:*}"; port="${evm#*:}"
+# Ethereum Sepolia likewise (port 3008), when its fixture has a facilitator key.
+for evm in "x402-evm:3005:eip155:84532" "x402-permit2:3006:eip155:84532" "x402-sepolia:3008:eip155:11155111"; do
+  name="${evm%%:*}"; rest="${evm#*:}"; port="${rest%%:*}"; network="${rest#*:}"
   if lsof -nP -iTCP:"$port" -sTCP:LISTEN -t >/dev/null 2>&1; then
     if [ "$FULL" = 1 ]; then
-      SUITES+=("$name|test --target http://localhost:$port/protected --network eip155:84532")
+      SUITES+=("$name|test --target http://localhost:$port/protected --network $network")
     else
-      SUITES+=("$name|test --target http://localhost:$port/protected --network eip155:84532 --read-only")
+      SUITES+=("$name|test --target http://localhost:$port/protected --network $network --read-only")
     fi
   fi
 done

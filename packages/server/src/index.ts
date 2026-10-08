@@ -173,7 +173,7 @@ server.registerTool(
       "Runs the x402 conformance checks (X402-01..10) against a running service. " +
       "Payment checks are included only when the network's payer key is set in " +
       "this server's environment (STELLAR_PRIVATE_KEY on Stellar, EVM_PRIVATE_KEY " +
-      "on Base Sepolia, SVM_PRIVATE_KEY on Solana devnet); otherwise they are " +
+      "on Base and Ethereum Sepolia, SVM_PRIVATE_KEY on Solana devnet); otherwise they are " +
       "skipped. When they do run, "
       + "X402-06 settles a real payment and X402-07..10 send payments the target "
       + "must refuse, so each call spends testnet funds and repeated calls spend "
@@ -186,7 +186,8 @@ server.registerTool(
         .optional()
         .describe(
           'Network the payment checks pay on: "stellar:testnet" (default), ' +
-            '"stellar:pubnet", "eip155:84532" (Base Sepolia) or ' +
+            '"stellar:pubnet", "eip155:84532" (Base Sepolia), "eip155:11155111" ' +
+            '(Ethereum Sepolia) or ' +
             '"solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1" (Solana devnet). The ' +
             "read-only checks apply to a challenge on any chain.",
         ),

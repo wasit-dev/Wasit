@@ -1,0 +1,130 @@
+# x402 Payment Checks on Ethereum Sepolia — A/B Against Lying Servers, and a Real Settlement
+
+**Date:** 2026-10-05 and 2026-10-06
+**Wasit:** builds of the local `release/0.7.0` branch (`35b12a6` and `11672d4` for
+Ethereum Sepolia, `93e04c0` for the spend-control result, `178b8a6` for the settlement
+failure reason), not yet published.
+**Targets:** `wasit serve --network eip155:11155111`, the paywall that misbehaves on
+purpose; and Wasit's own Ethereum Sepolia x402 fixture
+(`packages/core/test/fixtures/x402-evm-sepolia-server.ts`). No public facilitator settles
+Ethereum Sepolia, so that fixture runs the official SDK's facilitator (`x402Facilitator`
+with the EVM `exact` scheme, `@x402/evm` 2.28.0) in its own process, paying the gas from
+a key of ours. All on our machine; the chain is Ethereum Sepolia.
+**Environment:** macOS, Node `v26.8.1`.
+
+**What this is for.** `X402-06` to `X402-10` now also pay on Ethereum Sepolia, through
+the same EVM adapter as Base Sepolia. Circle's USDC there
+(`0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238`) has EIP-3009: read from the contract, it
+answers `authorizationState` and `nonces`, with EIP-712 name "USDC", version "2", 6
+decimals. The same two things have to hold as on the other chains: the checks fail
+servers that lie, and pass an honest one.
+
+**Authorization.** None was needed or sought. Every target was Wasit's own code on our
+machine. No service operated by anyone else was tested.
+
+## Servers that lie
+
+Payer: Najmi's Base Sepolia payer, which also held 20 Sepolia USDC and no ETH. Nothing
+moved: `wasit serve` never settles.
+
+| `wasit serve` mode | `X402-06` | `X402-07`–`10` | Run time |
+|---|---|---|---|
+| `no-settle` | **FAIL**, no `PAYMENT-RESPONSE` | **FAIL** | 6 s |
+| `wrong-settlement` | **FAIL**, "the chain produced 10 more blocks without it" | **FAIL** | 131 s |
+| `wrong-network` (asks `eip155:1`) | SKIP, nothing sent | SKIP | 1 s |
+
+Ethereum Sepolia makes a block about every 12 seconds, so the wait for a cited
+transaction is 10 blocks there (30 on Base Sepolia): 131 seconds here.
+
+## An honest server
+
+`wasit test --target http://localhost:3008/protected --network eip155:11155111`:
+**10/10**, in 20 seconds.
+
+```
+PASS  X402-06  Signature Resubmit Accepted
+      Valid payment accepted (HTTP 200) and settled on-chain for exactly the
+      advertised 10000 base units of 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238
+      to 0xb57bFdA962aAa607D5260747A175cda8f4bDDad7, verified from the Transfer
+      log (tx 0x0c48fa9d…7849).
+PASS  X402-07  ... rejected (HTTP 402: invalid_exact_evm_signature).
+PASS  X402-08  ... refused (HTTP 402: invalid_exact_evm_nonce_already_used).
+PASS  X402-09  ... 5000 of the advertised 10000 base units was refused
+      (HTTP 402: invalid_exact_evm_payload_authorization_value_mismatch).
+PASS  X402-10  ... refused (HTTP 402: invalid_exact_evm_payload_authorization_valid_before).
+```
+
+[`0x0c48fa9d…7849`](https://sepolia.etherscan.io/tx/0x0c48fa9def71f95411862beceef7110c50ac72c323c4603feacb40bc314d7849)
+
+Read back independently afterwards, outside Wasit, with `viem` against the public
+Sepolia RPC:
+
+| | |
+|---|---|
+| Receipt | `success`, block 11849904, 85728 gas |
+| Sent by | `0x5D58…C579`, the fixture's facilitator, calling the USDC contract |
+| Logs | `AuthorizationUsed` for the payer `0xC171…0428`, and exactly one `Transfer` from the payer to the payee `0xb57b…Dad7` for 10000 |
+| Payer after | 19.99 USDC, **still 0 ETH** |
+
+A second run, after the spend-control change (`93e04c0`), passed 10/10 again
+([`0x5b351060…67bb`](https://sepolia.etherscan.io/tx/0x5b351060f5597a8240b3f9f4a193a3124cb7c8e0eec238a0af616664341f67bb)).
+
+## The client's spend controls
+
+The official x402 client pays only the SDK's default assets, at most $1 a payment,
+unless told otherwise. Circle's Sepolia USDC is not a default asset, so the first
+attempt stopped before signing: `ERROR (harness) All payment requirements were rejected
+by spendControls: only default assets or entries in spendControls.allowedAssets are
+allowed`. The EVM adapter now allows that token on Ethereum Sepolia only, with the same
+$1 cap the SDK puts on its defaults (1000000 base units); an offline test pays 10000 and
+refuses 1000001.
+
+A target above those limits is not at fault and gets no verdict. Against `wasit serve`
+on Base Sepolia priced at 2000000 units (2 USDC), with a payer holding 19.8:
+
+```
+ERROR  X402-06  Signature Resubmit Accepted
+      Check could not run (setup): The target asks for 2000000 base units of
+      0x036CbD53842c5426634e7929541eC2318f3dCF7e, more than the $1 a payment the
+      official x402 client pays by default, so nothing was sent. ...
+```
+
+and the paywall's log shows no payment received.
+
+## Settlement failures are named now
+
+A payment that verifies but does not settle used to read `got 402.` with no reason. The
+official SDK server answers it with a `PAYMENT-RESPONSE` whose `success` is false and
+whose `errorReason` names the facilitator's failure, and Wasit now reads it. On
+2026-10-06, on the Base Sepolia fixtures, which settle through the public facilitator:
+
+```
+FAIL  X402-06  Signature Resubmit Accepted
+      Expected 2xx after a valid payment, got 402
+      (settlement failed: invalid_exact_evm_transaction_failed).
+PASS  X402-08  Payment Replay Rejected
+      The same payment, sent again, was refused
+      (HTTP 402: settlement failed: invalid_exact_evm_nonce_already_used).
+```
+
+The first is the public facilitator failing to broadcast its own transaction (the
+fixture's log: `eth_sendRawTransaction` answered "Missing or invalid parameters"); five
+of sixteen Base Sepolia runs that day failed `X402-06` this way, each passing on re-run,
+and the three whose cause could be seen all showed it. The second
+shows where the public facilitator stops a replay: the replayed EIP-3009 authorization
+passed its verify and was refused at settlement, its nonce spent. The resource was not
+served either way. The same day the Stellar fixture passed 10/10, in 198 seconds against
+41 the day before; one earlier run had stopped with `ERROR (harness)` when Stellar
+testnet RPC was slow enough for the payment's own authorization to expire before the
+SDK client simulated it.
+
+## Limits
+
+- One more EVM network: Ethereum Sepolia, with EIP-3009. Permit2 there was not run.
+  BNB Smart Chain testnet stays read-only.
+- The honest target is Wasit's own fixture with the SDK's facilitator run locally. No
+  third-party Ethereum Sepolia service was tested.
+- A facilitator's transient failure is reported as `X402-06` FAIL, with its reason: the
+  target did refuse a valid payment. Wasit cannot tell a transient failure from a lasting
+  one in a single run.
+- Unreleased: this ran from the branch, not from npm.

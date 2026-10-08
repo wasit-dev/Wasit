@@ -182,7 +182,7 @@ export const stellarChain: PaymentChain = {
   payerBalance: stellarTokenBalance,
   generatePayerKey: () => Keypair.random().secret(),
   isSettlementReference: (reference) => TRANSACTION_HASH.test(reference),
-  verifySettlement,
+  verifySettlement: (_network, rpcUrl, reference, expected) => verifySettlement(rpcUrl, reference, expected),
   corruptPayload: (payload) => ({
     ...payload,
     transaction: corruptAuthSignature(payload["transaction"] as string),

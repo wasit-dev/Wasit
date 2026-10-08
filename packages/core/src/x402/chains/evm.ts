@@ -9,8 +9,10 @@
  *
  * Settlement is read from the transaction receipt: the token contract's own
  * ERC-20 `Transfer` log is held to the advertised terms, as the Stellar
- * adapter holds the `transfer` event. Only Base Sepolia for now:
- * the official SDK ships its USDC and the public facilitator settles there.
+ * adapter holds the `transfer` event. Base Sepolia, where the official SDK
+ * ships its USDC and the public facilitator settles, and Ethereum
+ * Sepolia, which Circle's USDC with EIP-3009 also serves but no public
+ * facilitator settles.
  */
 
 import { toClientEvmSigner } from "@x402/evm";
@@ -27,16 +29,50 @@ import {
   type Hex,
 } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
-import { baseSepolia } from "viem/chains";
+import { baseSepolia, sepolia } from "viem/chains";
 
 import { CheckSetupError, ConfigurationError } from "../../errors.js";
 import type { ExpectedSettlement, SettlementVerdict } from "../../settlement.js";
 import type { PaymentChain } from "./types.js";
 import { waitForReceipt } from "./wait.js";
 
-/** The networks this adapter pays on, with viem's chain definition for each. */
-const NETWORKS: Readonly<Record<string, Chain>> = {
-  "eip155:84532": baseSepolia,
+/** What differs between the EVM networks this adapter pays on. */
+interface EvmNetwork {
+  /** viem's definition, whose first default RPC is the default endpoint. */
+  readonly chain: Chain;
+  /**
+   * How long to look for the settled transaction, in blocks, as the Stellar
+   * adapter counts ledgers: about a minute or two of the chain's own blocks,
+   * long enough for any facilitator that reports a hash before its receipt,
+   * short enough that a fabricated hash fails soon.
+   */
+  readonly blocksBeforeMissing: bigint;
+  /** The wall-clock limit on that wait, past which a still RPC gives no verdict. */
+  readonly maxWaitMs: number;
+  /**
+   * Tokens to pay in besides the SDK's default assets. The SDK client's spend
+   * controls refuse any other asset; each entry keeps the cap the SDK puts on
+   * its defaults, $1 a payment, as base units.
+   */
+  readonly allowedAssets?: readonly { readonly asset: string; readonly maxAmountPerPayment: string }[];
+}
+
+/**
+ * Circle's USDC on Ethereum Sepolia: EIP-3009, EIP-712 domain "USDC" version
+ * "2", 6 decimals (read from the contract, 2026-10-05). Not an SDK default.
+ */
+export const ETHEREUM_SEPOLIA_USDC = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238";
+
+const NETWORKS: Readonly<Record<string, EvmNetwork>> = {
+  // A block every 2 seconds: 30 blocks is about a minute.
+  "eip155:84532": { chain: baseSepolia, blocksBeforeMissing: 30n, maxWaitMs: 120_000 },
+  // A block every 12 seconds: 10 blocks is about two minutes.
+  "eip155:11155111": {
+    chain: sepolia,
+    blocksBeforeMissing: 10n,
+    maxWaitMs: 240_000,
+    allowedAssets: [{ asset: ETHEREUM_SEPOLIA_USDC, maxAmountPerPayment: "1000000" }],
+  },
 };
 
 /** An EVM transaction hash: 0x and 32 bytes of hex. */
@@ -47,14 +83,6 @@ const PRIVATE_KEY = /^0x[0-9a-fA-F]{64}$/;
 
 /** `Transfer(address indexed from, address indexed to, uint256 value)`. */
 const TRANSFER_TOPIC = toEventSelector("Transfer(address,address,uint256)");
-
-/**
- * How long to look for the settled transaction, in blocks, as the Stellar
- * adapter counts ledgers. Base Sepolia makes a block every 2 seconds, so 30
- * blocks is about a minute: long enough for any facilitator that reports a
- * hash before its receipt, short enough that a fabricated hash fails soon.
- */
-const BLOCKS_BEFORE_MISSING = 30n;
 
 function payerAccount(payerKey: string) {
   // The message never echoes the key: it is a secret, and a malformed one is
@@ -185,10 +213,15 @@ export function verifyEvmReceipt(
 }
 
 async function verifyEvmSettlement(
+  network: string,
   rpcUrl: string,
   reference: string,
   expected: ExpectedSettlement,
 ): Promise<SettlementVerdict> {
+  const profile = NETWORKS[network];
+  if (profile === undefined) {
+    throw new ConfigurationError(`No EVM network "${network}" in Wasit's payment checks.`);
+  }
   const client = createPublicClient({ transport: http(rpcUrl) });
   const lookup = await waitForReceipt(
     async () => {
@@ -200,7 +233,7 @@ async function verifyEvmSettlement(
       }
     },
     () => client.getBlockNumber(),
-    { blocks: BLOCKS_BEFORE_MISSING },
+    { blocks: profile.blocksBeforeMissing, maxWaitMs: profile.maxWaitMs },
   );
 
   if (lookup.kind === "stalled") {
@@ -252,18 +285,18 @@ export const evmChain: PaymentChain = {
   payerKeyEnv: "EVM_PRIVATE_KEY",
   referenceKind: "an EVM transaction hash",
   resolveRpcUrl(network, override) {
-    const chain = NETWORKS[network];
-    if (chain === undefined) {
+    const profile = NETWORKS[network];
+    if (profile === undefined) {
       throw new ConfigurationError(`No EVM network "${network}" in Wasit's payment checks.`);
     }
     if (override) return override;
-    const fallback = chain.rpcUrls.default.http[0];
+    const fallback = profile.chain.rpcUrls.default.http[0];
     if (fallback === undefined) {
       throw new ConfigurationError(`No default RPC endpoint for ${network}. Pass an explicit rpcUrl.`);
     }
     return fallback;
   },
-  registerPayer(client, _network, payerKey, rpcUrl) {
+  registerPayer(client, network, payerKey, rpcUrl) {
     // The signer can read the chain: the SDK needs that only on the Permit2
     // path (allowance, permit nonce). EIP-3009 signing stays offline.
     const signer = toClientEvmSigner(
@@ -271,8 +304,16 @@ export const evmChain: PaymentChain = {
       createPublicClient({ transport: http(rpcUrl) }),
     );
     client.register("eip155:*", new ExactEvmScheme(signer, { rpcUrl }));
+    const allowed = NETWORKS[network]?.allowedAssets;
+    if (allowed !== undefined) {
+      client.setSpendControls({
+        allowedAssets: allowed.map((entry) => ({ network: network as `${string}:${string}`, ...entry })),
+      });
+    }
   },
-  // validBefore is now + 1 second; Base Sepolia blocks come every 2 seconds.
+  // validBefore is now + 1 second. Held 5 seconds, it has passed by the
+  // clock, and any block that could include it is later still, whatever
+  // the chain's block time.
   expiredSigning: async () => ({ terms: { maxTimeoutSeconds: 1 }, holdMs: 5_000 }),
   payerAddress: (payerKey) => payerAccount(payerKey).address,
   generatePayerKey: () => generatePrivateKey(),

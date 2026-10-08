@@ -277,12 +277,12 @@ describe("payment checks on a challenge Wasit cannot pay", () => {
   }
 
   it("stops before paying when asked to pay on a network it cannot pay on", async () => {
-    // Ethereum Sepolia: read-only only.
-    const target = await serveV2(v2(option("eip155:11155111")));
+    // BNB Smart Chain testnet: read-only only.
+    const target = await serveV2(v2(option("eip155:97")));
     try {
       const results = await runX402PaymentChecks({
         target: target.url,
-        network: "eip155:11155111",
+        network: "eip155:97",
         payerSecretKey,
       });
       assert.equal(results.length, 1);

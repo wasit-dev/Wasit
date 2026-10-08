@@ -12,7 +12,7 @@ keys in this file.
 |---|---|
 | `X402-01`–`05` | nothing |
 | `X402-06`–`10` on Stellar | `STELLAR_PRIVATE_KEY` |
-| `X402-06`–`10` on Base Sepolia (`--network eip155:84532`) | `EVM_PRIVATE_KEY` |
+| `X402-06`–`10` on Base Sepolia (`--network eip155:84532`) or Ethereum Sepolia (`--network eip155:11155111`) | `EVM_PRIVATE_KEY` |
 | `X402-06`–`10` on Solana devnet (`--network solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1`) | `SVM_PRIVATE_KEY` |
 | `MPP-01` | `MPP_PAYER_SECRET`, `MPP_STELLAR_NETWORK` |
 | `MPP-10`–`12`, `14` | `COMMITMENT_SECRET_HEX`, `MPP_STELLAR_NETWORK` |
@@ -34,7 +34,10 @@ third-party node.
 The x402 payment checks also pay on Base Sepolia (`eip155:84532`), through
 `--network` (MCP: `network`), with the payer key in `EVM_PRIVATE_KEY`. Its
 default RPC endpoint is Base's public `https://sepolia.base.org`, overridable
-with `--rpc-url`. They pay on Solana devnet too
+with `--rpc-url`. They pay on Ethereum Sepolia (`eip155:11155111`) with the same
+`EVM_PRIVATE_KEY`, through viem's default Sepolia endpoint
+`https://11155111.rpc.thirdweb.com` unless `--rpc-url` names another. The public
+x402.org facilitator does not settle Ethereum Sepolia. They pay on Solana devnet too
 (`solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1`), with the payer key in `SVM_PRIVATE_KEY`
 and the public `https://api.devnet.solana.com` as the default RPC endpoint. Any other
 network gets the read-only checks only.
@@ -66,6 +69,12 @@ that uses Permit2 instead needs no ETH either when it offers the
 once on-chain, which needs gas, and a run without that approval reports
 `ERROR (setup)`. A wrong or malformed key is reported at `PREFLIGHT` before
 anything is sent, without echoing it.
+
+On Ethereum Sepolia the same key pays in Circle's USDC
+(`0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238`), from https://faucet.circle.com (network
+Ethereum Sepolia), and again needs no ETH. Wasit's own Ethereum Sepolia fixture runs the
+SDK's facilitator itself, paying the gas from `EVM_FACILITATOR_PRIVATE_KEY`, which needs
+Sepolia ETH; that key is for the fixture only.
 
 For Solana devnet, `SVM_PRIVATE_KEY` is the base58 encoding of the keypair's 64
 bytes (seed, then public key), the form wallets export and `wasit wallet create

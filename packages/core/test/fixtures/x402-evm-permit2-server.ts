@@ -1,7 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import { paymentMiddlewareFromConfig } from "@x402/express";
-import { HTTPFacilitatorClient } from "@x402/core/server";
+import { HTTPFacilitatorClient, type FacilitatorClient } from "@x402/core/server";
 import { ExactEvmScheme } from "@x402/evm/exact/server";
 import { declareEip2612GasSponsoringExtension } from "@x402/extensions";
 
@@ -17,6 +17,29 @@ const NETWORK = "eip155:84532";
 const FACILITATOR_URL = "https://www.x402.org/facilitator";
 const PAY_TO = process.env.EVM_PAYEE_ADDRESS;
 if (!PAY_TO) throw new Error("EVM_PAYEE_ADDRESS is not set in .env");
+
+// The facilitator's refusals, logged: a refused settlement otherwise reaches
+// the client as a bare 402 with no reason, and the fixture's own log is the
+// only place to find out why (one Permit2 run did that on 2026-10-05).
+const remote = new HTTPFacilitatorClient({ url: FACILITATOR_URL });
+const facilitator: FacilitatorClient = {
+  async verify(payload, requirements) {
+    const result = await remote.verify(payload, requirements);
+    if (!result.isValid) console.log(`verify refused: ${result.invalidReason} ${result.invalidMessage ?? ""}`);
+    return result;
+  },
+  async settle(payload, requirements) {
+    try {
+      const result = await remote.settle(payload, requirements);
+      if (!result.success) console.log(`settle failed: ${result.errorReason} ${result.errorMessage ?? ""}`);
+      return result;
+    } catch (error) {
+      console.log(`settle threw: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
+    }
+  },
+  getSupported: () => remote.getSupported(),
+};
 
 const app = express();
 
@@ -34,7 +57,7 @@ app.use(
         extensions: { ...declareEip2612GasSponsoringExtension() },
       },
     },
-    new HTTPFacilitatorClient({ url: FACILITATOR_URL }),
+    facilitator,
     [{ network: NETWORK, server: new ExactEvmScheme() }],
   ),
 );

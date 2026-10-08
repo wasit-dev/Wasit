@@ -63,6 +63,18 @@ Sepolia, the lying modes fail both checks
 the default; MPP is Stellar only. Under the hood, the payment checks now go through a
 per-chain adapter, and the x402 SDK moves from 2.19 to 2.28.
 
+**Added — the x402 payment checks pay on Ethereum Sepolia.** `--network
+eip155:11155111` runs `X402-06` to `X402-10` there with the same `EVM_PRIVATE_KEY`,
+paying in Circle's Sepolia USDC through EIP-3009, so the payer needs no ETH. The SDK
+ships no default asset for this network, and its client's spend controls refuse other
+assets: Wasit allows Circle's Sepolia USDC there, with the SDK's own $1 cap. The wait
+for a settled transaction is now per network: 10 blocks on Sepolia, whose blocks are 12
+seconds apart. No public facilitator settles Ethereum Sepolia, so Wasit's own fixture
+runs the SDK's facilitator itself. Against it, all ten pass with the settlement read back
+independently; against `wasit serve` there, the lying modes fail
+([evidence](docs/evidence/2026-10-06-ethereum-sepolia-verification-run.md)). BNB Smart
+Chain testnet stays read-only.
+
 **Added — the x402 payment checks pay on Solana devnet.** `--network
 solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` (MCP: `network`) runs `X402-06` to `X402-10`
 there, with the payer key in `SVM_PRIVATE_KEY` (base58 of the 64-byte keypair, as
@@ -98,6 +110,20 @@ to expire.
 refuses `X402-06`'s valid payment, `X402-07` to `X402-10` are skipped rather than passed:
 a target that refuses everything proves nothing by refusing a bad payment. `X402-07` used
 to pass in that case.
+
+**Changed — a price the official client will not pay gets no verdict.** The official x402
+client, which Wasit pays through, pays only the SDK's default assets and at most $1 a
+payment. A target above that used to get `X402-06` ERROR (harness) with the SDK's own
+configuration advice; it now gets `ERROR (setup)` naming the price or the asset, and
+nothing is sent. Wasit keeps the cap: it pays automatically, and on `stellar:pubnet`
+with real money.
+
+**Fixed — a failed settlement names its reason.** A valid payment that verified but did
+not settle read `got 402.`. The official SDK server reports why in a `PAYMENT-RESPONSE`
+with `success: false`, which Wasit now reads: `got 402 (settlement failed:
+invalid_exact_evm_transaction_failed)`. The same reason now shows on refused negative
+payments, which is how the public facilitator was seen refusing a replay at settlement
+rather than at verify.
 
 **Changed — a payer that cannot cover the price gets no verdict.** `X402-06` reads the
 payer's balance of the advertised asset before it signs; below the price, it reports

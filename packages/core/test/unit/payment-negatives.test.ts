@@ -41,9 +41,13 @@ interface Received {
  * with 200 and no settlement (`accept`), or with 402 (`refuse`).
  */
 async function standIn(options: {
-  mode: "accept" | "refuse" | "permit2-allowance";
+  mode: "accept" | "refuse" | "permit2-allowance" | "settle-fail";
   amount?: string;
   paymentIdentifier?: boolean;
+  network?: string;
+  asset?: string;
+  /** settle-fail only: what its PAYMENT-RESPONSE claims. */
+  settled?: boolean;
 }): Promise<{ url: string; received: Received[]; close: () => Promise<void> }> {
   const received: Received[] = [];
   const challenge = {
@@ -52,9 +56,9 @@ async function standIn(options: {
     accepts: [
       {
         scheme: "exact",
-        network: NETWORK,
+        network: options.network ?? NETWORK,
         amount: options.amount ?? "10000",
-        asset: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+        asset: options.asset ?? "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
         payTo: "0x209693Bc6afc0C5328bA36FaF03C514EF312287C",
         maxTimeoutSeconds: 60,
         extra: { name: "USDC", version: "2" },
@@ -77,6 +81,19 @@ async function standIn(options: {
       payload: JSON.parse(Buffer.from(paid, "base64").toString("utf-8")),
       atSeconds: Math.floor(Date.now() / 1000),
     });
+    if (options.mode === "settle-fail") {
+      // As the official SDK server answers a payment that verified but did
+      // not settle (measured with the public facilitator, 2026-10-06).
+      const failure = {
+        success: options.settled ?? false,
+        errorReason: "invalid_exact_evm_transaction_failed: Missing or invalid parameters.",
+        transaction: "",
+        network: options.network ?? NETWORK,
+      };
+      response.writeHead(402, { "payment-response": Buffer.from(JSON.stringify(failure)).toString("base64") });
+      response.end("{}");
+      return;
+    }
     if (options.mode === "permit2-allowance") {
       const refusal = { ...challenge, error: "permit2_allowance_required" };
       response.writeHead(412, { "payment-required": Buffer.from(JSON.stringify(refusal)).toString("base64") });
@@ -232,6 +249,47 @@ describe("a Permit2 target that needs an approval this payer never made", () => 
   });
 });
 
+describe("a valid payment whose settlement failed", () => {
+  it("names the facilitator's reason from PAYMENT-RESPONSE, and says where to look", async () => {
+    const target = await standIn({ mode: "settle-fail" });
+    try {
+      const r = byId(
+        await runX402PaymentChecks({
+          target: target.url,
+          network: NETWORK,
+          payerSecretKey: generatePrivateKey(),
+          rpcUrl: funded.url,
+        }),
+      );
+      assert.equal(r["X402-06"]?.pass, false);
+      assert.match(
+        r["X402-06"]?.detail ?? "",
+        /^Expected 2xx after a valid payment, got 402 \(settlement failed: invalid_exact_evm_transaction_failed\)\.$/,
+      );
+      assert.match(r["X402-06"]?.hint ?? "", /the facilitator did not settle it/);
+    } finally {
+      await target.close();
+    }
+  });
+
+  it("does not call a refusal a failed settlement when PAYMENT-RESPONSE claims success", async () => {
+    const target = await standIn({ mode: "settle-fail", settled: true });
+    try {
+      const r = byId(
+        await runX402PaymentChecks({
+          target: target.url,
+          network: NETWORK,
+          payerSecretKey: generatePrivateKey(),
+          rpcUrl: funded.url,
+        }),
+      );
+      assert.match(r["X402-06"]?.detail ?? "", /^Expected 2xx after a valid payment, got 402\.$/);
+    } finally {
+      await target.close();
+    }
+  });
+});
+
 describe("a refused valid payment", () => {
   // Earlier evidence quotes this wording; a reason is added only when given.
   it("keeps X402-06's wording when the target gives no reason", async () => {
@@ -248,6 +306,70 @@ describe("a refused valid payment", () => {
       assert.match(r["X402-06"]?.detail ?? "", /^Expected 2xx after a valid payment, got 402\.$/);
     } finally {
       await target.close();
+    }
+  });
+});
+
+describe("on Ethereum Sepolia", () => {
+  // Circle's Sepolia USDC is not an SDK default asset, and the SDK client's
+  // spend controls refuse non-default assets unless they are allowed.
+  it("pays in Circle's Sepolia USDC, up to the SDK's own $1 cap", async () => {
+    for (const [amount, paid] of [
+      ["10000", true],
+      ["1000001", false],
+    ] as const) {
+      const target = await standIn({
+        mode: "refuse",
+        amount,
+        network: "eip155:11155111",
+        asset: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+      });
+      try {
+        const r = byId(
+          await runX402PaymentChecks({
+            target: target.url,
+            network: "eip155:11155111",
+            payerSecretKey: generatePrivateKey(),
+            rpcUrl: funded.url,
+          }),
+        );
+        assert.equal(target.received.length, paid ? 1 : 0, amount);
+        if (paid) assert.match(r["X402-06"]?.detail ?? "", /got 402/);
+        else {
+          assert.equal(r["X402-06"]?.error?.kind, "setup");
+          assert.match(r["X402-06"]?.detail ?? "", /asks for 1000001 base units .* more than the \$1 a payment/);
+        }
+      } finally {
+        await target.close();
+      }
+    }
+  });
+});
+
+describe("a target the SDK client's spend controls refuse", () => {
+  // Not the target's fault, and nothing is sent: no verdict, saying why.
+  it("is a setup error on a price above $1, or on an asset the client does not pay in", async () => {
+    for (const [label, options, reason] of [
+      ["above $1", { amount: "1000001" }, /more than the \$1 a payment the official x402 client pays by default/],
+      ["other asset", { asset: "0x0000000000000000000000000000000000000Bad" }, /not an asset the official x402 client pays in by default/],
+    ] as const) {
+      const target = await standIn({ mode: "accept", ...options });
+      try {
+        const r = byId(
+          await runX402PaymentChecks({
+            target: target.url,
+            network: NETWORK,
+            payerSecretKey: generatePrivateKey(),
+            rpcUrl: funded.url,
+          }),
+        );
+        assert.equal(r["X402-06"]?.error?.kind, "setup", label);
+        assert.match(r["X402-06"]?.detail ?? "", reason, label);
+        for (const id of ["X402-07", "X402-08", "X402-09", "X402-10"]) assert.equal(r[id]?.skipped, true, `${label} ${id}`);
+        assert.equal(target.received.length, 0, label);
+      } finally {
+        await target.close();
+      }
     }
   });
 });

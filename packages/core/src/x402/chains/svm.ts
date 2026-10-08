@@ -425,6 +425,6 @@ export const svmChain: PaymentChain = {
       return false;
     }
   },
-  verifySettlement: verifySvmSettlement,
+  verifySettlement: (_network, rpcUrl, reference, expected) => verifySvmSettlement(rpcUrl, reference, expected),
   corruptPayload: corruptSvmSignature,
 };
