@@ -23,7 +23,7 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Wasit",
   description:
-    "Independent protocol-compliance tester for x402 and MPP on Stellar. Runs the real payment flow and verifies on-chain settlement, not just response shape.",
+    "Independent protocol-compliance tester for x402 and MPP. Runs the real payment flow and verifies on-chain settlement, not just response shape: x402 on Stellar, Base, Ethereum and Solana testnets, MPP on Stellar.",
 };
 
 export default function RootLayout({

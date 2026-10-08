@@ -31,7 +31,7 @@ const TICKER_ITEMS = [
   "VERIFY THE SETTLEMENT",
   "x402",
   "MPP",
-  "STELLAR TESTNET",
+  "STELLAR · BASE · ETHEREUM · SOLANA",
   `${CHECK_COUNT} CHECKS`,
   "CLI · MCP · CORE",
   "APACHE-2.0",
@@ -209,13 +209,14 @@ export default function Home() {
             <div className="hero-copy hero-rise" style={{ "--rise-delay": "320ms" } as React.CSSProperties}>
               <h1 id="hero-title" className="hero-heading">
                 Independent protocol-compliance testing for <mark className="hl">x402</mark> and{" "}
-                <mark className="hl">MPP</mark> on Stellar.
+                <mark className="hl">MPP</mark>.
               </h1>
               <p className="tagline">
                 Wasit runs the real payment flow against your service, not a
                 schema check against its response — and verifies settlement{" "}
-                <mark className="hl-2">on-chain</mark>, from the token
-                contract&rsquo;s own transfer event.
+                <mark className="hl-2">on-chain</mark>, from the chain&rsquo;s own
+                record of the transfer. x402 on Stellar, Base, Ethereum and Solana
+                testnets; MPP on Stellar.
               </p>
               <div className="btn-row">
                 <Link href="/docs/start/try-it" className="btn btn-primary">

@@ -462,7 +462,7 @@ export function getAboutMarkdown(): string {
 # Wasit
 
 Wasit is an independent protocol-compliance tester for two agentic-payment
-protocols on Stellar: **x402** and **MPP**. It runs the real payment flow
+protocols, **x402** and **MPP**, on Stellar testnet. It runs the real payment flow
 against a live service and verifies the settlement itself — by reading
 Stellar RPC and the token contract's own transfer event — rather than
 trusting whatever the service's response claims happened. The x402 payment

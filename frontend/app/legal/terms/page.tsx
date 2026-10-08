@@ -5,7 +5,7 @@ import { DocsToc } from "@/components/docs-toc"
 
 export const metadata: Metadata = {
   title: "Terms of Service — Wasit",
-  description: "Terms of Service for Wasit, an open-source protocol-compliance tester for the x402 and MPP protocols on Stellar.",
+  description: "Terms of Service for Wasit, an open-source protocol-compliance tester for the x402 and MPP payment protocols.",
 }
 
 /**
@@ -24,12 +24,13 @@ export default function TermsPage() {
           <div className="article-wrap">
             <article id="terms-content" className="typeset legal-typeset">
             <h1>Terms of Service</h1>
-            <p><em>Last updated: September 2026.</em></p>
+            <p><em>Last updated: October 2026.</em></p>
 
             <h2 id="what-wasit-is">1. What Wasit is</h2>
             <p>
               Wasit is an open-source protocol-compliance tester for the x402 and MPP
-              (Machine Payments Protocol) payment protocols on Stellar. It
+              (Machine Payments Protocol) payment protocols, on public testnets:
+              Stellar for both, and Base, Ethereum and Solana for x402. It
               ships as a CLI, an MCP server, and a shared core library
               (<code>@wasit-dev/cli</code>, <code>@wasit-dev/server</code>,
               <code>@wasit-dev/core</code>), published to npm under the
