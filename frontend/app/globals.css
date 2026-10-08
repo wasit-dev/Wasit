@@ -677,31 +677,34 @@ mark { color: inherit; background: none; }
 }
 .copy-btn:hover { color: var(--accent); border-color: var(--accent); }
 
-/* Ticker band: the accent, full bleed, one line of facts scrolling. */
+/* Ticker band: the marks of the two protocols Wasit checks and the four
+   chains it reads, each in its own colour on the page's dark, one line
+   scrolling. The protocols' marks carry their names; the chains' are small
+   glyphs, so their names follow them. */
 .ticker {
   overflow: hidden;
-  background: var(--accent);
-  color: var(--on-accent);
-  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  border-block: 1px solid var(--border-strong);
 }
 .ticker-track {
   display: flex;
   width: max-content;
   animation: ticker 38s linear infinite;
 }
-.ticker-group { display: flex; flex: none; }
+.ticker-group { display: flex; flex: none; align-items: center; }
 .ticker-item {
   display: inline-flex;
   align-items: center;
-  gap: 22px;
-  padding: 11px 0 11px 22px;
-  font-family: var(--font-code);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
+  gap: 9px;
+  padding: 13px 0 13px 30px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
   white-space: nowrap;
 }
-.ticker-square { width: 7px; height: 7px; background: var(--on-accent); }
+.ticker-item svg { display: block; flex: none; fill: currentColor; }
+.ticker-dot { width: 4px; height: 4px; margin-left: 30px; background: var(--dim); flex: none; }
 @keyframes ticker {
   to { transform: translateX(-50%); }
 }
@@ -710,21 +713,11 @@ mark { color: inherit; background: none; }
 }
 
 /* The stack strip under the ticker (components/StackStrip.tsx): a short
-   line, then one cell per project — the two protocols Wasit checks and
-   the chain it trusts — each with its logo in the page's own colour. */
+   line, then the protocols joined by a line to each chain they run on.
+   Two drawings of it; CSS shows the wide one from 1100px. */
 .stack { border-bottom: 1px solid var(--border); }
-.stack-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.25fr) repeat(3, minmax(0, 1fr));
-}
-.stack-intro {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 10px;
-  padding: 32px 28px 32px 0;
-  border-right: 1px solid var(--border-strong);
-}
+.stack-fan { display: flex; flex-direction: column; gap: 24px; padding-block: 40px 44px; }
+.stack-intro { display: flex; flex-direction: column; gap: 10px; }
 .stack-kicker {
   display: inline-flex;
   align-items: center;
@@ -737,41 +730,37 @@ mark { color: inherit; background: none; }
 }
 .stack-kicker::before { content: ""; width: 7px; height: 7px; background: var(--accent); }
 .stack-title { margin: 0; font-size: clamp(19px, 1.7vw, 24px); font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; }
-.stack-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 28px 24px;
-  border-right: 1px solid var(--border-strong);
-  color: var(--fg);
-  transition: background 160ms ease;
+.stack-diagram { min-width: 0; }
+.fan { display: block; width: 100%; height: auto; }
+.fan--narrow { display: none; max-width: 560px; }
+@media (max-width: 1099px) {
+  .fan--wide { display: none; }
+  .fan--narrow { display: block; }
 }
-.stack-cell:last-child { border-right: none; }
-.stack-cell:hover { color: var(--fg); background: color-mix(in oklab, var(--accent), transparent 90%); }
-.stack-role {
-  font-family: var(--font-code);
-  font-size: 10.5px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--accent);
-}
-.stack-role::before { content: "// "; color: var(--dim); }
-.stack-mark { display: flex; align-items: center; height: 48px; margin: 6px 0 4px; color: var(--fg); opacity: 0.85; transition: opacity 160ms ease; }
-.stack-cell:hover .stack-mark { opacity: 1; }
-.stack-logo { display: block; width: auto; fill: currentColor; }
-.stack-logo--x402 { height: 40px; }
-.stack-logo--mpp { height: 26px; }
-.stack-logo--stellar { height: 36px; }
-.stack-name { font-size: 14.5px; font-weight: 600; }
-.stack-meta { font-family: var(--font-code); font-size: 11.5px; letter-spacing: 0.04em; color: var(--muted); }
-@media (max-width: 960px) {
-  .stack-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .stack-intro { grid-column: 1 / -1; padding: 28px 0 20px; border-right: none; border-bottom: 1px solid var(--border-strong); }
-}
-@media (max-width: 600px) {
-  .stack-grid { grid-template-columns: minmax(0, 1fr); }
-  .stack-cell { border-right: none; border-bottom: 1px solid var(--border-strong); padding: 22px 0; }
-  .stack-cell:last-child { border-bottom: none; }
+.fan-box { fill: var(--surface); stroke: var(--border-strong); stroke-width: 1; transition: fill 160ms ease, stroke 160ms ease; }
+.fan-node:hover .fan-box,
+.fan-node:focus-visible .fan-box { fill: color-mix(in oklab, var(--accent), var(--surface) 88%); stroke: var(--accent); }
+.fan-node:focus-visible { outline: none; }
+.fan-role { font-family: var(--font-code); font-size: 11.5px; letter-spacing: 0.16em; text-transform: uppercase; fill: var(--accent); }
+.fan-role--sm { font-size: 9.5px; }
+.fan-slash { fill: var(--dim); }
+.fan-name { font-family: var(--font-body); font-size: 17px; font-weight: 600; fill: var(--fg); }
+.fan-name--sm { font-size: 15px; }
+.fan-name--xs { font-size: 12.5px; }
+.fan-meta { font-family: var(--font-code); font-size: 13px; letter-spacing: 0.03em; fill: var(--muted); }
+.fan-meta--sm { font-size: 10px; }
+.fan-mark { fill: var(--fg); opacity: 0.88; transition: opacity 160ms ease; }
+.fan-node:hover .fan-mark { opacity: 1; }
+.fan-line { fill: none; stroke-width: 1.5; }
+.fan-line--x { stroke: var(--accent); }
+.fan-line--m { stroke: var(--accent-2); }
+.fan-joint { stroke: var(--bg); stroke-width: 2; }
+.fan-joint--x { fill: var(--accent); }
+.fan-joint--m { fill: var(--accent-2); }
+.fan-flow--x { fill: var(--fg); }
+.fan-flow--m { fill: var(--accent-2); }
+@media (prefers-reduced-motion: reduce) {
+  .fan-flow { display: none; }
 }
 
 /* Bands: every section below the hero. */
