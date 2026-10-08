@@ -23,6 +23,7 @@ import { SERVER_VERSION } from "./version.js";
 import {
   checkStatus,
   fixFor,
+  paymentChainFor,
   runMppChannelSuite,
   runMppChargeSuite,
   runX402PaymentChecks,
@@ -170,8 +171,9 @@ server.registerTool(
     title: "Test x402 compliance",
     description:
       "Runs the x402 conformance checks (X402-01..07) against a running service. " +
-      "Payment checks are included only when STELLAR_PRIVATE_KEY is set in this " +
-      "server's environment; otherwise they are skipped. When they do run, "
+      "Payment checks are included only when the network's payer key is set in " +
+      "this server's environment (STELLAR_PRIVATE_KEY on Stellar, EVM_PRIVATE_KEY " +
+      "on Base Sepolia); otherwise they are skipped. When they do run, "
       + "X402-06 settles a real payment and X402-07 attempts one, so each call "
       + "spends testnet funds and repeated calls spend repeatedly. Testnet only.",
     inputSchema: {
@@ -180,8 +182,9 @@ server.registerTool(
         .string()
         .optional()
         .describe(
-          'Network the payment checks pay on: "stellar:testnet" (default) or ' +
-            '"stellar:pubnet". The read-only checks apply to a challenge on any chain.',
+          'Network the payment checks pay on: "stellar:testnet" (default), ' +
+            '"stellar:pubnet" or "eip155:84532" (Base Sepolia). The read-only ' +
+            "checks apply to a challenge on any chain.",
         ),
       readOnly: z
         .boolean()
@@ -190,7 +193,9 @@ server.registerTool(
       rpcUrl: z
         .string()
         .optional()
-        .describe("Override the Soroban RPC endpoint used to verify X402-06's settlement"),
+        .describe(
+          "Override the RPC endpoint used to verify X402-06's settlement (Soroban RPC on Stellar, JSON-RPC on EVM)",
+        ),
       method: z
         .string()
         .optional()
@@ -231,13 +236,14 @@ server.registerTool(
       ...(headers !== undefined ? { headers } : {}),
     };
     const results = await runX402ReadChecks({ target, ...shape });
-    const payerKey = process.env.STELLAR_PRIVATE_KEY;
+    const payNetwork = network ?? "stellar:testnet";
+    const payerKey = process.env[paymentChainFor(payNetwork)?.payerKeyEnv ?? "STELLAR_PRIVATE_KEY"];
 
     if (readOnly !== true && payerKey) {
       results.push(
         ...(await runX402PaymentChecks({
           target,
-          network: network ?? "stellar:testnet",
+          network: payNetwork,
           payerSecretKey: payerKey,
           ...(rpcUrl !== undefined ? { rpcUrl } : {}),
           ...shape,

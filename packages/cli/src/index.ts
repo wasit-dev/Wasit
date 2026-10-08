@@ -7,8 +7,10 @@ import { App } from "./dashboard/App.js";
 import { CLI_VERSION } from "./version.js";
 import { registerWalletCommand } from "./wallet-command.js";
 import {
+  DEFAULT_SERVE_NETWORK,
   MODE_DESCRIPTIONS,
   SERVE_MODES,
+  SERVE_NETWORKS,
   createServeServer,
   validateServeOptions,
   type ServeMode,
@@ -18,6 +20,7 @@ import {
   PROTOCOL_IDS,
   checkStatus,
   fixFor,
+  paymentChainFor,
   runMppChannelSuite,
   runMppChargeSuite,
   runX402PaymentChecks,
@@ -200,14 +203,17 @@ program
   .requiredOption("--target <url>", "URL of the service to test")
   .option(
     "--network <network>",
-    "Network the payment checks pay on: stellar:testnet or stellar:pubnet. " +
-      "X402-01..05 apply to a challenge on any chain.",
+    "Network the payment checks pay on: stellar:testnet, stellar:pubnet or " +
+      "eip155:84532 (Base Sepolia). X402-01..05 apply to a challenge on any chain.",
     "stellar:testnet",
   )
-  .option("--rpc-url <url>", "Override the Soroban RPC endpoint used to verify X402-06's settlement")
+  .option(
+    "--rpc-url <url>",
+    "Override the RPC endpoint used to verify X402-06's settlement (Soroban RPC on Stellar, JSON-RPC on EVM)",
+  )
   .option(
     "--payer-key <key>",
-    "Testnet payer secret key (overrides STELLAR_PRIVATE_KEY from .env)",
+    "Testnet payer key (overrides STELLAR_PRIVATE_KEY, or EVM_PRIVATE_KEY on eip155 networks, from .env)",
   )
   .option(
     "--method <verb>",
@@ -244,14 +250,16 @@ signature. See docs/CHECKS.md for what each check ID verifies.`,
     };
 
     const results = await runX402ReadChecks({ target: opts.target, ...shape });
-    const payerKey: string | undefined = opts.payerKey ?? process.env.STELLAR_PRIVATE_KEY;
+    // Each chain reads its own payer key: a Stellar secret is no use on EVM.
+    const keyEnv = paymentChainFor(opts.network as string)?.payerKeyEnv ?? "STELLAR_PRIVATE_KEY";
+    const payerKey: string | undefined = opts.payerKey ?? process.env[keyEnv];
 
     if (opts.readOnly) {
       note(jsonMode, "(--read-only set: skipping payment checks)\n");
     } else if (!payerKey) {
       note(
         jsonMode,
-        "(no payer key: set STELLAR_PRIVATE_KEY in .env or pass --payer-key — skipping payment checks)\n",
+        `(no payer key: set ${keyEnv} in .env or pass --payer-key — skipping payment checks)\n`,
       );
     } else {
       note(
@@ -277,14 +285,20 @@ program
   .command("serve")
   .description("Run a local x402 paywall that misbehaves on purpose, to test an agent that pays")
   .requiredOption("--mode <mode>", `How the paywall misbehaves: ${SERVE_MODES.join(", ")}`)
+  .option(
+    "--network <network>",
+    `Testnet to pose on: ${Object.keys(SERVE_NETWORKS).join(" or ")}`,
+    DEFAULT_SERVE_NETWORK,
+  )
   .option("--port <port>", "Port to listen on", "4020")
   .option("--host <host>", "Interface to bind (local only by default)", "127.0.0.1")
   .option(
     "--pay-to <address>",
-    "Payee account (G...) with a USDC trustline on testnet (overrides STELLAR_PAYEE_ADDRESS)",
+    "Payee: a Stellar account (G...) with a USDC trustline, or an EVM address (0x...) " +
+      "on Base Sepolia (overrides STELLAR_PAYEE_ADDRESS or EVM_PAYEE_ADDRESS)",
   )
   .option("--amount <units>", "Price in base units for every mode except overprice", "10000")
-  .option("--asset <contract>", "Token contract (default: testnet USDC)")
+  .option("--asset <contract>", "Token contract (default: the network's testnet USDC)")
   .option(
     "--settlement-tx <hash>",
     "wrong-settlement: transaction to cite (default: a random hash that exists nowhere)",
@@ -303,12 +317,16 @@ simulate the transfer to --pay-to before signing.
 Examples:
   $ wasit serve --mode no-settle
   $ wasit serve --mode wrong-settlement --settlement-tx <hash of an unrelated tx>
-  $ wasit serve --mode overprice --port 4021`,
+  $ wasit serve --mode overprice --port 4021
+  $ wasit serve --mode no-settle --network eip155:84532   # Base Sepolia`,
   )
   .action((opts) => {
+    const network = opts.network as string;
+    const payeeEnv = SERVE_NETWORKS[network]?.payeeEnv ?? "STELLAR_PAYEE_ADDRESS";
     const options = {
       mode: opts.mode as ServeMode,
-      payTo: (opts.payTo as string | undefined) ?? process.env.STELLAR_PAYEE_ADDRESS ?? "",
+      network,
+      payTo: (opts.payTo as string | undefined) ?? process.env[payeeEnv] ?? "",
       amount: opts.amount as string,
       ...(opts.asset ? { asset: opts.asset as string } : {}),
       ...(opts.settlementTx ? { settlementTx: opts.settlementTx as string } : {}),
@@ -328,7 +346,7 @@ Examples:
     });
     server.listen(port, opts.host as string, () => {
       const description = MODE_DESCRIPTIONS[options.mode];
-      console.log(`wasit serve: ${options.mode} on http://${opts.host}:${port}/ (any path)`);
+      console.log(`wasit serve: ${options.mode} on ${network}, http://${opts.host}:${port}/ (any path)`);
       console.log(`  This paywall ${description.does}`);
       console.log(`  An agent that pays carefully ${description.careful}`);
       console.log("  Nothing is settled or forwarded; no funds move. Ctrl+C to stop.\n");

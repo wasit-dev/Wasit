@@ -2,8 +2,9 @@
 #
 # Runs every Wasit suite against the local fixtures in one go.
 #
-# Starts the fixtures if they are not already up, runs the x402, MPP charge and
-# MPP channel suites, prints one summary, and stops the fixtures it started.
+# Starts the fixtures if they are not already up, runs the x402 (Stellar, and
+# Base Sepolia when configured), MPP charge and MPP channel suites, prints one
+# summary, and stops the fixtures it started.
 #
 #   ./scripts/run-all.sh              free checks only (the default)
 #   ./scripts/run-all.sh --full       also the checks that settle testnet payments
@@ -102,6 +103,15 @@ if [ "$FULL" = 1 ]; then
 else
   SUITES+=("x402|test --target http://localhost:3001/protected --read-only")
   echo "Mode: free checks only. Pass --full to include the payment checks."
+fi
+# Base Sepolia, only when its fixture is up: fixtures.sh starts it only when
+# .env has EVM_PAYEE_ADDRESS. The payment checks read EVM_PRIVATE_KEY.
+if lsof -nP -iTCP:3005 -sTCP:LISTEN -t >/dev/null 2>&1; then
+  if [ "$FULL" = 1 ]; then
+    SUITES+=("x402-evm|test --target http://localhost:3005/protected --network eip155:84532")
+  else
+    SUITES+=("x402-evm|test --target http://localhost:3005/protected --network eip155:84532 --read-only")
+  fi
 fi
 SUITES+=("mpp-channel|mpp-channel --target http://localhost:3003/data")
 

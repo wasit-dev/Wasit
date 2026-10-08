@@ -14,11 +14,13 @@ import { after, before, describe, it } from "node:test";
 import { runX402ReadChecks } from "@wasit-dev/core";
 
 import {
+  BASE_SEPOLIA_USDC,
   OVERPRICE_AMOUNT,
   SERVE_MODES,
   TESTNET_USDC,
   challengeFor,
   createServeServer,
+  overpriceAmount,
   validateServeOptions,
   type ServeMode,
 } from "../../src/serve.js";
@@ -43,7 +45,7 @@ function paymentHeader(network: string, amount: string): string {
 
 async function start(
   mode: ServeMode,
-  extra: { settlementTx?: string } = {},
+  extra: { settlementTx?: string; network?: string; payTo?: string } = {},
 ): Promise<{ url: string; lines: string[]; server: http.Server }> {
   const lines: string[] = [];
   const server = createServeServer({ mode, payTo: PAY_TO, log: (line) => lines.push(line), ...extra });
@@ -172,7 +174,7 @@ describe("answers to a payment", () => {
     const { url, lines, server } = await start("wrong-network");
     try {
       await fetch(url, { headers: { "PAYMENT-SIGNATURE": paymentHeader("stellar:pubnet", "10000") } });
-      assert.match(lines.at(-1) ?? "", /paid a challenge on stellar:pubnet \(mainnet\)/);
+      assert.match(lines.at(-1) ?? "", /paid a challenge on stellar:pubnet \(Stellar mainnet\)/);
     } finally {
       await stop(server);
     }
@@ -227,5 +229,73 @@ describe("the challenge names the URL the agent asked for", () => {
     const response = await fetch(`${target.url}?q=1`);
     const challenge = decode(response.headers.get("payment-required"));
     assert.match(String((challenge["resource"] as { url: string }).url), /\/paid\?q=1$/);
+  });
+});
+
+const EVM_PAY_TO = "0x209693Bc6afc0C5328bA36FaF03C514EF312287C";
+const BASE = { network: "eip155:84532", payTo: EVM_PAY_TO };
+
+describe("on Base Sepolia", () => {
+  function accept(mode: ServeMode): Record<string, unknown> {
+    return (challengeFor({ mode, ...BASE }, "http://x/paid")["accepts"] as Array<Record<string, unknown>>)[0]!;
+  }
+
+  it("poses with the SDK's Base Sepolia USDC and its EIP-712 domain", () => {
+    const option = accept("no-settle");
+    assert.equal(option["network"], "eip155:84532");
+    assert.equal(option["asset"], BASE_SEPOLIA_USDC);
+    assert.deepEqual(option["extra"], { name: "USDC", version: "2" });
+  });
+
+  it("asks for Base mainnet in wrong-network, and one million 6-decimal USDC in overprice", () => {
+    assert.equal(accept("wrong-network")["network"], "eip155:8453");
+    assert.equal(accept("overprice")["amount"], "1000000000000");
+    assert.equal(overpriceAmount("eip155:84532"), "1000000000000");
+  });
+
+  it("validates the payee and the cited hash in EVM form", () => {
+    assert.equal(validateServeOptions({ mode: "no-settle", ...BASE }), undefined);
+    assert.match(validateServeOptions({ mode: "no-settle", ...BASE, payTo: PAY_TO }) ?? "", /EVM address/);
+    assert.match(
+      validateServeOptions({ mode: "wrong-settlement", ...BASE, settlementTx: CITED_TX }) ?? "",
+      /EVM transaction hash/,
+    );
+    assert.match(validateServeOptions({ mode: "no-settle", network: "eip155:1", payTo: EVM_PAY_TO }) ?? "", /Unknown network/);
+  });
+
+  for (const mode of SERVE_MODES) {
+    it(`${mode}: Wasit's read checks pass the Base Sepolia challenge`, async () => {
+      const { url, server } = await start(mode, BASE);
+      try {
+        const results = await runX402ReadChecks({ target: url });
+        for (const result of results) assert.equal(result.pass, true, `${mode} ${result.id}: ${result.detail}`);
+      } finally {
+        await stop(server);
+      }
+    });
+  }
+
+  it("wrong-settlement cites a well-formed EVM hash on the payment's network", async () => {
+    const { url, server } = await start("wrong-settlement", BASE);
+    try {
+      const response = await fetch(url, {
+        headers: { "PAYMENT-SIGNATURE": paymentHeader("eip155:84532", "10000") },
+      });
+      const settlement = decode(response.headers.get("payment-response"));
+      assert.match(String(settlement["transaction"]), /^0x[0-9a-f]{64}$/);
+      assert.equal(settlement["network"], "eip155:84532");
+    } finally {
+      await stop(server);
+    }
+  });
+
+  it("names Base mainnet when the agent pays the wrong-network challenge", async () => {
+    const { url, lines, server } = await start("wrong-network", BASE);
+    try {
+      await fetch(url, { headers: { "PAYMENT-SIGNATURE": paymentHeader("eip155:8453", "10000") } });
+      assert.match(lines.at(-1) ?? "", /paid a challenge on eip155:8453 \(Base mainnet\)/);
+    } finally {
+      await stop(server);
+    }
   });
 });

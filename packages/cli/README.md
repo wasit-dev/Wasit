@@ -48,8 +48,8 @@ wasit test --target <url> [options]
 | Option | Default | Notes |
 |---|---|---|
 | `--target <url>` | required | Must include the scheme |
-| `--network <id>` | `stellar:testnet` | Network the payment checks pay on (`stellar:testnet` or `stellar:pubnet`); `X402-01`–`05` apply on any chain |
-| `--payer-key <key>` | `STELLAR_PRIVATE_KEY` | Testnet secret key, `S...` |
+| `--network <id>` | `stellar:testnet` | Network the payment checks pay on (`stellar:testnet`, `stellar:pubnet` or `eip155:84532`, Base Sepolia); `X402-01`–`05` apply on any chain |
+| `--payer-key <key>` | `STELLAR_PRIVATE_KEY`, or `EVM_PRIVATE_KEY` on Base Sepolia | A Stellar secret (`S...`), or an EVM private key (`0x` + 64 hex) |
 | `--rpc-url <url>` | testnet default | Soroban RPC used to verify `X402-06`'s settlement |
 | `--method <verb>` | `GET` | HTTP method the paid endpoint uses |
 | `--body <json>` | — | Request body; implies `Content-Type: application/json` |
@@ -168,7 +168,8 @@ A run with both a failure and an error exits `1` — a real finding outranks a m
 
 | Env var | Used by |
 |---|---|
-| `STELLAR_PRIVATE_KEY` | `test` (x402 payment checks) |
+| `STELLAR_PRIVATE_KEY` | `test` (x402 payment checks on Stellar) |
+| `EVM_PRIVATE_KEY` | `test --network eip155:84532` (x402 payment checks on Base Sepolia) |
 | `MPP_PAYER_SECRET` | `mpp-charge` |
 | `MPP_STELLAR_NETWORK` | `mpp-charge`, `mpp-channel` |
 | `COMMITMENT_SECRET_HEX` | `mpp-channel` |

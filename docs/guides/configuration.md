@@ -11,7 +11,8 @@ keys in this file.
 | Checks | Required |
 |---|---|
 | `X402-01`–`05` | nothing |
-| `X402-06`, `07` | `STELLAR_PRIVATE_KEY` |
+| `X402-06`, `07` on Stellar | `STELLAR_PRIVATE_KEY` |
+| `X402-06`, `07` on Base Sepolia (`--network eip155:84532`) | `EVM_PRIVATE_KEY` |
 | `MPP-01` | `MPP_PAYER_SECRET`, `MPP_STELLAR_NETWORK` |
 | `MPP-10`–`12`, `14` | `COMMITMENT_SECRET_HEX`, `MPP_STELLAR_NETWORK` |
 | `MPP-13` | the above, plus `CHANNEL_CONTRACT_DISPOSABLE` and an explicit opt-in |
@@ -29,6 +30,11 @@ Only testnet has a default RPC endpoint. Pubnet deliberately has none, so a
 pubnet run must pass `--rpc-url` explicitly rather than silently reaching a
 third-party node.
 
+The x402 payment checks also pay on Base Sepolia (`eip155:84532`), through
+`--network` (MCP: `network`), with the payer key in `EVM_PRIVATE_KEY`. Its
+default RPC endpoint is Base's public `https://sepolia.base.org`, overridable
+with `--rpc-url`. Any other network gets the read-only checks only.
+
 ## Getting testnet keys
 
 ```bash
@@ -45,6 +51,13 @@ curl "https://friendbot.stellar.org/?addr=<G...>"
 
 `COMMITMENT_SECRET_HEX` is a raw ed25519 seed in hex, not a Stellar `S...`
 string — it signs channel commitments directly rather than transactions.
+
+For Base Sepolia, `EVM_PRIVATE_KEY` is a raw private key, `0x` followed by 64
+hex characters, from any EVM wallet or `viem`'s `generatePrivateKey()`. The
+payer needs Base Sepolia USDC, from https://faucet.circle.com, and **no ETH**:
+the facilitator pays the gas (the `exact` scheme's EIP-3009 method). A wrong
+or malformed key is reported at `PREFLIGHT` before anything is sent, without
+echoing it.
 
 ## The disposable channel
 

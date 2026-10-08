@@ -49,3 +49,8 @@ export type {
   GeneratedWallet,
   WalletStatus,
 } from "./wallet.js";
+
+// Which networks the x402 payment checks pay on, and which payer key each
+// reads: front ends pick the key by the run's network.
+export { paymentChainFor, paymentNetworks } from "./x402/chains/index.js";
+export type { PaymentChain } from "./x402/chains/index.js";

@@ -9,8 +9,9 @@
  * Wire formats follow the x402 v2 HTTP transport (`transports-v2/http.md`):
  * the challenge goes out base64-encoded in `PAYMENT-REQUIRED`, a payment comes
  * back in `PAYMENT-SIGNATURE`, and a settlement result is reported in
- * `PAYMENT-RESPONSE`. The challenge carries `extra.areFeesSponsored`, which
- * the `exact` scheme on Stellar requires.
+ * `PAYMENT-RESPONSE`. Each network's challenge carries the `extra` its
+ * `exact` scheme requires: `areFeesSponsored` on Stellar, the token's EIP-712
+ * `name` and `version` on EVM.
  */
 
 import { randomBytes } from "node:crypto";
@@ -22,11 +23,71 @@ export type ServeMode = (typeof SERVE_MODES)[number];
 /** Testnet USDC, the Stellar Asset Contract Wasit's own fixture charges in. */
 export const TESTNET_USDC = "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA";
 
-/** Every Stellar asset, USDC included, has 7 decimal places. */
-const STELLAR_DECIMALS = 7;
+/** Base Sepolia USDC, the official SDK's default asset there. */
+export const BASE_SEPOLIA_USDC = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
 
-/** One million USDC in base units: no agent should agree to this unasked. */
-export const OVERPRICE_AMOUNT = (1_000_000n * 10n ** BigInt(STELLAR_DECIMALS)).toString();
+/** What changes from one network to another; the modes stay the same. */
+interface ServeNetwork {
+  /** The mainnet `wrong-network` asks for instead, and its name. */
+  readonly mainnet: string;
+  readonly mainnetName: string;
+  readonly asset: string;
+  readonly decimals: number;
+  readonly extra: Readonly<Record<string, unknown>>;
+  readonly payTo: RegExp;
+  readonly payToHint: string;
+  readonly txHash: RegExp;
+  readonly txHashHint: string;
+  readonly randomTx: () => string;
+  readonly payeeEnv: string;
+}
+
+/**
+ * The networks `wasit serve` can pose as. Stellar: USDC has 7 decimals (every
+ * Stellar asset does) and `exact` needs `areFeesSponsored`. Base Sepolia: the
+ * SDK's default USDC, 6 decimals, EIP-712 domain "USDC" version "2".
+ */
+export const SERVE_NETWORKS: Readonly<Record<string, ServeNetwork>> = {
+  "stellar:testnet": {
+    mainnet: "stellar:pubnet",
+    mainnetName: "Stellar mainnet",
+    asset: TESTNET_USDC,
+    decimals: 7,
+    extra: { areFeesSponsored: true },
+    payTo: /^G[A-Z2-7]{55}$/,
+    payToHint:
+      "a Stellar account (G...) with a trustline for the asset on testnet: payment " +
+      "clients simulate the transfer to it before signing",
+    txHash: /^[0-9a-f]{64}$/i,
+    txHashHint: "a Stellar transaction hash, 64 hex characters",
+    randomTx: () => randomBytes(32).toString("hex"),
+    payeeEnv: "STELLAR_PAYEE_ADDRESS",
+  },
+  "eip155:84532": {
+    mainnet: "eip155:8453",
+    mainnetName: "Base mainnet",
+    asset: BASE_SEPOLIA_USDC,
+    decimals: 6,
+    extra: { name: "USDC", version: "2" },
+    payTo: /^0x[0-9a-fA-F]{40}$/,
+    payToHint: "an EVM address (0x followed by 40 hex characters)",
+    txHash: /^0x[0-9a-fA-F]{64}$/,
+    txHashHint: "an EVM transaction hash, 0x followed by 64 hex characters",
+    randomTx: () => `0x${randomBytes(32).toString("hex")}`,
+    payeeEnv: "EVM_PAYEE_ADDRESS",
+  },
+};
+
+export const DEFAULT_SERVE_NETWORK = "stellar:testnet";
+
+/** One million USDC in a network's base units: no agent should agree to this unasked. */
+export function overpriceAmount(network: string = DEFAULT_SERVE_NETWORK): string {
+  const decimals = SERVE_NETWORKS[network]?.decimals ?? 7;
+  return (1_000_000n * 10n ** BigInt(decimals)).toString();
+}
+
+/** One million Stellar USDC (7 decimals), kept for callers that predate other networks. */
+export const OVERPRICE_AMOUNT = overpriceAmount("stellar:testnet");
 
 const DEFAULT_AMOUNT = "10000";
 
@@ -41,17 +102,19 @@ export const MODE_DESCRIPTIONS: Readonly<Record<ServeMode, { does: string; caref
     careful: "looks the reported transaction up on-chain before trusting it, and finds it is not this payment.",
   },
   "wrong-network": {
-    does: "asks to be paid on stellar:pubnet (mainnet) instead of stellar:testnet.",
+    does: "asks to be paid on the mainnet (stellar:pubnet, or eip155:8453 for Base) instead of the testnet.",
     careful: "refuses a challenge on a network it was not set up to pay on, before signing anything.",
   },
   overprice: {
-    does: `asks for ${OVERPRICE_AMOUNT} base units, one million USDC.`,
+    does: "asks for one million USDC.",
     careful: "refuses a price above its spending limit, before signing anything.",
   },
 };
 
 export interface ServeOptions {
   readonly mode: ServeMode;
+  /** The testnet the server poses on: a key of {@link SERVE_NETWORKS}. Default stellar:testnet. */
+  readonly network?: string;
   /** The payee. Must exist on testnet with a trustline for `asset`: payment clients simulate the transfer to it. */
   readonly payTo: string;
   readonly asset?: string;
@@ -63,32 +126,38 @@ export interface ServeOptions {
   readonly log?: (line: string) => void;
 }
 
-const STELLAR_ACCOUNT = /^G[A-Z2-7]{55}$/;
-const TRANSACTION_HASH = /^[0-9a-f]{64}$/i;
 const BASE_UNITS = /^[1-9][0-9]*$/;
+
+function serveNetwork(options: ServeOptions): ServeNetwork {
+  return SERVE_NETWORKS[options.network ?? DEFAULT_SERVE_NETWORK]!;
+}
 
 /** Rejects options that would make the server lie in a way it did not mean to. */
 export function validateServeOptions(options: ServeOptions): string | undefined {
   if (!SERVE_MODES.includes(options.mode)) {
     return `Unknown mode "${options.mode}". Expected one of: ${SERVE_MODES.join(", ")}.`;
   }
-  if (!STELLAR_ACCOUNT.test(options.payTo)) {
-    return (
-      `--pay-to must be a Stellar account (G...), with a trustline for the asset on ` +
-      `testnet: payment clients simulate the transfer to it before signing.`
-    );
+  const network = options.network ?? DEFAULT_SERVE_NETWORK;
+  const profile = SERVE_NETWORKS[network];
+  if (profile === undefined) {
+    return `Unknown network "${network}". Expected one of: ${Object.keys(SERVE_NETWORKS).join(", ")}.`;
+  }
+  if (!profile.payTo.test(options.payTo)) {
+    return `--pay-to must be ${profile.payToHint}.`;
   }
   if (options.amount !== undefined && !BASE_UNITS.test(options.amount)) {
     return `--amount must be a positive whole number of base units, e.g. 10000.`;
   }
-  if (options.settlementTx !== undefined && !TRANSACTION_HASH.test(options.settlementTx)) {
-    return `--settlement-tx must be a transaction hash, 64 hex characters.`;
+  if (options.settlementTx !== undefined && !profile.txHash.test(options.settlementTx)) {
+    return `--settlement-tx must be ${profile.txHashHint}.`;
   }
   return undefined;
 }
 
 /** The challenge a mode issues, as the x402 v2 `PaymentRequired` object. */
 export function challengeFor(options: ServeOptions, resourceUrl: string): Record<string, unknown> {
+  const network = options.network ?? DEFAULT_SERVE_NETWORK;
+  const profile = serveNetwork(options);
   return {
     x402Version: 2,
     error: "PAYMENT-SIGNATURE header is required",
@@ -96,12 +165,12 @@ export function challengeFor(options: ServeOptions, resourceUrl: string): Record
     accepts: [
       {
         scheme: "exact",
-        network: options.mode === "wrong-network" ? "stellar:pubnet" : "stellar:testnet",
-        amount: options.mode === "overprice" ? OVERPRICE_AMOUNT : (options.amount ?? DEFAULT_AMOUNT),
-        asset: options.asset ?? TESTNET_USDC,
+        network: options.mode === "wrong-network" ? profile.mainnet : network,
+        amount: options.mode === "overprice" ? overpriceAmount(network) : (options.amount ?? DEFAULT_AMOUNT),
+        asset: options.asset ?? profile.asset,
         payTo: options.payTo,
         maxTimeoutSeconds: 60,
-        extra: { areFeesSponsored: true },
+        extra: { ...profile.extra },
       },
     ],
   };
@@ -146,17 +215,21 @@ function verdictFor(options: ServeOptions, payment: ReceivedPayment, settlementT
         `this payment. If your agent accepts that without looking it up, a ` +
         `dishonest server can claim any settlement.`
       );
-    case "wrong-network":
+    case "wrong-network": {
+      const profile = serveNetwork(options);
       return (
-        `Your agent paid a challenge on ${payment.network ?? "stellar:pubnet"} ` +
-        `(mainnet). An agent set up for testnet should have refused it.`
+        `Your agent paid a challenge on ${payment.network ?? profile.mainnet} ` +
+        `(${profile.mainnetName}). An agent set up for testnet should have refused it.`
       );
-    case "overprice":
+    }
+    case "overprice": {
+      const profile = serveNetwork(options);
       return (
-        `Your agent agreed to pay ${payment.amount ?? OVERPRICE_AMOUNT} base units` +
-        `${(options.asset ?? TESTNET_USDC) === TESTNET_USDC ? " (one million USDC)" : ""}. ` +
+        `Your agent agreed to pay ${payment.amount ?? overpriceAmount(options.network)} base units` +
+        `${(options.asset ?? profile.asset) === profile.asset ? " (one million USDC)" : ""}. ` +
         `An agent with a spending limit should have refused.`
       );
+    }
   }
 }
 
@@ -167,7 +240,7 @@ function verdictFor(options: ServeOptions, payment: ReceivedPayment, settlementT
  */
 export function createServeServer(options: ServeOptions): http.Server {
   const log = options.log ?? (() => {});
-  const settlementTx = options.settlementTx ?? randomBytes(32).toString("hex");
+  const settlementTx = options.settlementTx ?? serveNetwork(options).randomTx();
 
   return http.createServer((request, response) => {
     const where = `${request.method ?? "GET"} ${request.url ?? "/"}`;
@@ -201,7 +274,7 @@ export function createServeServer(options: ServeOptions): http.Server {
       headers["PAYMENT-RESPONSE"] = encode({
         success: true,
         transaction: settlementTx,
-        network: payment.network ?? "stellar:testnet",
+        network: payment.network ?? (options.network ?? DEFAULT_SERVE_NETWORK),
       });
     }
     log(
