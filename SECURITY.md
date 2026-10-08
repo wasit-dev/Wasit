@@ -19,6 +19,17 @@ has to be configured on purpose rather than reached by accident. **Do not do
 this.** No check in the catalogue has been validated against mainnet
 conditions, and the destructive check is irreversible wherever it runs.
 
+Nor can a target choose the network. The payment checks sign only for the
+network the run names: `X402-06` to `X402-10` pay only an option on
+`--network`, and `MPP-01` refuses a challenge for any other network before
+anything is signed, both on its unpaid read and on the request it pays. `MPP-01`
+pays through the run's RPC endpoint, not the SDK's default for the network, and
+pays once per run. Before 0.7.0, `MPP-01` let the SDK sign for whichever
+network the challenge named, through the SDK's default endpoint for it, so a
+target asking for `stellar:pubnet` could have a mainnet transfer signed by the
+payer key if that account holds mainnet funds (read from the SDK's source, not
+run). Use a payer key that has never held mainnet funds.
+
 ## Authorization
 
 **Only run Wasit against a service you own, or one whose operator has given you

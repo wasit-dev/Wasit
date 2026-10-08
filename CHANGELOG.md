@@ -4,6 +4,22 @@ All notable changes to Wasit are recorded here. Versions follow [Semantic Versio
 
 ## [Unreleased]
 
+**Fixed — `MPP-01` signs only for the network the run names, and pays once.**
+`MPP-01` read the amount, currency and recipient from the target's challenge
+but not its network, and the SDK's charge client signs for whichever network
+the challenge names, through its own default RPC endpoint for it. A target
+asking for `stellar:pubnet` could therefore have a mainnet transfer, for the
+amount it chose, signed by the payer key if that account holds mainnet funds.
+This is read from the SDK's source (`@stellar/mpp` 0.7.1), not run: it would
+need mainnet funds. A challenge for any network but the run's is now refused before anything
+is signed, on the unpaid read and on the request actually paid, with no verdict
+(`ERROR (configuration)`); a network that is not `stellar:testnet` or
+`stellar:pubnet` fails. The payment now goes through the run's RPC endpoint
+(`--rpc-url`, MCP: `rpcUrl`) rather than the SDK's default, so an http endpoint,
+which the SDK's client refuses, now stops the run before anything is sent. And
+it is made once: the SDK's client paid up to three times when a target kept
+answering 402 after being paid.
+
 **Changed — `X402-04` and `X402-05` read every payment option, on any chain.**
 Both read only `accepts[0]`, and `X402-05` accepted only `stellar:testnet` and
 `stellar:pubnet`, so a conformant x402 service on another chain failed it, and

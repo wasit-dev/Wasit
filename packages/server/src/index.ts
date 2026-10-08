@@ -271,11 +271,15 @@ server.registerTool(
       "NOT IDEMPOTENT - every call settles a real payment and spends testnet " +
       "funds from the payer key. Repeated calls repeatedly spend. The payer " +
       "key is read from MPP_PAYER_SECRET in this server's environment. " +
-      "Testnet only.",
+      "Pays only a challenge on `network`: one for any other network is " +
+      "refused before anything is signed. Testnet only.",
     inputSchema: {
       target: z.string().describe("Full URL of the paid resource, including scheme"),
       network: z.string().optional().describe('CAIP-2 network id, default "stellar:testnet"'),
-      rpcUrl: z.string().optional().describe("Override the Soroban RPC endpoint"),
+      rpcUrl: z
+        .string()
+        .optional()
+        .describe("Override the Soroban RPC endpoint (https), used for the payment and the settlement read"),
     },
     outputSchema: runOutputShape,
     annotations: {

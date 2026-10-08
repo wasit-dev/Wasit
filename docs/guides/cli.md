@@ -192,8 +192,8 @@ wasit mpp-charge --target <url> [options]
 |---|---|---|
 | `--target <url>` | required | The paid resource |
 | `--payer-key <key>` | `MPP_PAYER_SECRET` | Secret key, `S...` |
-| `--network <id>` | `MPP_STELLAR_NETWORK` | CAIP-2 |
-| `--rpc-url <url>` | testnet default | Required for pubnet |
+| `--network <id>` | `MPP_STELLAR_NETWORK` | CAIP-2. Only a challenge on this network is paid |
+| `--rpc-url <url>` | testnet default | Used for the payment and the settlement read; https only. Required for pubnet |
 | `--json` | off | Machine-readable output (see below) instead of formatted text |
 
 **Every run settles a real payment.** There is no read-only mode: charge mode
