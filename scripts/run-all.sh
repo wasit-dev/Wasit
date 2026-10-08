@@ -106,13 +106,16 @@ else
 fi
 # Base Sepolia, only when its fixture is up: fixtures.sh starts it only when
 # .env has EVM_PAYEE_ADDRESS. The payment checks read EVM_PRIVATE_KEY.
-if lsof -nP -iTCP:3005 -sTCP:LISTEN -t >/dev/null 2>&1; then
-  if [ "$FULL" = 1 ]; then
-    SUITES+=("x402-evm|test --target http://localhost:3005/protected --network eip155:84532")
-  else
-    SUITES+=("x402-evm|test --target http://localhost:3005/protected --network eip155:84532 --read-only")
+for evm in "x402-evm:3005" "x402-permit2:3006"; do
+  name="${evm%%:*}"; port="${evm#*:}"
+  if lsof -nP -iTCP:"$port" -sTCP:LISTEN -t >/dev/null 2>&1; then
+    if [ "$FULL" = 1 ]; then
+      SUITES+=("$name|test --target http://localhost:$port/protected --network eip155:84532")
+    else
+      SUITES+=("$name|test --target http://localhost:$port/protected --network eip155:84532 --read-only")
+    fi
   fi
-fi
+done
 SUITES+=("mpp-channel|mpp-channel --target http://localhost:3003/data")
 
 # The CLI reads .env from its working directory.

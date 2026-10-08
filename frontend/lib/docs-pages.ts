@@ -139,7 +139,7 @@ outranks a missing one.
 npx @wasit-dev/cli checks
 \`\`\`
 
-Lists all thirteen checks with the subcommand that runs each, and flags
+Lists all sixteen checks with the subcommand that runs each, and flags
 the ones that are negative, destructive, or spend funds. It contacts
 nothing.
 
@@ -393,7 +393,7 @@ where it went.
 wasit checks
 \`\`\`
 
-Contacts nothing and needs no keys. If this prints thirteen checks, the
+Contacts nothing and needs no keys. If this prints sixteen checks, the
 install is sound and the problem in any later failure is configuration or
 the target, not Wasit.
 

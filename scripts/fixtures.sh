@@ -27,6 +27,7 @@ FIXTURES=(
   "channel:3003:packages/core/test/fixtures/mpp-channel-server.ts"
   "refusing:3004:packages/core/test/fixtures/mpp-channel-refusing-server.ts"
   "x402-evm:3005:packages/core/test/fixtures/x402-evm-server.ts"
+  "x402-permit2:3006:packages/core/test/fixtures/x402-evm-permit2-server.ts"
 )
 
 field() { echo "$1" | cut -d: -f"$2"; }
@@ -82,10 +83,14 @@ cmd_start() {
   for fixture in "${FIXTURES[@]}"; do
     # The Base Sepolia fixture needs its own payee; without one it is skipped,
     # not failed, so a Stellar-only setup starts as before.
-    if [ "$(field "$fixture" 1)" = "x402-evm" ] && ! grep -q '^EVM_PAYEE_ADDRESS=.' "$ROOT/.env"; then
-      printf "  %-9s skipped (EVM_PAYEE_ADDRESS not set in .env)\n" "x402-evm"
-      continue
-    fi
+    case "$(field "$fixture" 1)" in
+      x402-evm|x402-permit2)
+        if ! grep -q '^EVM_PAYEE_ADDRESS=.' "$ROOT/.env"; then
+          printf "  %-9s skipped (EVM_PAYEE_ADDRESS not set in .env)\n" "$(field "$fixture" 1)"
+          continue
+        fi
+        ;;
+    esac
     start_one "$fixture"
   done
   echo
@@ -95,6 +100,7 @@ cmd_start() {
   echo "  channel  http://localhost:3003/data"
   echo "  refusing http://localhost:3004/data   (always refuses, by design)"
   echo "  x402-evm http://localhost:3005/protected   (Base Sepolia, needs EVM_PAYEE_ADDRESS)"
+  echo "  x402-permit2 http://localhost:3006/protected   (Base Sepolia, Permit2 with EIP-2612 sponsoring)"
 }
 
 cmd_stop() {

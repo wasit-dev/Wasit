@@ -34,7 +34,7 @@ Each action reuses the same environment-variable defaults as the matching
 subcommand below.
 
 This is deliberately narrower than the subcommands themselves: no
-`X402-06`/`07` payment checks, no `--allow-destructive`, no header/method/body
+`X402-06`–`10` payment checks, no `--allow-destructive`, no header/method/body
 overrides, no `--json`. Anything past "run the safe default checks and read
 the result" still goes through the direct subcommand — `wasit test
 --payer-key ...`, `wasit mpp-channel --allow-destructive ...`, and so on. MPP

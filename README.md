@@ -197,7 +197,7 @@ Wasit exists so these are found by a tool, before they are found by a user.
 | Area                                   | Status                                                                                                                                                                                                       |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | x402 read-only checks (`X402-01`–`05`) | Done, verified against a real facilitator                                                                                                                                                                    |
-| x402 payment checks (`X402-06`, `07`)  | Done, settlement verified from contract events                                                                                                                                                               |
+| x402 payment checks (`X402-06`–`10`)  | Done, settlement verified from contract events                                                                                                                                                               |
 | MPP charge mode (`MPP-01`)             | Done, settlement verified from contract events                                                                                                                                                               |
 | MPP channel mode (`MPP-10`–`14`)       | Done, including destructive close                                                                                                                                                                            |
 | CLI                                    | Done — five subcommands plus an interactive dashboard                                                                                                                                                        |
@@ -295,7 +295,7 @@ again, in a single command:
 
 ```bash
 ./scripts/run-all.sh            # free checks only: X402-01..05, MPP-10..12/14
-./scripts/run-all.sh --full     # also X402-06/07 and MPP-01, which move testnet funds
+./scripts/run-all.sh --full     # also X402-06..10 and MPP-01, which move testnet funds
 ./scripts/run-all.sh --npm      # run the published CLI instead of this checkout
 ```
 

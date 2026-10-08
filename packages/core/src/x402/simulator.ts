@@ -361,6 +361,7 @@ export async function runX402ReadChecks(
 }
 
 import { x402Client, x402HTTPClient } from "@x402/fetch";
+import type { PaymentRequirements } from "@x402/core/types";
 
 import { paymentChainFor, paymentNetworks, type PaymentChain } from "./chains/index.js";
 import { stellarChain } from "./chains/stellar.js";
@@ -375,6 +376,14 @@ export interface X402PaymentCheckOptions extends RequestShape {
   readonly rpcUrl?: string;
   /** See {@link X402SimulatorOptions.onResult} — same contract. */
   readonly onResult?: (result: CheckResult) => void;
+}
+
+/** One check has nothing to test against this target; it is skipped with the reason. */
+class CheckNotApplicable extends Error {
+  public constructor(reason: string) {
+    super(reason);
+    this.name = "CheckNotApplicable";
+  }
 }
 
 /** The payment flow was never started, so neither payment check has a verdict. */
@@ -402,9 +411,14 @@ function chainFor(network: string): PaymentChain {
   return chain;
 }
 
-function buildX402Client(chain: PaymentChain, network: string, payerSecretKey: string) {
+function buildX402Client(
+  chain: PaymentChain,
+  network: string,
+  payerSecretKey: string,
+  rpcUrl: string,
+) {
   const client = new x402Client();
-  chain.registerPayer(client, network, payerSecretKey);
+  chain.registerPayer(client, network, payerSecretKey, rpcUrl);
   client
     // A challenge may offer several networks, including both Stellar ones.
     // The client's default pick is the first it supports, which would sign
@@ -423,16 +437,33 @@ function describeOffered(accepts: ReadonlyArray<{ readonly network: string }>): 
 }
 
 /**
+ * What a negative check signs differently from the honest payment. The
+ * payload still claims, in `accepted`, the terms the target advertised, so the
+ * only thing wrong with it is what was signed.
+ */
+interface AlteredSigning {
+  readonly amount?: string;
+  readonly maxTimeoutSeconds?: number;
+}
+
+/**
  * Reads the challenge and produces a signed payment payload for it.
  *
- * Shared by both payment checks so each one starts from a challenge the
- * target issued just now, rather than reusing a stale one.
+ * Shared by every payment check so each one starts from a challenge the
+ * target issued just now, rather than reusing a stale one. With `altered`,
+ * the payment is signed for those terms instead, and its `accepted` is set
+ * back to what the target advertised.
  */
-async function preparePayment(options: X402PaymentCheckOptions) {
+async function preparePayment(
+  options: X402PaymentCheckOptions,
+  alter?: (selected: PaymentRequirements) => AlteredSigning,
+) {
+  const chain = chainFor(options.network);
   const { client, httpClient } = buildX402Client(
-    chainFor(options.network),
+    chain,
     options.network,
     options.payerSecretKey,
+    chain.resolveRpcUrl(options.network, options.rpcUrl),
   );
 
   const challenge = await fetchTarget(options.target, buildInit(options));
@@ -444,7 +475,7 @@ async function preparePayment(options: X402PaymentCheckOptions) {
     );
   } catch (error) {
     // The read checks already report what is wrong with the challenge. Failing
-    // X402-06/07 here too would count one broken challenge three times, and
+    // the payment checks here too would count one broken challenge many times, and
     // would make X402-07 read as a signature that was not rejected when no
     // payment was ever sent. docs/CHECKS.md: an unreadable challenge produces
     // no verdict.
@@ -481,8 +512,23 @@ async function preparePayment(options: X402PaymentCheckOptions) {
     );
   }
 
-  const paymentPayload = await client.createPaymentPayload(paymentRequired);
-  return { httpClient, paymentPayload };
+  const selected = onNetwork.find((requirement) => requirement.scheme === "exact")!;
+  // The payment-identifier extension lets a server answer a repeated payload
+  // with its cached response (specs/extensions/payment_identifier.md).
+  const idempotent = paymentRequired.extensions?.["payment-identifier"] !== undefined;
+
+  if (alter === undefined) {
+    const paymentPayload = await client.createPaymentPayload(paymentRequired);
+    return { httpClient, paymentPayload, selected, idempotent };
+  }
+
+  const altered = alter(selected);
+  const signed = await client.createPaymentPayload({
+    ...paymentRequired,
+    accepts: [{ ...selected, ...altered }],
+  });
+  const paymentPayload = { ...signed, accepted: selected };
+  return { httpClient, paymentPayload, selected, idempotent };
 }
 
 /**
@@ -544,27 +590,54 @@ export function readSettlementReference(
  * held to what the target advertised, as MPP-01 does: a target that serves
  * the resource without settling, or settles something else, fails here.
  */
-async function checkSignatureAccepted(
-  options: X402PaymentCheckOptions,
-): Promise<CheckResult> {
+/** What X402-06 hands the negative checks: whether the honest payment was taken, and how to replay it. */
+interface HonestPayment {
+  readonly result: CheckResult;
+  /** True when the target answered the honest payment with a 2xx. */
+  readonly accepted: boolean;
+  /** The exact headers the honest payment was sent with. */
+  readonly headers: Record<string, string>;
+  /** True when the challenge advertised the payment-identifier extension. */
+  readonly idempotent: boolean;
+}
+
+async function checkSignatureAccepted(options: X402PaymentCheckOptions): Promise<HonestPayment> {
   const id = "X402-06";
   const name = "Signature Resubmit Accepted";
   const fail = (detail: string, hint: string): CheckResult => ({ id, name, pass: false, detail, hint });
 
-  const { httpClient, paymentPayload } = await preparePayment(options);
+  const { httpClient, paymentPayload, idempotent } = await preparePayment(options);
   const paymentHeaders = httpClient.encodePaymentSignatureHeader(paymentPayload);
   const paid = await fetchTarget(
     options.target,
     withPaymentHeaders(options, paymentHeaders),
   );
+  const honest = (result: CheckResult, accepted: boolean): HonestPayment => ({
+    result,
+    accepted,
+    headers: paymentHeaders,
+    idempotent,
+  });
 
   if (paid.status < 200 || paid.status >= 300) {
-    return fail(
-      `Expected 2xx after a valid payment, got ${paid.status}.`,
+    const reason = await refusalReason(paid);
+    // Permit2 needs the payer to have approved the Permit2 contract once. A
+    // target that offers no gas-sponsored approval leaves that to the payer,
+    // so this refusal is about Wasit's payer, not the target: no verdict.
+    if (reason === "permit2_allowance_required") {
+      throw new CheckSetupError(
+        "The target pays through Permit2 without a gas-sponsored approval, and this " +
+          "run's payer has not approved the Permit2 contract for the token. Approve it " +
+          "once (an on-chain transaction that needs gas), then re-run.",
+      );
+    }
+    return honest(fail(
+      `Expected 2xx after a valid payment, got ${paid.status}` +
+        `${reason === undefined ? "" : ` (${reason})`}.`,
       "A valid payment was refused. Your server's log of the facilitator's " +
         "verify or settle response says why; serve the resource with a 2xx once " +
         "the payment settles.",
-    );
+    ), false);
   }
 
   const chain = chainFor(options.network);
@@ -573,7 +646,7 @@ async function checkSignatureAccepted(
     () => httpClient.getPaymentSettleResponse((header) => paid.headers.get(header)),
     chain,
   );
-  if ("failure" in read) return fail(read.failure, read.hint);
+  if ("failure" in read) return honest(fail(read.failure, read.hint), true);
   const reference = read.reference;
 
   const accepted = paymentPayload.accepted;
@@ -595,19 +668,22 @@ async function checkSignatureAccepted(
     payer: chain.payerAddress(options.payerSecretKey),
   });
 
-  return verdict.pass
-    ? {
-        id,
-        name,
-        pass: true,
-        detail: `Valid payment accepted (HTTP ${paid.status}) and ${verdict.detail}.`,
-      }
-    : fail(
-        verdict.detail,
-        "PAYMENT-RESPONSE must name the transaction that settled this payment, " +
-          "and that transaction must move exactly `amount` of `asset` from the " +
-          "payer to `payTo`, in a single transfer.",
-      );
+  return honest(
+    verdict.pass
+      ? {
+          id,
+          name,
+          pass: true,
+          detail: `Valid payment accepted (HTTP ${paid.status}) and ${verdict.detail}.`,
+        }
+      : fail(
+          verdict.detail,
+          "PAYMENT-RESPONSE must name the transaction that settled this payment, " +
+            "and that transaction must move exactly `amount` of `asset` from the " +
+            "payer to `payTo`, in a single transfer.",
+        ),
+    true,
+  );
 }
 
 /**
@@ -639,14 +715,14 @@ async function checkInvalidSignatureRejected(
     withPaymentHeaders(options, paymentHeaders),
   );
 
-  return signatureRejectionVerdict(response.status);
+  return signatureRejectionVerdict(response.status, await refusalReason(response));
 }
 
 /**
  * X402-07's verdict from the status a corrupted payment drew. Split out so
  * the verdict can be tested without building a payment.
  */
-export function signatureRejectionVerdict(status: number): CheckResult {
+export function signatureRejectionVerdict(status: number, reason?: string): CheckResult {
   const accepted = status >= 200 && status < 300;
   return {
     id: "X402-07",
@@ -656,7 +732,7 @@ export function signatureRejectionVerdict(status: number): CheckResult {
       ? `A payment with a corrupted authorization signature was accepted with ` +
         `HTTP ${status} — security-relevant failure.`
       : `Payment with a corrupted authorization signature correctly rejected ` +
-        `(HTTP ${status}).`,
+        `(${statusWithReason(status, reason)}).`,
     ...(accepted
       ? {
           hint:
@@ -668,10 +744,226 @@ export function signatureRejectionVerdict(status: number): CheckResult {
   };
 }
 
+
+/** Any 2xx is the target serving the resource. */
+function served(status: number): boolean {
+  return status >= 200 && status < 300;
+}
+
 /**
- * Runs X402-06 and X402-07 against a target.
+ * Why the target refused a payment, when it says: x402 servers answer a
+ * refused payment with a fresh challenge whose `error` names the reason
+ * (often the facilitator's, e.g. `invalid_exact_evm_payload_signature`).
+ * Shown with a PASS so a reader can tell the refusal came from the rule the
+ * check is about, not from something else that also answers 402.
+ */
+async function refusalReason(response: Response): Promise<string | undefined> {
+  const header = response.headers.get("PAYMENT-REQUIRED");
+  const fromJson = (text: string): string | undefined => {
+    try {
+      const parsed = JSON.parse(text) as { error?: unknown };
+      return typeof parsed.error === "string" && parsed.error.length > 0 ? parsed.error : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+  if (header !== null) return fromJson(Buffer.from(header, "base64").toString("utf-8"));
+  return fromJson(await readText(response));
+}
+
+function statusWithReason(status: number, reason: string | undefined): string {
+  return reason === undefined ? `HTTP ${status}` : `HTTP ${status}: ${reason}`;
+}
+
+/**
+ * X402-08 (negative): a payment already accepted must not be accepted again.
  *
- * Both settle real payments when the target accepts them; see docs/CHECKS.md.
+ * The headers X402-06's honest payment was sent with are sent once more,
+ * byte for byte. Each authorization is single-use: an EIP-3009 nonce, or a
+ * Soroban auth entry's nonce, is spent once the payment settles, so the
+ * facilitator's verify refuses it (spec §10.1). A target that serves it again
+ * has sold the resource twice for one payment. Nothing can settle twice.
+ */
+async function checkReplayRejected(
+  options: X402PaymentCheckOptions,
+  honest: HonestPayment,
+): Promise<CheckResult> {
+  if (honest.idempotent) {
+    return skipped(
+      "X402-08",
+      "Payment Replay Rejected",
+      "the challenge advertises the payment-identifier extension, under which a " +
+        "server may answer a repeated payment with its cached response.",
+    );
+  }
+  const response = await fetchTarget(options.target, withPaymentHeaders(options, honest.headers));
+  return replayVerdict(response.status, await refusalReason(response));
+}
+
+/** X402-08's verdict from the status the replayed payment drew. */
+export function replayVerdict(status: number, reason?: string): CheckResult {
+  const accepted = served(status);
+  return {
+    id: "X402-08",
+    name: "Payment Replay Rejected",
+    pass: !accepted,
+    detail: accepted
+      ? `The payment X402-06 had already been accepted for was accepted again ` +
+        `(HTTP ${status}): one payment bought the resource twice.`
+      : `The same payment, sent again, was refused (${statusWithReason(status, reason)}).`,
+    ...(accepted
+      ? {
+          hint:
+            "Treat every payment as single-use: verify it with the facilitator " +
+            "before serving, which refuses an authorization whose nonce is already " +
+            "spent, and never serve the same payload twice.",
+        }
+      : {}),
+  };
+}
+
+/**
+ * X402-09 (negative): a validly signed payment for less than the price must
+ * be rejected.
+ *
+ * The payment is signed for half the advertised amount, while its `accepted`
+ * still claims the advertised terms, so the signature is good and only the
+ * amount is wrong. The facilitator must hold the signed amount to the
+ * requirement (Stellar: exactly; EVM: verification step 3). If the target
+ * accepts, the lower amount may settle.
+ */
+async function checkUnderpaymentRejected(options: X402PaymentCheckOptions): Promise<CheckResult> {
+  let advertised = 0n;
+  let offered = 0n;
+  let prepared;
+  try {
+    prepared = await preparePayment(options, (selected) => {
+      try {
+        advertised = BigInt(selected.amount);
+      } catch {
+        throw new MalformedResponseError(
+          `The payment requirements carry a non-numeric amount (${JSON.stringify(selected.amount)}).`,
+        );
+      }
+      if (advertised < 2n) {
+        throw new CheckNotApplicable(
+          `the advertised price is ${advertised} base unit${advertised === 1n ? "" : "s"}, so ` +
+            `there is no smaller payment to offer.`,
+        );
+      }
+      offered = advertised / 2n;
+      return { amount: offered.toString() };
+    });
+  } catch (error) {
+    if (error instanceof CheckNotApplicable) {
+      return skipped("X402-09", "Underpayment Rejected", error.message);
+    }
+    throw error;
+  }
+  const { httpClient, paymentPayload } = prepared;
+  const response = await fetchTarget(
+    options.target,
+    withPaymentHeaders(options, httpClient.encodePaymentSignatureHeader(paymentPayload)),
+  );
+  return underpaymentVerdict(response.status, offered, advertised, await refusalReason(response));
+}
+
+/** X402-09's verdict from the status the underpaid payment drew. */
+export function underpaymentVerdict(
+  status: number,
+  offered: bigint,
+  advertised: bigint,
+  reason?: string,
+): CheckResult {
+  const accepted = served(status);
+  return {
+    id: "X402-09",
+    name: "Underpayment Rejected",
+    pass: !accepted,
+    detail: accepted
+      ? `A validly signed payment for ${offered} of the advertised ${advertised} base ` +
+        `units was accepted (HTTP ${status}) — security-relevant failure: the target ` +
+        `served for less than its price.`
+      : `A validly signed payment for ${offered} of the advertised ${advertised} base ` +
+        `units was refused (${statusWithReason(status, reason)}).`,
+    ...(accepted
+      ? {
+          hint:
+            "Hold the signed payment to the advertised amount before serving. The " +
+            "facilitator's verify does; a server that skips it, or checks only the " +
+            "signature, sells for less than its price.",
+        }
+      : {}),
+  };
+}
+
+/**
+ * X402-10 (negative): a payment whose authorization has expired must be
+ * rejected.
+ *
+ * The payment is signed with a one-second lifetime (EVM `validBefore`, or the
+ * Stellar auth entry's expiration ledger, both derived from
+ * `maxTimeoutSeconds`), then held until that has passed, and sent claiming the
+ * advertised terms. An expired authorization cannot settle, so a target that
+ * serves it serves for nothing.
+ */
+async function checkExpiredRejected(options: X402PaymentCheckOptions): Promise<CheckResult> {
+  const { httpClient, paymentPayload } = await preparePayment(options, () => ({ maxTimeoutSeconds: 1 }));
+  await new Promise<void>((done) => setTimeout(done, chainFor(options.network).expiryWaitMs));
+  const response = await fetchTarget(
+    options.target,
+    withPaymentHeaders(options, httpClient.encodePaymentSignatureHeader(paymentPayload)),
+  );
+  return expiredVerdict(response.status, await refusalReason(response));
+}
+
+/** X402-10's verdict from the status the expired payment drew. */
+export function expiredVerdict(status: number, reason?: string): CheckResult {
+  const accepted = served(status);
+  return {
+    id: "X402-10",
+    name: "Expired Authorization Rejected",
+    pass: !accepted,
+    detail: accepted
+      ? `A payment whose authorization had already expired was accepted (HTTP ` +
+        `${status}). It cannot settle, so the target served for nothing.`
+      : `A payment whose authorization had expired was refused (${statusWithReason(status, reason)}).`,
+    ...(accepted
+      ? {
+          hint:
+            "Verify each payment with the facilitator before serving: it refuses an " +
+            "authorization past its window (validBefore on EVM, the auth entry's " +
+            "expiration ledger on Stellar).",
+        }
+      : {}),
+  };
+}
+
+/** The negative checks, in catalogue order, each with how it runs. */
+const NEGATIVE_CHECKS: ReadonlyArray<
+  readonly [string, string, (options: X402PaymentCheckOptions, honest: HonestPayment) => Promise<CheckResult>]
+> = [
+  ["X402-07", "Invalid Signature Rejected", (options) => checkInvalidSignatureRejected(options)],
+  ["X402-08", "Payment Replay Rejected", checkReplayRejected],
+  ["X402-09", "Underpayment Rejected", (options) => checkUnderpaymentRejected(options)],
+  ["X402-10", "Expired Authorization Rejected", (options) => checkExpiredRejected(options)],
+];
+
+/**
+ * Every check `runX402PaymentChecks` reports, in order. Front ends that list
+ * checks before a run use it, so a read-only run never shows these as pending.
+ */
+export const X402_PAYMENT_CHECK_IDS: readonly string[] = [
+  "X402-06",
+  ...NEGATIVE_CHECKS.map(([id]) => id),
+];
+
+/**
+ * Runs X402-06 through X402-10 against a target.
+ *
+ * X402-06 settles a real payment. The negative checks send payments the
+ * target must refuse; a target that accepts the underpaid one may settle it.
+ * See docs/CHECKS.md.
  */
 export async function runX402PaymentChecks(
   options: X402PaymentCheckOptions,
@@ -704,46 +996,50 @@ export async function runX402PaymentChecks(
   }
 
   const results: CheckResult[] = [];
+  const emit = (result: CheckResult): void => {
+    results.push(result);
+    options.onResult?.(result);
+  };
+  const skipNegatives = (reason: string): CheckResult[] => {
+    for (const [id, name] of NEGATIVE_CHECKS) emit(skipped(id, name, reason));
+    return results;
+  };
 
-  let accepted: CheckResult;
+  let honest: HonestPayment;
   try {
-    accepted = await checkSignatureAccepted(options);
+    honest = await checkSignatureAccepted(options);
   } catch (error) {
     if (error instanceof PaymentNotAttemptedError) {
-      const notAttempted = [
-        skipped("X402-06", "Signature Resubmit Accepted", error.message),
-        skipped("X402-07", "Invalid Signature Rejected", error.message),
-      ];
-      for (const result of notAttempted) options.onResult?.(result);
-      return notAttempted;
+      emit(skipped("X402-06", "Signature Resubmit Accepted", error.message));
+      return skipNegatives(error.message);
     }
-    accepted = errored("X402-06", "Signature Resubmit Accepted", error);
-  }
-  results.push(accepted);
-  options.onResult?.(accepted);
-
-  // If the payment flow could not be exercised at all, a corrupted variant of
-  // it cannot be either — and must not be reported as a passing rejection.
-  if (accepted.error !== undefined) {
-    const notExercised = skipped(
-      "X402-07",
-      "Invalid Signature Rejected",
-      `the payment flow could not be exercised (${accepted.error.kind}), so ` +
-        `a corrupted signature cannot be tested against it.`,
+    const failed = errored("X402-06", "Signature Resubmit Accepted", error);
+    emit(failed);
+    // If the payment flow could not be exercised at all, no altered variant of
+    // it can be either, and none may be reported as a passing rejection.
+    return skipNegatives(
+      `the payment flow could not be exercised (${failed.error?.kind ?? "harness"}), ` +
+        `so no altered payment can be tested against it.`,
     );
-    results.push(notExercised);
-    options.onResult?.(notExercised);
-    return results;
+  }
+  emit(honest.result);
+
+  // A negative check passes when the target refuses. A target that refused
+  // the honest payment too proves nothing by refusing a bad one, so without an
+  // accepted baseline none of them has a verdict.
+  if (!honest.accepted) {
+    return skipNegatives(
+      "the target refused X402-06's valid payment, so refusing an altered one " +
+        "says nothing about what it checks.",
+    );
   }
 
-  let rejected: CheckResult;
-  try {
-    rejected = await checkInvalidSignatureRejected(options);
-  } catch (error) {
-    rejected = errored("X402-07", "Invalid Signature Rejected", error);
+  for (const [id, name, run] of NEGATIVE_CHECKS) {
+    try {
+      emit(await run(options, honest));
+    } catch (error) {
+      emit(errored(id, name, error));
+    }
   }
-  results.push(rejected);
-  options.onResult?.(rejected);
-
   return results;
 }

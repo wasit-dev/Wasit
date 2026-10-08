@@ -265,7 +265,7 @@ describe("payment checks on a challenge Wasit cannot pay", () => {
         const results = byId(
           await runX402PaymentChecks({ target: target.url, network: "stellar:testnet", payerSecretKey }),
         );
-        for (const id of ["X402-06", "X402-07"]) {
+        for (const id of ["X402-06", "X402-07", "X402-08", "X402-09", "X402-10"]) {
           assert.equal(results[id]?.skipped, true, id);
           assert.match(results[id]?.skipReason ?? "", reason, id);
         }

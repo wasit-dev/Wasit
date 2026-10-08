@@ -11,8 +11,8 @@ keys in this file.
 | Checks | Required |
 |---|---|
 | `X402-01`–`05` | nothing |
-| `X402-06`, `07` on Stellar | `STELLAR_PRIVATE_KEY` |
-| `X402-06`, `07` on Base Sepolia (`--network eip155:84532`) | `EVM_PRIVATE_KEY` |
+| `X402-06`–`10` on Stellar | `STELLAR_PRIVATE_KEY` |
+| `X402-06`–`10` on Base Sepolia (`--network eip155:84532`) | `EVM_PRIVATE_KEY` |
 | `MPP-01` | `MPP_PAYER_SECRET`, `MPP_STELLAR_NETWORK` |
 | `MPP-10`–`12`, `14` | `COMMITMENT_SECRET_HEX`, `MPP_STELLAR_NETWORK` |
 | `MPP-13` | the above, plus `CHANNEL_CONTRACT_DISPOSABLE` and an explicit opt-in |
@@ -55,9 +55,12 @@ string — it signs channel commitments directly rather than transactions.
 For Base Sepolia, `EVM_PRIVATE_KEY` is a raw private key, `0x` followed by 64
 hex characters, from any EVM wallet or `viem`'s `generatePrivateKey()`. The
 payer needs Base Sepolia USDC, from https://faucet.circle.com, and **no ETH**:
-the facilitator pays the gas (the `exact` scheme's EIP-3009 method). A wrong
-or malformed key is reported at `PREFLIGHT` before anything is sent, without
-echoing it.
+the facilitator pays the gas (the `exact` scheme's EIP-3009 method). A target
+that uses Permit2 instead needs no ETH either when it offers the
+`eip2612GasSponsoring` extension; without it, the payer must approve Permit2
+once on-chain, which needs gas, and a run without that approval reports
+`ERROR (setup)`. A wrong or malformed key is reported at `PREFLIGHT` before
+anything is sent, without echoing it.
 
 ## The disposable channel
 
