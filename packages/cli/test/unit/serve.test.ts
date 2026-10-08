@@ -17,6 +17,7 @@ import {
   BASE_SEPOLIA_USDC,
   OVERPRICE_AMOUNT,
   SERVE_MODES,
+  SOLANA_DEVNET_USDC,
   TESTNET_USDC,
   challengeFor,
   createServeServer,
@@ -294,6 +295,78 @@ describe("on Base Sepolia", () => {
     try {
       await fetch(url, { headers: { "PAYMENT-SIGNATURE": paymentHeader("eip155:8453", "10000") } });
       assert.match(lines.at(-1) ?? "", /paid a challenge on eip155:8453 \(Base mainnet\)/);
+    } finally {
+      await stop(server);
+    }
+  });
+});
+
+const SVM_PAY_TO = "2wKupLR9q6wXYppw8Gr2NvWxKBUqm4PPJKkQfoxHDBg4";
+const SOLANA_DEVNET = "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1";
+const SOLANA = { network: SOLANA_DEVNET, payTo: SVM_PAY_TO };
+
+describe("on Solana devnet", () => {
+  function accept(mode: ServeMode): Record<string, unknown> {
+    return (challengeFor({ mode, ...SOLANA }, "http://x/paid")["accepts"] as Array<Record<string, unknown>>)[0]!;
+  }
+
+  it("poses with the SDK's devnet USDC, the payee sponsoring its own fees", () => {
+    const option = accept("no-settle");
+    assert.equal(option["network"], SOLANA_DEVNET);
+    assert.equal(option["asset"], SOLANA_DEVNET_USDC);
+    assert.deepEqual(option["extra"], { feePayer: SVM_PAY_TO });
+  });
+
+  it("asks for Solana mainnet in wrong-network, and one million 6-decimal USDC in overprice", () => {
+    assert.equal(accept("wrong-network")["network"], "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp");
+    assert.equal(accept("overprice")["amount"], "1000000000000");
+  });
+
+  it("validates the payee and the cited signature in Solana form", () => {
+    assert.equal(validateServeOptions({ mode: "no-settle", ...SOLANA }), undefined);
+    assert.match(validateServeOptions({ mode: "no-settle", ...SOLANA, payTo: EVM_PAY_TO }) ?? "", /Solana address/);
+    assert.match(
+      validateServeOptions({ mode: "wrong-settlement", ...SOLANA, settlementTx: CITED_TX }) ?? "",
+      /Solana transaction signature/,
+    );
+  });
+
+  for (const mode of SERVE_MODES) {
+    it(`${mode}: Wasit's read checks pass the Solana devnet challenge`, async () => {
+      const { url, server } = await start(mode, SOLANA);
+      try {
+        const results = await runX402ReadChecks({ target: url });
+        for (const result of results) assert.equal(result.pass, true, `${mode} ${result.id}: ${result.detail}`);
+      } finally {
+        await stop(server);
+      }
+    });
+  }
+
+  it("wrong-settlement cites a well-formed signature, new each run", async () => {
+    const cited: string[] = [];
+    for (let run = 0; run < 2; run++) {
+      const { url, server } = await start("wrong-settlement", SOLANA);
+      try {
+        const response = await fetch(url, { headers: { "PAYMENT-SIGNATURE": paymentHeader(SOLANA_DEVNET, "10000") } });
+        const settlement = decode(response.headers.get("payment-response"));
+        assert.equal(settlement["network"], SOLANA_DEVNET);
+        cited.push(String(settlement["transaction"]));
+      } finally {
+        await stop(server);
+      }
+    }
+    for (const signature of cited) assert.match(signature, /^[1-9A-HJ-NP-Za-km-z]{86,88}$/);
+    assert.notEqual(cited[0], cited[1]);
+  });
+
+  it("names Solana mainnet when the agent pays the wrong-network challenge", async () => {
+    const { url, lines, server } = await start("wrong-network", SOLANA);
+    try {
+      await fetch(url, {
+        headers: { "PAYMENT-SIGNATURE": paymentHeader("solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp", "10000") },
+      });
+      assert.match(lines.at(-1) ?? "", /\(Solana mainnet\)/);
     } finally {
       await stop(server);
     }

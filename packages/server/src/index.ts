@@ -173,7 +173,8 @@ server.registerTool(
       "Runs the x402 conformance checks (X402-01..10) against a running service. " +
       "Payment checks are included only when the network's payer key is set in " +
       "this server's environment (STELLAR_PRIVATE_KEY on Stellar, EVM_PRIVATE_KEY " +
-      "on Base Sepolia); otherwise they are skipped. When they do run, "
+      "on Base Sepolia, SVM_PRIVATE_KEY on Solana devnet); otherwise they are " +
+      "skipped. When they do run, "
       + "X402-06 settles a real payment and X402-07..10 send payments the target "
       + "must refuse, so each call spends testnet funds and repeated calls spend "
       + "repeatedly. X402-10 waits for an authorization to expire (about 20 s on "
@@ -185,8 +186,9 @@ server.registerTool(
         .optional()
         .describe(
           'Network the payment checks pay on: "stellar:testnet" (default), ' +
-            '"stellar:pubnet" or "eip155:84532" (Base Sepolia). The read-only ' +
-            "checks apply to a challenge on any chain.",
+            '"stellar:pubnet", "eip155:84532" (Base Sepolia) or ' +
+            '"solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1" (Solana devnet). The ' +
+            "read-only checks apply to a challenge on any chain.",
         ),
       readOnly: z
         .boolean()
@@ -196,7 +198,7 @@ server.registerTool(
         .string()
         .optional()
         .describe(
-          "Override the RPC endpoint used to verify X402-06's settlement (Soroban RPC on Stellar, JSON-RPC on EVM)",
+          "Override the RPC endpoint used to verify X402-06's settlement (Soroban RPC on Stellar, JSON-RPC on EVM and Solana)",
         ),
       method: z
         .string()

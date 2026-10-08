@@ -158,9 +158,9 @@ wasit test --target <url> [options]
 | Option | Default | Notes |
 |---|---|---|
 | `--target <url>` | required | Must include the scheme |
-| `--network <id>` | `stellar:testnet` | Network the payment checks pay on: `stellar:testnet`, `stellar:pubnet` or `eip155:84532` (Base Sepolia). `X402-01`–`05` apply to a challenge on any chain |
-| `--payer-key <key>` | `STELLAR_PRIVATE_KEY`, or `EVM_PRIVATE_KEY` on Base Sepolia | A Stellar secret (`S...`), or an EVM private key (`0x` + 64 hex) |
-| `--rpc-url <url>` | the network's default | RPC used to verify `X402-06`'s settlement: Soroban RPC on Stellar, required for pubnet; JSON-RPC on Base Sepolia (default `https://sepolia.base.org`) |
+| `--network <id>` | `stellar:testnet` | Network the payment checks pay on: `stellar:testnet`, `stellar:pubnet`, `eip155:84532` (Base Sepolia) or `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` (Solana devnet). `X402-01`–`05` apply to a challenge on any chain |
+| `--payer-key <key>` | `STELLAR_PRIVATE_KEY`, `EVM_PRIVATE_KEY` on Base Sepolia, or `SVM_PRIVATE_KEY` on Solana devnet | A Stellar secret (`S...`), an EVM private key (`0x` + 64 hex), or a Solana keypair (base58 of its 64 bytes) |
+| `--rpc-url <url>` | the network's default | RPC used to verify `X402-06`'s settlement: Soroban RPC on Stellar, required for pubnet; JSON-RPC on Base Sepolia (default `https://sepolia.base.org`) and on Solana devnet (default `https://api.devnet.solana.com`) |
 | `--method <verb>` | `GET` | HTTP method the paid endpoint uses. Endpoints that compute something usually take `POST` |
 | `--body <json>` | — | Request body, sent verbatim; implies `Content-Type: application/json` |
 | `--header <name:value>` | — | Extra request header the endpoint needs before it will issue a challenge. Repeatable |
@@ -249,8 +249,8 @@ wasit serve --mode no-settle
 | `--mode <mode>` | required | One of the four above |
 | `--port <port>` | `4020` | The server answers on every path |
 | `--host <host>` | `127.0.0.1` | Local only unless you bind another interface |
-| `--network <id>` | `stellar:testnet` | `stellar:testnet` or `eip155:84532` (Base Sepolia). On Base Sepolia the paywall uses the SDK's USDC, `wrong-network` asks for Base mainnet (`eip155:8453`), and `overprice` one million USDC in its 6 decimals |
-| `--pay-to <address>` | `STELLAR_PAYEE_ADDRESS`, or `EVM_PAYEE_ADDRESS` on Base Sepolia | A testnet account (`G...`) with a trustline for the asset, or an EVM address (`0x...`) |
+| `--network <id>` | `stellar:testnet` | `stellar:testnet`, `eip155:84532` (Base Sepolia) or `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` (Solana devnet). On Base Sepolia and Solana devnet the paywall uses the SDK's USDC, `wrong-network` asks for that chain's mainnet (`eip155:8453`, `solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp`), and `overprice` one million USDC in its 6 decimals. On Solana the challenge names the payee as `extra.feePayer`, which the spec allows; nothing is ever submitted |
+| `--pay-to <address>` | `STELLAR_PAYEE_ADDRESS`, `EVM_PAYEE_ADDRESS` on Base Sepolia, or `SVM_PAYEE_ADDRESS` on Solana devnet | A testnet account (`G...`) with a trustline for the asset, an EVM address (`0x...`), or a Solana address (base58) |
 | `--amount <units>` | `10000` | Price in base units, for every mode except `overprice` |
 | `--asset <contract>` | testnet USDC | `CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA` |
 | `--settlement-tx <hash>` | a random hash | `wrong-settlement` only. The default cites a transaction that exists nowhere; pass a real, unrelated transaction to test an agent that finds it on-chain but must notice it is not this payment |

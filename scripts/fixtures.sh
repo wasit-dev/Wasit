@@ -28,6 +28,7 @@ FIXTURES=(
   "refusing:3004:packages/core/test/fixtures/mpp-channel-refusing-server.ts"
   "x402-evm:3005:packages/core/test/fixtures/x402-evm-server.ts"
   "x402-permit2:3006:packages/core/test/fixtures/x402-evm-permit2-server.ts"
+  "x402-svm:3007:packages/core/test/fixtures/x402-svm-server.ts"
 )
 
 field() { echo "$1" | cut -d: -f"$2"; }
@@ -81,12 +82,18 @@ cmd_start() {
   fi
   echo "Starting fixtures:"
   for fixture in "${FIXTURES[@]}"; do
-    # The Base Sepolia fixture needs its own payee; without one it is skipped,
-    # not failed, so a Stellar-only setup starts as before.
+    # The Base Sepolia and Solana fixtures need their own payee; without one
+    # they are skipped, not failed, so a Stellar-only setup starts as before.
     case "$(field "$fixture" 1)" in
       x402-evm|x402-permit2)
         if ! grep -q '^EVM_PAYEE_ADDRESS=.' "$ROOT/.env"; then
           printf "  %-9s skipped (EVM_PAYEE_ADDRESS not set in .env)\n" "$(field "$fixture" 1)"
+          continue
+        fi
+        ;;
+      x402-svm)
+        if ! grep -q '^SVM_PAYEE_ADDRESS=.' "$ROOT/.env"; then
+          printf "  %-9s skipped (SVM_PAYEE_ADDRESS not set in .env)\n" "$(field "$fixture" 1)"
           continue
         fi
         ;;
@@ -101,6 +108,7 @@ cmd_start() {
   echo "  refusing http://localhost:3004/data   (always refuses, by design)"
   echo "  x402-evm http://localhost:3005/protected   (Base Sepolia, needs EVM_PAYEE_ADDRESS)"
   echo "  x402-permit2 http://localhost:3006/protected   (Base Sepolia, Permit2 with EIP-2612 sponsoring)"
+  echo "  x402-svm http://localhost:3007/protected   (Solana devnet, needs SVM_PAYEE_ADDRESS)"
 }
 
 cmd_stop() {

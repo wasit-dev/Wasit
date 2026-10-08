@@ -30,6 +30,7 @@ import { baseSepolia } from "viem/chains";
 import { CheckSetupError, ConfigurationError } from "../../errors.js";
 import type { ExpectedSettlement, SettlementVerdict } from "../../settlement.js";
 import type { PaymentChain } from "./types.js";
+import { waitForReceipt } from "./wait.js";
 
 /** The networks this adapter pays on, with viem's chain definition for each. */
 const NETWORKS: Readonly<Record<string, Chain>> = {
@@ -52,8 +53,6 @@ const TRANSFER_TOPIC = toEventSelector("Transfer(address,address,uint256)");
  * hash before its receipt, short enough that a fabricated hash fails soon.
  */
 const BLOCKS_BEFORE_MISSING = 30n;
-const MAX_WAIT_MS = 120_000;
-const POLL_DELAY_MS = 1_000;
 
 function payerAccount(payerKey: string) {
   // The message never echoes the key: it is a secret, and a malformed one is
@@ -183,56 +182,6 @@ export function verifyEvmReceipt(
   };
 }
 
-/** What looking for a settled transaction on an EVM RPC established. */
-export type ReceiptLookup<R> =
-  | { readonly kind: "found"; readonly receipt: R }
-  | { readonly kind: "missing"; readonly blocksWatched: bigint }
-  | { readonly kind: "stalled"; readonly blocksWatched: bigint; readonly waitedMs: number };
-
-/**
- * Polls for a receipt until it appears, until the chain has produced enough
- * blocks without it to call it missing, or until the RPC stops advancing.
- *
- * `getReceipt` returns undefined while the transaction is unknown; any other
- * failure is the harness's and propagates. Clock and sleep are parameters so
- * the three outcomes can be exercised without a network.
- */
-export async function waitForReceipt<R>(
-  getReceipt: () => Promise<R | undefined>,
-  getBlockNumber: () => Promise<bigint>,
-  options: {
-    readonly blocks?: bigint;
-    readonly maxWaitMs?: number;
-    readonly delayMs?: number;
-    readonly now?: () => number;
-    readonly sleep?: (ms: number) => Promise<void>;
-  } = {},
-): Promise<ReceiptLookup<R>> {
-  const blocks = options.blocks ?? BLOCKS_BEFORE_MISSING;
-  const maxWaitMs = options.maxWaitMs ?? MAX_WAIT_MS;
-  const delayMs = options.delayMs ?? POLL_DELAY_MS;
-  const now = options.now ?? Date.now;
-  const pause = options.sleep ?? ((ms: number) => new Promise<void>((done) => setTimeout(done, ms)));
-
-  const startedAt = now();
-  let firstBlock: bigint | undefined;
-
-  for (;;) {
-    const receipt = await getReceipt();
-    if (receipt !== undefined) return { kind: "found", receipt };
-
-    const block = await getBlockNumber();
-    firstBlock ??= block;
-    const blocksWatched = block - firstBlock;
-    if (blocksWatched >= blocks) return { kind: "missing", blocksWatched };
-
-    const waitedMs = now() - startedAt;
-    if (waitedMs >= maxWaitMs) return { kind: "stalled", blocksWatched, waitedMs };
-
-    await pause(delayMs);
-  }
-}
-
 async function verifyEvmSettlement(
   rpcUrl: string,
   reference: string,
@@ -249,6 +198,7 @@ async function verifyEvmSettlement(
       }
     },
     () => client.getBlockNumber(),
+    { blocks: BLOCKS_BEFORE_MISSING },
   );
 
   if (lookup.kind === "stalled") {
@@ -299,8 +249,6 @@ export const evmChain: PaymentChain = {
   networks: Object.keys(NETWORKS),
   payerKeyEnv: "EVM_PRIVATE_KEY",
   referenceKind: "an EVM transaction hash",
-  // validBefore is now + 1 second; Base Sepolia blocks come every 2 seconds.
-  expiryWaitMs: 5_000,
   resolveRpcUrl(network, override) {
     const chain = NETWORKS[network];
     if (chain === undefined) {
@@ -322,6 +270,8 @@ export const evmChain: PaymentChain = {
     );
     client.register("eip155:*", new ExactEvmScheme(signer, { rpcUrl }));
   },
+  // validBefore is now + 1 second; Base Sepolia blocks come every 2 seconds.
+  expiredSigning: async () => ({ terms: { maxTimeoutSeconds: 1 }, holdMs: 5_000 }),
   payerAddress: (payerKey) => payerAccount(payerKey).address,
   isSettlementReference: (reference) => TRANSACTION_HASH.test(reference),
   verifySettlement: verifyEvmSettlement,

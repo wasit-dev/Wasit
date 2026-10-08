@@ -203,17 +203,19 @@ program
   .requiredOption("--target <url>", "URL of the service to test")
   .option(
     "--network <network>",
-    "Network the payment checks pay on: stellar:testnet, stellar:pubnet or " +
-      "eip155:84532 (Base Sepolia). X402-01..05 apply to a challenge on any chain.",
+    "Network the payment checks pay on: stellar:testnet, stellar:pubnet, " +
+      "eip155:84532 (Base Sepolia) or solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1 " +
+      "(Solana devnet). X402-01..05 apply to a challenge on any chain.",
     "stellar:testnet",
   )
   .option(
     "--rpc-url <url>",
-    "Override the RPC endpoint used to verify X402-06's settlement (Soroban RPC on Stellar, JSON-RPC on EVM)",
+    "Override the RPC endpoint used to verify X402-06's settlement (Soroban RPC on Stellar, JSON-RPC on EVM and Solana)",
   )
   .option(
     "--payer-key <key>",
-    "Testnet payer key (overrides STELLAR_PRIVATE_KEY, or EVM_PRIVATE_KEY on eip155 networks, from .env)",
+    "Testnet payer key (overrides STELLAR_PRIVATE_KEY, EVM_PRIVATE_KEY on eip155 networks, " +
+      "or SVM_PRIVATE_KEY on Solana, from .env)",
   )
   .option(
     "--method <verb>",
@@ -295,8 +297,9 @@ program
   .option("--host <host>", "Interface to bind (local only by default)", "127.0.0.1")
   .option(
     "--pay-to <address>",
-    "Payee: a Stellar account (G...) with a USDC trustline, or an EVM address (0x...) " +
-      "on Base Sepolia (overrides STELLAR_PAYEE_ADDRESS or EVM_PAYEE_ADDRESS)",
+    "Payee: a Stellar account (G...) with a USDC trustline, an EVM address (0x...) " +
+      "on Base Sepolia, or a Solana address on devnet (overrides STELLAR_PAYEE_ADDRESS, " +
+      "EVM_PAYEE_ADDRESS or SVM_PAYEE_ADDRESS)",
   )
   .option("--amount <units>", "Price in base units for every mode except overprice", "10000")
   .option("--asset <contract>", "Token contract (default: the network's testnet USDC)")
@@ -312,14 +315,15 @@ ${SERVE_MODES.map((mode) => `  ${mode.padEnd(17)} ${MODE_DESCRIPTIONS[mode].does
 
 Point your agent at http://127.0.0.1:4020/ (any path) and watch what it does.
 The server never settles and never forwards a payment, so nothing it receives
-moves funds. Your agent still needs a funded testnet wallet: payment clients
-simulate the transfer to --pay-to before signing.
+moves funds. On Stellar your agent still needs a funded testnet wallet:
+payment clients simulate the transfer to --pay-to before signing.
 
 Examples:
   $ wasit serve --mode no-settle
   $ wasit serve --mode wrong-settlement --settlement-tx <hash of an unrelated tx>
   $ wasit serve --mode overprice --port 4021
-  $ wasit serve --mode no-settle --network eip155:84532   # Base Sepolia`,
+  $ wasit serve --mode no-settle --network eip155:84532   # Base Sepolia
+  $ wasit serve --mode no-settle --network solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1   # Solana devnet`,
   )
   .action((opts) => {
     const network = opts.network as string;

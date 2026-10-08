@@ -19,10 +19,10 @@ import {
   evmChain,
   evmTransfers,
   verifyEvmReceipt,
-  waitForReceipt,
   type EvmLog,
 } from "../../src/x402/chains/evm.js";
 import { paymentChainFor } from "../../src/x402/chains/index.js";
+import { waitForReceipt } from "../../src/x402/chains/wait.js";
 import { readSettlementReference } from "../../src/x402/simulator.js";
 
 const USDC = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
@@ -116,7 +116,7 @@ describe("waitForReceipt", () => {
     const lookup = await waitForReceipt(
       async () => (++calls >= 3 ? "receipt" : undefined),
       async () => 100n,
-      clock(),
+      { blocks: 30n, ...clock() },
     );
     assert.deepEqual(lookup, { kind: "found", receipt: "receipt" });
   });
@@ -132,6 +132,7 @@ describe("waitForReceipt", () => {
 
   it("gives no verdict when the RPC stops advancing", async () => {
     const lookup = await waitForReceipt(async () => undefined, async () => 100n, {
+      blocks: 30n,
       maxWaitMs: 10_000,
       ...clock(),
     });
@@ -142,7 +143,7 @@ describe("waitForReceipt", () => {
     await assert.rejects(
       waitForReceipt(async () => {
         throw new Error("rpc down");
-      }, async () => 1n),
+      }, async () => 1n, { blocks: 30n }),
       /rpc down/,
     );
   });

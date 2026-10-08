@@ -11,7 +11,7 @@
  * back in `PAYMENT-SIGNATURE`, and a settlement result is reported in
  * `PAYMENT-RESPONSE`. Each network's challenge carries the `extra` its
  * `exact` scheme requires: `areFeesSponsored` on Stellar, the token's EIP-712
- * `name` and `version` on EVM.
+ * `name` and `version` on EVM, a `feePayer` on Solana.
  */
 
 import { randomBytes } from "node:crypto";
@@ -26,6 +26,26 @@ export const TESTNET_USDC = "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMX
 /** Base Sepolia USDC, the official SDK's default asset there. */
 export const BASE_SEPOLIA_USDC = "0x036CbD53842c5426634e7929541eC2318f3dCF7e";
 
+/** Solana devnet USDC, the official SDK's default asset there. */
+export const SOLANA_DEVNET_USDC = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU";
+
+const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+
+/** Base58, as Solana writes addresses and signatures. */
+function base58(bytes: Uint8Array): string {
+  let value = BigInt(`0x${Buffer.from(bytes).toString("hex") || "0"}`);
+  let text = "";
+  while (value > 0n) {
+    text = BASE58_ALPHABET[Number(value % 58n)]! + text;
+    value /= 58n;
+  }
+  for (const byte of bytes) {
+    if (byte !== 0) break;
+    text = `1${text}`;
+  }
+  return text;
+}
+
 /** What changes from one network to another; the modes stay the same. */
 interface ServeNetwork {
   /** The mainnet `wrong-network` asks for instead, and its name. */
@@ -33,7 +53,7 @@ interface ServeNetwork {
   readonly mainnetName: string;
   readonly asset: string;
   readonly decimals: number;
-  readonly extra: Readonly<Record<string, unknown>>;
+  readonly extra: (payTo: string) => Readonly<Record<string, unknown>>;
   readonly payTo: RegExp;
   readonly payToHint: string;
   readonly txHash: RegExp;
@@ -45,7 +65,10 @@ interface ServeNetwork {
 /**
  * The networks `wasit serve` can pose as. Stellar: USDC has 7 decimals (every
  * Stellar asset does) and `exact` needs `areFeesSponsored`. Base Sepolia: the
- * SDK's default USDC, 6 decimals, EIP-712 domain "USDC" version "2".
+ * SDK's default USDC, 6 decimals, EIP-712 domain "USDC" version "2". Solana
+ * devnet: the SDK's default USDC, 6 decimals; `exact` needs a `feePayer`, and
+ * the payee is named, which the spec allows (merchant-sponsored fees) and
+ * which needs no third party, since nothing is ever submitted.
  */
 export const SERVE_NETWORKS: Readonly<Record<string, ServeNetwork>> = {
   "stellar:testnet": {
@@ -53,7 +76,7 @@ export const SERVE_NETWORKS: Readonly<Record<string, ServeNetwork>> = {
     mainnetName: "Stellar mainnet",
     asset: TESTNET_USDC,
     decimals: 7,
-    extra: { areFeesSponsored: true },
+    extra: () => ({ areFeesSponsored: true }),
     payTo: /^G[A-Z2-7]{55}$/,
     payToHint:
       "a Stellar account (G...) with a trustline for the asset on testnet: payment " +
@@ -68,13 +91,26 @@ export const SERVE_NETWORKS: Readonly<Record<string, ServeNetwork>> = {
     mainnetName: "Base mainnet",
     asset: BASE_SEPOLIA_USDC,
     decimals: 6,
-    extra: { name: "USDC", version: "2" },
+    extra: () => ({ name: "USDC", version: "2" }),
     payTo: /^0x[0-9a-fA-F]{40}$/,
     payToHint: "an EVM address (0x followed by 40 hex characters)",
     txHash: /^0x[0-9a-fA-F]{64}$/,
     txHashHint: "an EVM transaction hash, 0x followed by 64 hex characters",
     randomTx: () => `0x${randomBytes(32).toString("hex")}`,
     payeeEnv: "EVM_PAYEE_ADDRESS",
+  },
+  "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1": {
+    mainnet: "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+    mainnetName: "Solana mainnet",
+    asset: SOLANA_DEVNET_USDC,
+    decimals: 6,
+    extra: (payTo) => ({ feePayer: payTo }),
+    payTo: /^[1-9A-HJ-NP-Za-km-z]{32,44}$/,
+    payToHint: "a Solana address (base58, 32 to 44 characters)",
+    txHash: /^[1-9A-HJ-NP-Za-km-z]{86,88}$/,
+    txHashHint: "a Solana transaction signature, base58 (about 88 characters)",
+    randomTx: () => base58(randomBytes(64)),
+    payeeEnv: "SVM_PAYEE_ADDRESS",
   },
 };
 
@@ -102,7 +138,7 @@ export const MODE_DESCRIPTIONS: Readonly<Record<ServeMode, { does: string; caref
     careful: "looks the reported transaction up on-chain before trusting it, and finds it is not this payment.",
   },
   "wrong-network": {
-    does: "asks to be paid on the mainnet (stellar:pubnet, or eip155:8453 for Base) instead of the testnet.",
+    does: "asks to be paid on the mainnet (stellar:pubnet, eip155:8453 for Base, or Solana mainnet) instead of the testnet.",
     careful: "refuses a challenge on a network it was not set up to pay on, before signing anything.",
   },
   overprice: {
@@ -170,7 +206,7 @@ export function challengeFor(options: ServeOptions, resourceUrl: string): Record
         asset: options.asset ?? profile.asset,
         payTo: options.payTo,
         maxTimeoutSeconds: 60,
-        extra: { ...profile.extra },
+        extra: { ...profile.extra(options.payTo) },
       },
     ],
   };

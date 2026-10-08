@@ -39,11 +39,13 @@
     "typecheck": "tsc -p test/tsconfig.json"
   },
   "dependencies": {
+    "@solana/kit": "^5.5.1",
     "@stellar/mpp": "^0.7.1",
     "@stellar/stellar-sdk": "^16.1.0",
     "@x402/evm": "^2.28.0",
     "@x402/fetch": "^2.28.0",
     "@x402/stellar": "^2.28.0",
+    "@x402/svm": "^2.28.0",
     "mppx": "^0.8.14",
     "viem": "^2.57.3"
   },

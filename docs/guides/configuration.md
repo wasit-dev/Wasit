@@ -13,6 +13,7 @@ keys in this file.
 | `X402-01`–`05` | nothing |
 | `X402-06`–`10` on Stellar | `STELLAR_PRIVATE_KEY` |
 | `X402-06`–`10` on Base Sepolia (`--network eip155:84532`) | `EVM_PRIVATE_KEY` |
+| `X402-06`–`10` on Solana devnet (`--network solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1`) | `SVM_PRIVATE_KEY` |
 | `MPP-01` | `MPP_PAYER_SECRET`, `MPP_STELLAR_NETWORK` |
 | `MPP-10`–`12`, `14` | `COMMITMENT_SECRET_HEX`, `MPP_STELLAR_NETWORK` |
 | `MPP-13` | the above, plus `CHANNEL_CONTRACT_DISPOSABLE` and an explicit opt-in |
@@ -33,7 +34,10 @@ third-party node.
 The x402 payment checks also pay on Base Sepolia (`eip155:84532`), through
 `--network` (MCP: `network`), with the payer key in `EVM_PRIVATE_KEY`. Its
 default RPC endpoint is Base's public `https://sepolia.base.org`, overridable
-with `--rpc-url`. Any other network gets the read-only checks only.
+with `--rpc-url`. They pay on Solana devnet too
+(`solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1`), with the payer key in `SVM_PRIVATE_KEY`
+and the public `https://api.devnet.solana.com` as the default RPC endpoint. Any other
+network gets the read-only checks only.
 
 ## Getting testnet keys
 
@@ -61,6 +65,14 @@ that uses Permit2 instead needs no ETH either when it offers the
 once on-chain, which needs gas, and a run without that approval reports
 `ERROR (setup)`. A wrong or malformed key is reported at `PREFLIGHT` before
 anything is sent, without echoing it.
+
+For Solana devnet, `SVM_PRIVATE_KEY` is the base58 encoding of the keypair's 64
+bytes (seed, then public key), the form wallets export. The payer needs devnet USDC
+of the SDK's default mint, `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`, and **no
+SOL**: the facilitator signs as fee payer and pays the fee. The payee's USDC token
+account must exist before the first payment, since the payment's transaction does
+not create it. A keypair whose public half does not belong to its seed, or any
+malformed key, is reported at `PREFLIGHT` without echoing it.
 
 ## The disposable channel
 
