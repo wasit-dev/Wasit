@@ -9,6 +9,7 @@ import { FaqList, type FaqEntry } from "@/components/FaqList";
 import { McpSession } from "@/components/McpSession";
 import { SequenceFlow } from "@/components/SequenceFlow";
 import { StackStrip } from "@/components/StackStrip";
+import { BrandSprite, Mark, type MarkId } from "@/components/BrandMarks";
 import { StrokeText } from "@/components/StrokeText";
 import { TechText } from "@/components/TechText";
 import { ScrollReveal } from "@/components/ScrollReveal";
@@ -24,17 +25,19 @@ import { CHECK_COUNT, WASIT_VERSION } from "@/lib/site-facts";
 const INSTALL_CMD = "npx @wasit-dev/cli test --target <your-service-url> --read-only";
 const GITHUB_URL = "https://github.com/wasit-dev/wasit";
 
-// Words for the ticker band under the hero. Every item is a fact the page
-// makes elsewhere; the band repeats them, it does not add to them. Set in
-// capitals here rather than by CSS, which would also capitalise "x402".
-const TICKER_ITEMS = [
-  "VERIFY THE SETTLEMENT",
-  "x402",
-  "MPP",
-  "STELLAR · BASE · ETHEREUM · SOLANA",
-  `${CHECK_COUNT} CHECKS`,
-  "CLI · MCP · CORE",
-  "APACHE-2.0",
+// The ticker band under the hero: the two protocols Wasit checks and the
+// four chains it reads the settlement from, as their marks. x402's and MPP's
+// marks are their names, so they stand alone; the chains' are glyphs, so
+// each is followed by its name. Brand colours, except Stellar's mark, which
+// is white on this dark band.
+type TickerMark = { id: MarkId; height: number; label?: string; style: React.CSSProperties }
+const TICKER_MARKS: TickerMark[] = [
+  { id: "x402", height: 19, style: { color: "var(--fg)" } },
+  { id: "mpp", height: 13, style: { color: "var(--fg)" } },
+  { id: "stellar", height: 20, label: "Stellar", style: { color: "var(--fg)" } },
+  { id: "base", height: 18, label: "Base", style: { color: "#3d5afe" } },
+  { id: "ethereum", height: 21, label: "Ethereum", style: { color: "#8a92f2" } },
+  { id: "solana", height: 19, label: "Solana", style: { fill: "url(#wm-solana-gradient)" } },
 ];
 
 type CompareRow = { without: string; with: string };
@@ -244,16 +247,20 @@ export default function Home() {
           </div>
         </section>
 
+        <BrandSprite />
         <div className="ticker" aria-hidden="true">
           <div className="ticker-track">
             {[0, 1].map((copy) => (
               <div className="ticker-group" key={copy}>
-                {TICKER_ITEMS.map((item) => (
-                  <span className="ticker-item" key={item}>
-                    {item}
-                    <span className="ticker-square" />
-                  </span>
-                ))}
+                {[0, 1].flatMap((half) =>
+                  TICKER_MARKS.map((m) => (
+                    <span className="ticker-item" key={`${half}-${m.id}`}>
+                      <Mark id={m.id} height={m.height} style={m.style} />
+                      {m.label}
+                      <span className="ticker-dot" />
+                    </span>
+                  )),
+                )}
               </div>
             ))}
           </div>

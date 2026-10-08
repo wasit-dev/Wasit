@@ -1,81 +1,200 @@
-import Image from "next/image"
+import { SvgMark, markWidth, type MarkId } from "@/components/BrandMarks"
 
-// The two protocols' marks, inlined (from their official brand files) so
-// they take the page's colour through currentColor. Stellar's lockup is
-// only available as a bitmap, so it ships as public/brand/stellar-white.png.
+// The stack strip under the ticker: the two protocols Wasit checks on the
+// left, the four chains whose own record it reads the settlement from on
+// the right, and a line wherever a protocol runs on a chain. The lines are
+// facts, not decoration: in 0.7.0 x402 pays on all four testnets and MPP on
+// Stellar's only, so MPP has one line. A dot runs each line from protocol
+// to chain, the direction the payment goes.
+//
+// Drawn as SVG at a fixed viewBox, so the lines meet the boxes exactly at
+// every width. Two layouts, chosen in CSS: wide (side by side) from 1100px,
+// narrow (protocols above chains) below it, where the wide one's text would
+// shrink too far.
 
-function X402Logo() {
-  return (
-    <svg viewBox="0 0 486.3 187.4" className="stack-logo stack-logo--x402" role="img" aria-label="x402">
-      <path d="M10.5,59.5c.6-.6,1.6-.6,2.3,0l50.9,50.9,19.5-19.5c.6-.6,1.6-.6,2.3,0l10,10c.6.6.6,1.7,0,2.3l-14.4,14.4v10.4l45.8,45.8c.6.6.6,1.7,0,2.3l-10,10c-.6.6-1.6.6-2.3,0l-50.9-50.9-50.9,50.9c-.6.6-1.6.6-2.3,0L.5,176.1c-.6-.6-.6-1.7,0-2.3l45.8-45.8v-10.4L.5,71.8c-.6-.6-.6-1.7,0-2.3l10-10Z" />
-      <path d="M374.1,151.7c0-2.5,1-4.9,2.7-6.7l91-93.6c.4-.5.7-1.1.7-1.7v-7.4c0-.6-.2-1.2-.7-1.7l-18.9-19.9c-.4-.5-1.1-.7-1.7-.7h-37.9c-.6,0-1.3.3-1.7.7l-22.9,23c-.9.9-2.5.9-3.4,0l-9.1-9.1c-.9-.9-.9-2.5,0-3.4l26-26c1.8-1.8,4.3-2.8,6.8-2.8h46.7c2.6,0,5.2,1.1,7,3l24.9,26.1c1.7,1.8,2.7,4.2,2.7,6.7v15.9c0,2.5-1,4.9-2.7,6.7l-91,93.6c-.4.5-.7,1.1-.7,1.7v11.4c0,1.3,1.1,2.4,2.4,2.4h89.6c1.3,0,2.4,1.1,2.4,2.4v12.9c0,1.3-1.1,2.4-2.4,2.4h-100.1c-5.3,0-9.7-4.3-9.7-9.7v-26.1Z" />
-      <path d="M317.9,2.2c17.8,0,32.2,14.4,32.2,32.2v121.6c-.4,17.1-14.2,30.9-31.3,31.4h-41.2c-17.1-.4-30.9-14.2-31.3-31.4v-.8s0-120.8,0-120.8c0-17.8,14.4-32.2,32.2-32.2h39.5ZM263.8,144.8v10.5c0,8,6.5,14.5,14.5,14.5h39.5c8,0,14.5-6.5,14.5-14.5v-79l-68.5,68.6ZM278.3,19.9c-8,0-14.5,6.5-14.5,14.5v85.3l68.5-68.6v-16.7c0-8-6.5-14.5-14.5-14.5h-39.5Z" />
-      <path d="M199.3,0c1.3,0,2.4,1.1,2.4,2.4v78.6c0,1.3,1.1,2.4,2.4,2.4h17.3c1.3,0,2.4,1.1,2.4,2.4v12.9c0,1.3-1.1,2.4-2.4,2.4h-17.3c-1.3,0-2.4,1.1-2.4,2.4v81.5c0,1.3-1.1,2.4-2.4,2.4h-12.9c-1.3,0-2.4-1.1-2.4-2.4v-81.5c0-1.3-1.1-2.4-2.4-2.4h-60.8c-.6,0-1.3-.3-1.7-.7l-21-21c-.9-.9-.9-2.5,0-3.4L172.9.7c.5-.5,1.1-.7,1.7-.7h24.7ZM123,76c-.9.9-.9,2.5,0,3.4l3.3,3.3c.5.5,1.1.7,1.7.7h53.5c1.3,0,2.4-1.1,2.4-2.4V19.9c0-1.2-1-2.2-2.2-2.2s-1.1.2-1.5.6l-57.3,57.6Z" />
-    </svg>
-  )
-}
-
-function MppLogo() {
-  return (
-    <svg viewBox="0 0 81.2195 18" className="stack-logo stack-logo--mpp" role="img" aria-label="MPP">
-      <path d="M33.1162 17.9828H29.2324V2.84079e-05H51.2711C52.7167 2.84079e-05 53.8884 1.17531 53.8884 2.62538V8.65536C53.8884 10.1054 52.7167 11.2807 51.2711 11.2807H33.7302C33.3911 11.2807 33.1162 11.5556 33.1162 11.8948V17.9828ZM33.9887 7.62911H49.1322C49.6143 7.62911 50.0047 7.2375 50.0047 6.754V4.52674C50.0047 4.04324 49.6143 3.65162 49.1322 3.65162H33.9887C33.5066 3.65162 33.1162 4.04324 33.1162 4.52674V6.754C33.1162 7.2375 33.5066 7.62911 33.9887 7.62911Z" />
-      <path d="M26.5978 17.9828H22.7141V5.6935C22.7141 5.30451 22.246 5.10892 21.9707 5.38284L16.511 10.8126C16.2658 11.0564 15.9347 11.1933 15.5897 11.1933H11.0099C10.6661 11.1933 10.3364 11.0577 10.0916 10.8157L4.62666 5.41609C4.35096 5.14349 3.88419 5.33952 3.88419 5.72763V17.9828H0V0H4.67988L11.8982 7.13351C12.0613 7.29496 12.2812 7.3851 12.5106 7.3851H14.0824C14.3123 7.3851 14.5334 7.29409 14.6966 7.13132L21.8669 0H26.5983V17.9828H26.5978Z" />
-      <path d="M60.4063 17.9828H56.5226V2.84079e-05H78.5612C80.0068 2.84079e-05 81.1786 1.17531 81.1786 2.62538V8.65536C81.1786 10.1054 80.0068 11.2807 78.5612 11.2807H61.0204C60.6812 11.2807 60.4063 11.5556 60.4063 11.8948V17.9828ZM61.2788 7.62911H76.4223C76.9044 7.62911 77.2948 7.2375 77.2948 6.754V4.52674C77.2948 4.04324 76.9044 3.65162 76.4223 3.65162H61.2788C60.7968 3.65162 60.4063 4.04324 60.4063 4.52674V6.754C60.4063 7.2375 60.7968 7.62911 61.2788 7.62911Z" />
-    </svg>
-  )
-}
-
-type Cell = { key: string; href: string; name: string; role: "checks" | "trusts"; meta: string; logo: React.ReactNode }
+type Node = { id: MarkId; name: string; short: string; meta: string; metaShort: string; href: string }
 
 // Check counts as docs/CHECKS.md lists them: ten for x402, one for MPP
-// charge mode and five for channel mode. Links are the homepages the repo
-// already cites.
-const CELLS: Cell[] = [
-  { key: "x402", href: "https://x402.org", name: "x402", role: "checks", meta: "10 checks · exact scheme on Stellar, EVM and Solana", logo: <X402Logo /> },
-  { key: "mpp", href: "https://paymentauth.org", name: "Machine Payments Protocol", role: "checks", meta: "6 checks · charge and channel", logo: <MppLogo /> },
-  {
-    key: "stellar",
-    href: "https://stellar.org",
-    name: "Stellar",
-    role: "trusts",
-    meta: "settlement read from Stellar RPC; for x402 also Base, Ethereum and Solana",
-    logo: <Image src="/brand/stellar-white.png" alt="Stellar" width={1200} height={300} className="stack-logo stack-logo--stellar" />,
-  },
+// charge mode and five for channel mode.
+const PROTOCOLS: Node[] = [
+  { id: "x402", name: "x402", short: "x402", meta: "10 checks · exact scheme", metaShort: "10 checks", href: "https://x402.org" },
+  { id: "mpp", name: "Machine Payments Protocol", short: "MPP", meta: "6 checks · charge and channel", metaShort: "6 checks", href: "https://paymentauth.org" },
 ]
 
-/**
- * The stack Wasit works on, as a logo strip under the hero: the two
- * payment protocols it checks and the chain it trusts for the settlement.
- * Stellar has the cell because both protocols run there; the x402 chains
- * beyond it are named in its line rather than given logos of their own.
- * Each cell links to that project's own site.
- */
+// The testnet each chain is tested on, and what Wasit reads the settlement
+// from there (docs/CHECKS.md, X402-06 and MPP-01).
+const CHAINS: Node[] = [
+  { id: "stellar", name: "Stellar", short: "Stellar", meta: "testnet · contract transfer event", metaShort: "testnet", href: "https://stellar.org" },
+  { id: "base", name: "Base", short: "Base", meta: "Sepolia · ERC-20 Transfer log", metaShort: "Sepolia", href: "https://base.org" },
+  { id: "ethereum", name: "Ethereum", short: "Ethereum", meta: "Sepolia · ERC-20 Transfer log", metaShort: "Sepolia", href: "https://ethereum.org" },
+  { id: "solana", name: "Solana", short: "Solana", meta: "devnet · token balances", metaShort: "devnet", href: "https://solana.com" },
+]
+
+/** Which chains each protocol runs on, as 0.7.0 tests them. */
+const RUNS_ON: Record<"x402" | "mpp", readonly MarkId[]> = {
+  x402: ["stellar", "base", "ethereum", "solana"],
+  mpp: ["stellar"],
+}
+
+function chainList(ids: readonly MarkId[]): string {
+  const names = ids.map((id) => CHAINS.find((c) => c.id === id)!.name)
+  return names.length === 1 ? names[0]! : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`
+}
+
+function protocolLabel(p: Node): string {
+  const on = RUNS_ON[p.id as "x402" | "mpp"]
+  return `${p.name}: ${p.meta}. Tested on ${chainList(on)} ${on.length === 1 ? "testnet" : "testnets"}.`
+}
+
+function chainLabel(c: Node): string {
+  const by = (Object.keys(RUNS_ON) as Array<"x402" | "mpp">).filter((p) => RUNS_ON[p].includes(c.id))
+  return `${c.name}, ${c.meta}. Settlement read here for ${by.map((p) => (p === "mpp" ? "MPP" : p)).join(" and ")}.`
+}
+
+/** A dot that runs the path `id` from start to end, forever. */
+function Flow({ path, dur, begin, kind }: { path: string; dur: number; begin: number; kind: "x" | "m" }) {
+  return (
+    <circle r="3.2" className={`fan-flow fan-flow--${kind}`}>
+      <animateMotion dur={`${dur}s`} begin={`${begin}s`} repeatCount="indefinite">
+        <mpath href={`#${path}`} />
+      </animateMotion>
+    </circle>
+  )
+}
+
+/** Where a protocol's line meets a chain; MPP lands a little lower so the two never merge. */
+function landing(p: "x402" | "mpp", centre: number, offset: number): number {
+  return p === "mpp" ? centre + offset : centre
+}
+
+function Wide() {
+  const W = 1200
+  const H = 440
+  const pw = 340, ph = 150, py = [36, 254]
+  const cx = W - 340, cw = 340, ch = 92, cy = [0, 116, 232, 348]
+  const pc = py.map((y) => y + ph / 2)
+  const cc = cy.map((y) => y + ch / 2)
+  const lines: React.ReactNode[] = []
+  PROTOCOLS.forEach((p, i) => {
+    const key = p.id as "x402" | "mpp"
+    RUNS_ON[key].forEach((chainId, n) => {
+      const j = CHAINS.findIndex((c) => c.id === chainId)
+      const y0 = pc[i]!, y1 = landing(key, cc[j]!, 16)
+      const id = `fan-w-${key}-${chainId}`
+      const kind = key === "x402" ? "x" : "m"
+      lines.push(
+        <g key={id}>
+          <path id={id} d={`M${pw},${y0} C${pw + 220},${y0} ${cx - 220},${y1} ${cx},${y1}`} className={`fan-line fan-line--${kind}`} />
+          <circle cx={cx} cy={y1} r="4" className={`fan-joint fan-joint--${kind}`} />
+          <Flow path={id} dur={key === "x402" ? 2.6 : 2.9} begin={n * 0.45 + (kind === "m" ? 0.3 : 0)} kind={kind} />
+        </g>,
+      )
+    })
+    lines.push(<circle key={`j-${key}`} cx={pw} cy={pc[i]} r="4" className={`fan-joint fan-joint--${key === "x402" ? "x" : "m"}`} />)
+  })
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="fan fan--wide" role="group" aria-label="Which protocol runs on which chain">
+      {lines}
+      {PROTOCOLS.map((p, i) => {
+        const y = py[i]!
+        const markH = p.id === "x402" ? 30 : 18
+        return (
+          <a key={p.id} href={p.href} target="_blank" rel="noreferrer noopener" aria-label={protocolLabel(p)} className="fan-node">
+            <rect x="0" y={y} width={pw} height={ph} className="fan-box" />
+            <text x="22" y={y + 28} className="fan-role"><tspan className="fan-slash">{"// "}</tspan>checks</text>
+            <SvgMark id={p.id} x={22} y={y + 44} height={markH} className="fan-mark" />
+            <text x="22" y={y + ph - 42} className="fan-name">{p.name}</text>
+            <text x="22" y={y + ph - 20} className="fan-meta">{p.meta}</text>
+          </a>
+        )
+      })}
+      {CHAINS.map((c, j) => {
+        const y = cy[j]!
+        return (
+          <a key={c.id} href={c.href} target="_blank" rel="noreferrer noopener" aria-label={chainLabel(c)} className="fan-node">
+            <rect x={cx} y={y} width={cw} height={ch} className="fan-box" />
+            <text x={cx + 22} y={y + 26} className="fan-role"><tspan className="fan-slash">{"// "}</tspan>trusts</text>
+            <text x={cx + 22} y={y + 54} className="fan-name">{c.name}</text>
+            <text x={cx + 22} y={y + 76} className="fan-meta">{c.meta}</text>
+            <SvgMark id={c.id} x={cx + cw - 22 - markWidth(c.id, 30)} y={y + 31} height={30} className="fan-mark" />
+          </a>
+        )
+      })}
+    </svg>
+  )
+}
+
+function Narrow() {
+  const W = 420
+  const H = 404
+  const pw = 200, ph = 118, px = [0, 220]
+  const cw = 96, ch = 122, cy = H - ch, cx = [0, 108, 216, 324]
+  const pc = px.map((x) => x + pw / 2)
+  const cc = cx.map((x) => x + cw / 2)
+  const lines: React.ReactNode[] = []
+  PROTOCOLS.forEach((p, i) => {
+    const key = p.id as "x402" | "mpp"
+    RUNS_ON[key].forEach((chainId, n) => {
+      const j = CHAINS.findIndex((c) => c.id === chainId)
+      const x0 = pc[i]!, x1 = landing(key, cc[j]!, 16)
+      const id = `fan-n-${key}-${chainId}`
+      const kind = key === "x402" ? "x" : "m"
+      lines.push(
+        <g key={id}>
+          <path id={id} d={`M${x0},${ph} C${x0},${ph + 90} ${x1},${cy - 90} ${x1},${cy}`} className={`fan-line fan-line--${kind}`} />
+          <circle cx={x1} cy={cy} r="3.5" className={`fan-joint fan-joint--${kind}`} />
+          <Flow path={id} dur={2.2} begin={n * 0.4 + (kind === "m" ? 0.3 : 0)} kind={kind} />
+        </g>,
+      )
+    })
+    lines.push(<circle key={`j-${key}`} cx={pc[i]} cy={ph} r="3.5" className={`fan-joint fan-joint--${key === "x402" ? "x" : "m"}`} />)
+  })
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="fan fan--narrow" role="group" aria-label="Which protocol runs on which chain">
+      {lines}
+      {PROTOCOLS.map((p, i) => {
+        const x = px[i]!
+        const markH = p.id === "x402" ? 22 : 13
+        return (
+          <a key={p.id} href={p.href} target="_blank" rel="noreferrer noopener" aria-label={protocolLabel(p)} className="fan-node">
+            <rect x={x} y="0" width={pw} height={ph} className="fan-box" />
+            <text x={x + 16} y="22" className="fan-role fan-role--sm"><tspan className="fan-slash">{"// "}</tspan>checks</text>
+            <SvgMark id={p.id} x={x + 16} y={34} height={markH} className="fan-mark" />
+            <text x={x + 16} y={ph - 32} className="fan-name fan-name--sm">{p.short}</text>
+            <text x={x + 16} y={ph - 14} className="fan-meta fan-meta--sm">{p.metaShort}</text>
+          </a>
+        )
+      })}
+      {CHAINS.map((c, j) => {
+        const x = cx[j]!
+        return (
+          <a key={c.id} href={c.href} target="_blank" rel="noreferrer noopener" aria-label={chainLabel(c)} className="fan-node">
+            <rect x={x} y={cy} width={cw} height={ch} className="fan-box" />
+            <text x={x + 12} y={cy + 20} className="fan-role fan-role--sm"><tspan className="fan-slash">{"// "}</tspan>trusts</text>
+            <SvgMark id={c.id} x={x + 12} y={cy + 32} height={24} className="fan-mark" />
+            <text x={x + 12} y={cy + ch - 32} className="fan-name fan-name--xs">{c.short}</text>
+            <text x={x + 12} y={cy + ch - 14} className="fan-meta fan-meta--sm">{c.metaShort}</text>
+          </a>
+        )
+      })}
+    </svg>
+  )
+}
+
 export function StackStrip() {
   return (
     <section className="stack" aria-labelledby="stack-title">
-      <div className="frame stack-grid">
+      <div className="frame stack-fan">
         <div className="stack-intro" data-reveal>
           <span className="stack-kicker">The stack</span>
           <p id="stack-title" className="stack-title">
-            Two protocols it <span className="hl-2">checks</span>. Only the chain it <span className="hl-2">trusts</span>.
+            Two protocols it <span className="hl-2">checks</span>. Four chains it <span className="hl-2">trusts</span>.
           </p>
         </div>
-        {CELLS.map((cell, i) => (
-          <a
-            key={cell.key}
-            className="stack-cell"
-            href={cell.href}
-            target="_blank"
-            rel="noreferrer noopener"
-            data-reveal
-            data-reveal-delay={String(100 * (i + 1))}
-          >
-            <span className="stack-role">{cell.role}</span>
-            <span className="stack-mark">{cell.logo}</span>
-            <span className="stack-name">{cell.name}</span>
-            <span className="stack-meta">{cell.meta}</span>
-          </a>
-        ))}
+        <div className="stack-diagram" data-reveal data-reveal-delay="120">
+          <Wide />
+          <Narrow />
+        </div>
       </div>
     </section>
   )
