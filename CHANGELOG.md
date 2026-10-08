@@ -2,7 +2,28 @@
 
 All notable changes to Wasit are recorded here. Versions follow [Semantic Versioning](https://semver.org/): patch releases are fixes, minor releases add checks or features without breaking existing usage, major releases break something.
 
-## [Unreleased]
+## [0.7.0] — 2026-10-08
+
+All three packages, versioned together as usual. The x402 payment checks now
+pay on Base Sepolia, Ethereum Sepolia and Solana devnet as well as Stellar
+testnet, and three negative payment checks join them (`X402-08` to `X402-10`),
+for sixteen checks in all. `X402-04` and `X402-05` read every payment option, on
+any chain, and every FAIL says what to change. `MPP-01` now signs only for the
+network the run names. New in the CLI: `wasit serve`, a paywall that misbehaves
+on purpose, and `wasit wallet --network`.
+
+**Results can change on upgrade.** A service on a chain other than Stellar now
+passes `X402-05` where it failed. A challenge with a broken second option now
+fails `X402-04` or `X402-05` where it passed. A challenge without `scheme`,
+`asset` or `maxTimeoutSeconds`, or with a wrongly typed field, now fails
+`X402-04`. A target that accepts replayed, underpaid or expired payments now fails
+`X402-08`, `X402-09` or `X402-10`; one that refuses even a valid payment now gets
+`X402-07` skipped instead of passed. A payer whose balance is below the price now
+gets no verdict from `X402-06`, and nothing is sent. A target that asks `MPP-01`
+to pay on a network other than the run's now gets no verdict and is not paid,
+an http `--rpc-url` now stops `MPP-01` before anything is sent, and a target
+that answers 402 after being paid has that 402 reported instead of being paid
+again.
 
 **Fixed — `MPP-01` signs only for the network the run names, and pays once.**
 `MPP-01` read the amount, currency and recipient from the target's challenge
@@ -182,14 +203,6 @@ lists `EVM_PRIVATE_KEY` and `SVM_PRIVATE_KEY`.
 **Changed — the CLI's payment warning says when it applies.** It said funds
 would move before every payment run, including runs where the target offered
 no option on the run's network and nothing was paid.
-
-**Results can change on upgrade.** A service on a chain other than Stellar now
-passes `X402-05` where it failed. A challenge with a broken second option now
-fails `X402-04` or `X402-05` where it passed. A challenge without `scheme`,
-`asset` or `maxTimeoutSeconds`, or with a wrongly typed field, now fails
-`X402-04`. A target that accepts replayed, underpaid or expired payments now fails
-`X402-08`, `X402-09` or `X402-10`; one that refuses even a valid payment now gets
-`X402-07` skipped instead of passed.
 
 ## [0.6.0] — 2026-09-30
 

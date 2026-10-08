@@ -180,30 +180,36 @@ would not appear in that file until it was resolved.
 
 ## Known advisories in a clean install
 
-`npm audit` on a fresh install of all three published packages (0.6.0,
-measured 2026-09-30) reports eight packages: four high, four moderate.
-Installing `@wasit-dev/cli` alone reports seven (four high, three moderate),
-since it pulls a smaller slice of the same graph. None originate in Wasit's own
-code or declared dependencies. All of them trace to `@stellar/mpp@0.7.1`, which
-brings older copies of two packages alongside the ones Wasit declares:
+`npm audit` on a fresh install of all three packages (0.7.0, measured
+2026-10-08) reports nine packages: eight high, one moderate. Installing
+`@wasit-dev/cli` alone reports eight (seven high, one moderate), since it pulls
+a smaller slice of the same graph. None originate in Wasit's own code. They
+arrive by two routes:
 
-- `@stellar/stellar-sdk@15.1.0`, because `@stellar/mpp` peers on `^15.1.0`
-  while this project declares `^16.1.0`. That copy brings `axios@1.15.0` and
-  `toml@3.0.0` (high). The SDK Wasit itself declares resolves `axios@1.18.0`,
-  which no current advisory matches.
-- `mppx@0.6.31`, because `@stellar/mpp` peers on `^0.6.29`. The "gas draining"
-  advisories (moderate) affect `mppx` before 0.8.1; the `mppx` Wasit declares
-  resolves 0.8.19.
+- `@stellar/mpp@0.7.1` brings older copies of two packages alongside the ones
+  Wasit declares. `@stellar/stellar-sdk@15.1.0`, because `@stellar/mpp` peers on
+  `^15.1.0`, brings `axios@1.15.0` and `toml@3.0.0` (high). `mppx@0.6.31`,
+  because `@stellar/mpp` peers on `^0.6.29`, is matched by the "gas draining"
+  advisories (moderate), which affect `mppx` before 0.8.2; the `mppx` Wasit
+  declares resolves 0.8.19.
+- `@stellar/stellar-sdk@16.3.1`, the version Wasit and `@x402/stellar@2.28.0`
+  both resolve, pins `axios@1.18.0`, which axios advisories published since
+  0.6.0 now match (fixed in axios 1.20.0). No 16.x release of the SDK moves past
+  axios 1.18.0. 17.2.1 pins axios 1.20.0, but `@x402/stellar` 2.28.0, its latest,
+  requires `^16.3.0`, so moving Wasit to 17 would install two copies of the SDK.
 
-The three `@wasit-dev/*` packages appear in that count only because npm marks
-a package that depends on an affected one; there is no advisory against Wasit.
+`@stellar/mpp`, `@x402/stellar` and the three `@wasit-dev/*` packages appear in
+that count only because npm marks a package that depends on an affected one.
+There is no advisory against Wasit 0.7.0's own code; versions up to 0.6.0 have
+the `MPP-01` network issue described under [Testnet only](#testnet-only).
 
-There is no downstream fix — the only lever is those two peer ranges, which we
-do not control. They are reported upstream as
+There is no downstream fix. The levers are `@stellar/mpp`'s two peer ranges,
+reported upstream as
 [stellar-mpp-sdk#70](https://github.com/stellar/stellar-mpp-sdk/issues/70) and
-written up in [findings/upstream-sdk.md](docs/findings/upstream-sdk.md); the
-fix has merged upstream, but `@stellar/mpp@0.7.1` is still the latest on npm
-(checked 2026-09-30).
+written up in [findings/upstream-sdk.md](docs/findings/upstream-sdk.md), whose
+fix has merged upstream while `@stellar/mpp@0.7.1` is still the latest on npm;
+and a release of the Stellar SDK's 16 line on a fixed axios, or `@x402/stellar`
+accepting 17 (all checked 2026-10-08).
 `npm run verify:clean-install` installs all three packages and prints the
 audit on every CI run, so the count is measured rather than remembered.
 

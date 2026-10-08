@@ -7,7 +7,7 @@ narrative, read the [completion summary](2026-09-20-completion-summary.md).
 **Builder:** Muhammad Dzakwan Najmi · **Program:** Stellar Chapter Ambassador
 Indonesia Instaward · **Repo:** [wasit-dev/wasit](https://github.com/wasit-dev/wasit)
 · **Site:** [usewasit.dev](https://usewasit.dev) · **Packages:** `@wasit-dev/core`,
-`@wasit-dev/cli`, `@wasit-dev/server` at 0.6.0 · **As of:** 2026-10-01
+`@wasit-dev/cli`, `@wasit-dev/server` at 0.7.0 · **As of:** 2026-10-08
 
 | Deliverable | Status |
 |---|---|
