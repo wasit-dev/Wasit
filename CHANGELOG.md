@@ -99,6 +99,14 @@ refuses `X402-06`'s valid payment, `X402-07` to `X402-10` are skipped rather tha
 a target that refuses everything proves nothing by refusing a bad payment. `X402-07` used
 to pass in that case.
 
+**Changed — a payer that cannot cover the price gets no verdict.** `X402-06` reads the
+payer's balance of the advertised asset before it signs; below the price, it reports
+`ERROR (setup)` naming the key to fund, sends nothing, and skips `X402-07`–`10`. An
+unfunded payer used to fail `X402-06` on Solana devnet, for a reason real defects give
+too, and to stop on Stellar with only the token's error code. A balance that cannot be
+read pays as before. Measured on all three chains with fresh payers
+([evidence](docs/evidence/2026-10-05-payer-balance-check-run.md)).
+
 **Changed — a payer key for the wrong chain, or a malformed one, stops the run at
 preflight.** It used to surface mid-payment as a harness error. The message never
 echoes the key.
@@ -113,7 +121,20 @@ Every mode's challenge is well-formed (`wasit test --read-only` passes it), and
 the two settlement modes reproduce the servers built for the 0.6.0 A/B:
 `X402-06` and `X402-07` fail against them. `--network eip155:84532` poses the same
 modes on Base Sepolia, and `--network solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` on Solana
-devnet.
+devnet. Two more modes are about the challenge: `v1-challenge` sends only an x402 v1
+challenge (Base Sepolia and Solana devnet; v1 names no Stellar network), and
+`malformed-header` a `PAYMENT-REQUIRED` header that does not decode; both answer a
+payment with 402 and log which header it came in. The official SDK client pays the
+first as v1 and refuses the second without paying
+([evidence](docs/evidence/2026-10-05-wallet-network-and-serve-modes-run.md)).
+
+**Added — `wasit wallet --network` for the Base Sepolia and Solana devnet payers.**
+`wasit wallet create --role x402 --network eip155:84532` (or Solana devnet) generates the
+payer key in the form the payment checks read and prints its `.env` line and the
+address to fund at faucet.circle.com; `status --network` shows that payer's USDC
+balance, and `fund --network` prints the faucet step, since the payer needs nothing
+else. Testnets only; the MPP roles stay on Stellar. The dashboard's environment panel
+lists `EVM_PRIVATE_KEY` and `SVM_PRIVATE_KEY`.
 
 **Changed — the CLI's payment warning says when it applies.** It said funds
 would move before every payment run, including runs where the target offered

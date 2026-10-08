@@ -53,7 +53,8 @@ The second was decided against Solana devnet itself, through its public RPC
 ## An honest server
 
 Payer: a devnet account holding 20 USDC of the SDK's default devnet mint
-(`4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`) and **no SOL**. Payee: a second account
+(`4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`), from Circle's faucet
+(https://faucet.circle.com, Solana Devnet), and **no SOL**. Payee: a second account
 whose USDC token account already existed (the payment's transaction does not create
 one).
 

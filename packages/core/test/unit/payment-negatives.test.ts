@@ -5,13 +5,15 @@
  *
  * Offline: the payer is a throwaway EVM key, and EIP-3009 signing needs no
  * RPC, so a local stand-in on Base Sepolia's network id can take or refuse
- * every payment while recording exactly what was signed. The X402-10 runs
- * wait out a one-second lifetime, so each takes about five seconds.
+ * every payment while recording exactly what was signed. A second stand-in
+ * answers the payer's token balance, which X402-06 reads before paying. The
+ * X402-10 runs wait out a one-second lifetime, so each takes about five
+ * seconds.
  */
 
 import assert from "node:assert/strict";
 import http from "node:http";
-import { describe, it } from "node:test";
+import { after, before, describe, it } from "node:test";
 
 import { generatePrivateKey } from "viem/accounts";
 
@@ -93,6 +95,53 @@ async function standIn(options: {
   };
 }
 
+/**
+ * A JSON-RPC endpoint that answers every `eth_call` (the ERC-20 `balanceOf`
+ * X402-06 reads) with `balance`, or fails every request with 500.
+ */
+async function rpcStandIn(
+  balance: bigint | "unreadable",
+): Promise<{ url: string; calls: () => number; close: () => Promise<void> }> {
+  let calls = 0;
+  const server = http.createServer((request, response) => {
+    let body = "";
+    request.on("data", (chunk) => (body += chunk));
+    request.on("end", () => {
+      calls++;
+      if (balance === "unreadable") {
+        response.writeHead(500);
+        response.end();
+        return;
+      }
+      const { id, method } = JSON.parse(body) as { id: number; method: string };
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(
+        JSON.stringify(
+          method === "eth_call"
+            ? { jsonrpc: "2.0", id, result: `0x${balance.toString(16).padStart(64, "0")}` }
+            : { jsonrpc: "2.0", id, error: { code: -32601, message: "not in this stand-in" } },
+        ),
+      );
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address() as { port: number };
+  return {
+    url: `http://127.0.0.1:${port}`,
+    calls: () => calls,
+    close: () => new Promise((resolve) => server.close(() => resolve())),
+  };
+}
+
+/** A payer that holds plenty: the default for runs that are not about the balance. */
+let funded: Awaited<ReturnType<typeof rpcStandIn>>;
+before(async () => {
+  funded = await rpcStandIn(10n ** 12n);
+});
+after(async () => {
+  await funded.close();
+});
+
 function byId(results: CheckResult[]): Record<string, CheckResult> {
   return Object.fromEntries(results.map((result) => [result.id, result]));
 }
@@ -105,6 +154,7 @@ describe("the negative checks against a target that takes anything", () => {
         target: target.url,
         network: NETWORK,
         payerSecretKey: generatePrivateKey(),
+        rpcUrl: funded.url,
       });
       assert.deepEqual(
         results.map((result) => result.id),
@@ -140,7 +190,12 @@ describe("a target that refuses even the valid payment", () => {
     const target = await standIn({ mode: "refuse" });
     try {
       const r = byId(
-        await runX402PaymentChecks({ target: target.url, network: NETWORK, payerSecretKey: generatePrivateKey() }),
+        await runX402PaymentChecks({
+          target: target.url,
+          network: NETWORK,
+          payerSecretKey: generatePrivateKey(),
+          rpcUrl: funded.url,
+        }),
       );
       assert.equal(r["X402-06"]?.pass, false);
       for (const id of ["X402-07", "X402-08", "X402-09", "X402-10"]) {
@@ -161,7 +216,12 @@ describe("a Permit2 target that needs an approval this payer never made", () => 
     const target = await standIn({ mode: "permit2-allowance" });
     try {
       const r = byId(
-        await runX402PaymentChecks({ target: target.url, network: NETWORK, payerSecretKey: generatePrivateKey() }),
+        await runX402PaymentChecks({
+          target: target.url,
+          network: NETWORK,
+          payerSecretKey: generatePrivateKey(),
+          rpcUrl: funded.url,
+        }),
       );
       assert.equal(r["X402-06"]?.error?.kind, "setup");
       assert.match(r["X402-06"]?.detail ?? "", /approved the Permit2 contract/);
@@ -178,11 +238,68 @@ describe("a refused valid payment", () => {
     const target = await standIn({ mode: "refuse" });
     try {
       const r = byId(
-        await runX402PaymentChecks({ target: target.url, network: NETWORK, payerSecretKey: generatePrivateKey() }),
+        await runX402PaymentChecks({
+          target: target.url,
+          network: NETWORK,
+          payerSecretKey: generatePrivateKey(),
+          rpcUrl: funded.url,
+        }),
       );
       assert.match(r["X402-06"]?.detail ?? "", /^Expected 2xx after a valid payment, got 402\.$/);
     } finally {
       await target.close();
+    }
+  });
+});
+
+describe("a payer that cannot cover the price", () => {
+  // Measured on Solana devnet: an unfunded payer's payment is refused for a
+  // reason a real defect gives too. Read first, it is the payer's, not the
+  // target's: no verdict, and nothing is sent.
+  it("gets X402-06 as a setup error before any payment is sent", async () => {
+    const target = await standIn({ mode: "accept" });
+    const chain = await rpcStandIn(9_999n);
+    try {
+      const r = byId(
+        await runX402PaymentChecks({
+          target: target.url,
+          network: NETWORK,
+          payerSecretKey: generatePrivateKey(),
+          rpcUrl: chain.url,
+        }),
+      );
+      assert.equal(r["X402-06"]?.error?.kind, "setup");
+      assert.match(r["X402-06"]?.detail ?? "", /holds less of .* than the advertised 10000 base units/);
+      assert.match(r["X402-06"]?.detail ?? "", /EVM_PRIVATE_KEY/);
+      for (const id of ["X402-07", "X402-08", "X402-09", "X402-10"]) assert.equal(r[id]?.skipped, true, id);
+      assert.equal(target.received.length, 0);
+    } finally {
+      await chain.close();
+      await target.close();
+    }
+  });
+
+  it("pays as before when the balance cannot be read, or covers the price exactly", async () => {
+    for (const balance of ["unreadable", 10_000n] as const) {
+      const target = await standIn({ mode: "refuse" });
+      const chain = await rpcStandIn(balance);
+      try {
+        const r = byId(
+          await runX402PaymentChecks({
+            target: target.url,
+            network: NETWORK,
+            payerSecretKey: generatePrivateKey(),
+            rpcUrl: chain.url,
+          }),
+        );
+        assert.ok(chain.calls() > 0, `${balance}: the balance was asked for`);
+        assert.equal(r["X402-06"]?.error, undefined, `${balance}: no setup error`);
+        assert.match(r["X402-06"]?.detail ?? "", /got 402/, `${balance}`);
+        assert.equal(target.received.length, 1, `${balance}: the payment was sent`);
+      } finally {
+        await chain.close();
+        await target.close();
+      }
     }
   });
 });
@@ -192,7 +309,12 @@ describe("when a negative check has nothing to test", () => {
     const target = await standIn({ mode: "accept", amount: "1", paymentIdentifier: true });
     try {
       const r = byId(
-        await runX402PaymentChecks({ target: target.url, network: NETWORK, payerSecretKey: generatePrivateKey() }),
+        await runX402PaymentChecks({
+          target: target.url,
+          network: NETWORK,
+          payerSecretKey: generatePrivateKey(),
+          rpcUrl: funded.url,
+        }),
       );
       assert.equal(r["X402-08"]?.skipped, true);
       assert.match(r["X402-08"]?.skipReason ?? "", /payment-identifier/);

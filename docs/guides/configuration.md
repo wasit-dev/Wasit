@@ -57,7 +57,8 @@ curl "https://friendbot.stellar.org/?addr=<G...>"
 string — it signs channel commitments directly rather than transactions.
 
 For Base Sepolia, `EVM_PRIVATE_KEY` is a raw private key, `0x` followed by 64
-hex characters, from any EVM wallet or `viem`'s `generatePrivateKey()`. The
+hex characters, from `wasit wallet create --role x402 --network eip155:84532`,
+any EVM wallet, or `viem`'s `generatePrivateKey()`. The
 payer needs Base Sepolia USDC, from https://faucet.circle.com, and **no ETH**:
 the facilitator pays the gas (the `exact` scheme's EIP-3009 method). A target
 that uses Permit2 instead needs no ETH either when it offers the
@@ -67,9 +68,10 @@ once on-chain, which needs gas, and a run without that approval reports
 anything is sent, without echoing it.
 
 For Solana devnet, `SVM_PRIVATE_KEY` is the base58 encoding of the keypair's 64
-bytes (seed, then public key), the form wallets export. The payer needs devnet USDC
-of the SDK's default mint, `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`, and **no
-SOL**: the facilitator signs as fee payer and pays the fee. The payee's USDC token
+bytes (seed, then public key), the form wallets export and `wasit wallet create
+--role x402 --network solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` prints. The payer needs devnet USDC
+of the SDK's default mint, `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`, from
+https://faucet.circle.com (network Solana Devnet), and **no SOL**: the facilitator signs as fee payer and pays the fee. The payee's USDC token
 account must exist before the first payment, since the payment's transaction does
 not create it. A keypair whose public half does not belong to its seed, or any
 malformed key, is reported at `PREFLIGHT` without echoing it.

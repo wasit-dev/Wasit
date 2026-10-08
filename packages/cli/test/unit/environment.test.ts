@@ -3,7 +3,13 @@ import { afterEach, beforeEach, describe, it } from "node:test";
 
 import { getEnvironmentStatus } from "../../src/dashboard/environment.js";
 
-const ENV_KEYS = ["STELLAR_PRIVATE_KEY", "COMMITMENT_SECRET_HEX", "MPP_PAYER_SECRET"] as const;
+const ENV_KEYS = [
+  "STELLAR_PRIVATE_KEY",
+  "EVM_PRIVATE_KEY",
+  "SVM_PRIVATE_KEY",
+  "COMMITMENT_SECRET_HEX",
+  "MPP_PAYER_SECRET",
+] as const;
 
 describe("getEnvironmentStatus", () => {
   const saved: Partial<Record<(typeof ENV_KEYS)[number], string>> = {};

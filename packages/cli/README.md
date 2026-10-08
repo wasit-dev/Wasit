@@ -108,12 +108,12 @@ Lists every check by ID with the subcommand that runs it, and flags the ones tha
 ### `wasit wallet` — testnet keys
 
 ```bash
-wasit wallet status [--role x402|mpp-charge] [--json]
-wasit wallet create --role x402|mpp-charge|mpp-channel [--fund]
-wasit wallet fund   --role x402|mpp-charge [--asset xlm|usdc] [--amount <n>]
+wasit wallet status [--role x402|mpp-charge] [--network <testnet>] [--json]
+wasit wallet create --role x402|mpp-charge|mpp-channel [--network <testnet>] [--fund]
+wasit wallet fund   --role x402|mpp-charge [--network <testnet>] [--asset xlm|usdc] [--amount <n>]
 ```
 
-Testnet-only helpers for the keys the subcommands above read from `.env`. There is deliberately no `--network` flag. `create` prints the exact `.env` lines to paste and never writes the file itself; `fund --asset xlm` uses Stellar's public Friendbot and is fully automatic.
+Testnet-only helpers for the keys the subcommands above read from `.env`. `--network` takes testnets only: `stellar:testnet` (default), `eip155:84532` or `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1`, where `create --role x402` prints an `EVM_PRIVATE_KEY` or `SVM_PRIVATE_KEY` line and the address to fund at [faucet.circle.com](https://faucet.circle.com); that payer needs USDC and no ETH or SOL. `create` prints the exact `.env` lines to paste and never writes the file itself; `fund --asset xlm` uses Stellar's public Friendbot and is fully automatic.
 
 `fund --asset usdc` opens the Circle testnet USDC trustline automatically, but **receiving a balance always needs one human step**: there is no scriptable USDC faucet for Stellar. Visit [faucet.circle.com](https://faucet.circle.com) once, or set `WASIT_USDC_DISTRIBUTOR_SECRET` to an account you funded that way and every later run sends from it automatically.
 
@@ -122,11 +122,13 @@ Testnet-only helpers for the keys the subcommands above read from `.env`. There 
 ### `wasit serve` — a paywall that misbehaves, for testing an agent that pays
 
 ```bash
-wasit serve --mode no-settle            # also: wrong-settlement, wrong-network, overprice
+wasit serve --mode no-settle            # also: wrong-settlement, wrong-network, overprice,
+                                        #       v1-challenge, malformed-header
 ```
 
 Runs a local x402 paywall that lies in one chosen way: serves without settling,
-cites someone else's settlement, asks for mainnet, or asks for one million USDC.
+cites someone else's settlement, asks for mainnet, asks for one million USDC, issues
+only an x402 v1 challenge, or sends a challenge header that does not decode.
 Point your agent at `http://127.0.0.1:4020/` and the server reports what the
 agent did. Nothing is settled or forwarded, so no funds move; the agent still
 needs a funded testnet wallet, and `--pay-to` (default `STELLAR_PAYEE_ADDRESS`)
