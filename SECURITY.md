@@ -28,7 +28,8 @@ pays once per run. Before 0.7.0, `MPP-01` let the SDK sign for whichever
 network the challenge named, through the SDK's default endpoint for it, so a
 target asking for `stellar:pubnet` could have a mainnet transfer signed by the
 payer key if that account holds mainnet funds (read from the SDK's source, not
-run). Use a payer key that has never held mainnet funds.
+run). Use a payer key that has never held mainnet funds. The advisory is
+[GHSA-wm3g-w88q-73xx](https://github.com/wasit-dev/wasit/security/advisories/GHSA-wm3g-w88q-73xx).
 
 ## Authorization
 
@@ -201,7 +202,8 @@ arrive by two routes:
 `@stellar/mpp`, `@x402/stellar` and the three `@wasit-dev/*` packages appear in
 that count only because npm marks a package that depends on an affected one.
 There is no advisory against Wasit 0.7.0's own code; versions up to 0.6.0 have
-the `MPP-01` network issue described under [Testnet only](#testnet-only).
+the `MPP-01` network issue described under [Testnet only](#testnet-only),
+[GHSA-wm3g-w88q-73xx](https://github.com/wasit-dev/wasit/security/advisories/GHSA-wm3g-w88q-73xx).
 
 There is no downstream fix. The levers are `@stellar/mpp`'s two peer ranges,
 reported upstream as
