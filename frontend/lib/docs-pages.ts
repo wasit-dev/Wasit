@@ -100,7 +100,7 @@ No install, no keys, no signup, and nothing settles on-chain:
 npx @wasit-dev/cli test --target https://your-service.example/paid --read-only
 \`\`\`
 
-Point \`--target\` at any endpoint that answers HTTP 402. That runs
+Point \`--target\` at an endpoint you operate that answers HTTP 402. That runs
 \`X402-01\` through \`X402-05\` — the read-only half of the x402 suite —
 and prints one line per check:
 
@@ -121,8 +121,9 @@ Every result carries its own detail line, passes included — a check that
 passed still tells you what it accepted.
 
 > **Note** — \`--read-only\` is what keeps this free. Drop it and the
-> payment checks \`X402-06\`/\`07\` run as soon as a \`STELLAR_PRIVATE_KEY\`
-> is available, settling a real testnet payment. The CLI reads \`.env\`
+> payment checks \`X402-06\` to \`10\` run as soon as a payer key such as
+> \`STELLAR_PRIVATE_KEY\` is available, and \`X402-06\` settles a real testnet
+> payment. The CLI reads \`.env\`
 > from the directory you run it in, so "I did not pass a key" is not the
 > same as "no key is set".
 
@@ -156,7 +157,7 @@ gets you a funded testnet wallet.
 /** Getting Started → Quick setup. */
 export const QUICK_SETUP_MD = `# Quick setup
 
-For the checks that settle a payment — \`X402-06\`/\`07\`, \`MPP-01\`, and the
+For the checks that settle a payment — \`X402-06\` to \`10\`, \`MPP-01\`, and the
 channel suite. If you only need the read-only checks, [Try it in one
 command](/docs/start/try-it) is the whole story and you can stop there.
 

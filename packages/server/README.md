@@ -27,7 +27,7 @@ claude mcp add --transport stdio wasit \
   -- npx -y @wasit-dev/server
 ```
 
-Verify it connected with `claude mcp list`, then ask directly — for example "run wasit_x402_test against https://my-service.example.com". Remove it later with `claude mcp remove wasit`.
+Verify it connected with `claude mcp list`, then ask directly — for example "run wasit_x402_test against https://my-service.example.com". Remove it later with `claude mcp remove wasit`. To try it with no keys and nothing settled, register it without any `--env` and ask for read-only checks (`readOnly: true`). On native Windows, put `cmd /c` before `npx`, and in PowerShell 5.1 quote the separator: `claude mcp add --transport stdio wasit '--' cmd /c npx -y @wasit-dev/server` (see the [MCP guide](https://github.com/wasit-dev/wasit/blob/main/docs/guides/mcp.md#claude-code)).
 
 ## <picture><source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/wasit-dev/Wasit/main/docs/media/clients/claude-paper.svg" /><img src="https://raw.githubusercontent.com/wasit-dev/Wasit/main/docs/media/clients/claude-ink.svg" height="22" alt="" /></picture> Claude Desktop
 
@@ -69,12 +69,12 @@ Full snippets are in the [MCP guide](https://github.com/wasit-dev/wasit/blob/mai
 
 | Tool | Checks | Cost |
 |---|---|---|
-| `wasit_x402_test` | `X402-01`–`07` | `06`/`07` settle real payments |
+| `wasit_x402_test` | `X402-01`–`10` | `06` settles a real payment; `07`–`10` send payments the target must refuse; all five run only with a payer key, and `readOnly` skips them |
 | `wasit_mpp_charge_test` | `MPP-01` | Settles a real payment every call |
 | `wasit_mpp_channel_test` | `MPP-10`–`12`, `14` | Free |
 | `wasit_mpp_channel_test_with_close` | + `MPP-13` | **Destroys a channel — permanent** |
 
-`wasit_x402_test` also takes optional `method`, `body` and `headers` for a paid endpoint that is not a plain `GET`, matching the CLI's `--method`, `--body` and `--header`. Every probe, including the payment checks, uses the same request shape. Header values appear in the agent's transcript, so never pass a credential as a header; test an endpoint that needs one with the CLI instead. Its optional `rpcUrl`, like the CLI's `--rpc-url`, overrides the Soroban RPC endpoint `X402-06` reads to verify the settlement on-chain.
+`wasit_x402_test` also takes an optional `readOnly` (skips the payment checks even when a payer key is set) and optional `method`, `body` and `headers` for a paid endpoint that is not a plain `GET`, matching the CLI's `--method`, `--body` and `--header`. Every probe, including the payment checks, uses the same request shape. Header values appear in the agent's transcript, so never pass a credential as a header; test an endpoint that needs one with the CLI instead. Its optional `rpcUrl`, like the CLI's `--rpc-url`, overrides the Soroban RPC endpoint `X402-06` reads to verify the settlement on-chain.
 
 The fourth tool is registered **only** when the server is started with `WASIT_ALLOW_DESTRUCTIVE=1` or `--allow-destructive`. Without that opt-in it's absent from `tools/list` entirely — an agent can't call what it can't see. Even then it refuses unless a `destructiveChannel` is named and the target's own challenge advertises that same address.
 

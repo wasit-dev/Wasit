@@ -34,6 +34,35 @@ connected with `claude mcp list`, then ask Claude Code directly, for example
 
 To remove it later: `claude mcp remove wasit`.
 
+#### Try it first: read-only, no keys
+
+The quickest safe start needs no keys and settles nothing. Register the server
+without any `--env`:
+
+```bash
+claude mcp add --transport stdio wasit -- npx -y @wasit-dev/server
+```
+
+Then ask Claude Code to run only the read-only checks, for example "run
+wasit_x402_test against https://my-service.example.com with readOnly true; do
+not pay anything". Without a payer key in the server's environment the payment
+checks (`X402-06` to `10`) do not run, and `readOnly: true` skips them even when
+a key is set.
+
+#### On Windows
+
+On native Windows, Claude Code needs `cmd /c` in front of `npx` for a stdio
+server. In Windows PowerShell 5.1 the bare `--` is swallowed, so `-y` reaches
+`claude` and the command fails with `error: unknown option '-y'`. Quote the
+separator:
+
+```powershell
+claude mcp add --transport stdio wasit '--' cmd /c npx -y @wasit-dev/server
+```
+
+A user reported this working on Windows 11 with PowerShell 5.1, Claude Code
+2.1.183 and Node 24 (2026-10-24, wasit-dev/Wasit#15).
+
 ### Claude Desktop
 
 Open Settings, go to the Developer tab, and click "Edit Config". This opens
@@ -195,7 +224,7 @@ their owners, shown only to say which client a configuration is for.
 
 | Tool | Checks | Cost |
 |---|---|---|
-| `wasit_x402_test` | `X402-01`–`07` | `06`/`07` settle real payments |
+| `wasit_x402_test` | `X402-01`–`10` | `06` settles a real payment; `07`–`10` send payments the target must refuse |
 | `wasit_mpp_charge_test` | `MPP-01` | Settles a real payment every call |
 | `wasit_mpp_channel_test` | `MPP-10`–`12`, `14` | Free |
 | `wasit_mpp_channel_test_with_close` | + `MPP-13` | **Destroys a channel** |
@@ -220,7 +249,10 @@ endpoint that is not a plain `GET`, matching the CLI's `--method`, `--body` and
 request shape. Header values appear in the agent's transcript, so never pass a
 credential as a header; test an endpoint that needs one with the CLI instead.
 Its optional `rpcUrl`, like the CLI's `--rpc-url`, overrides the Soroban RPC
-endpoint `X402-06` reads to verify the settlement on-chain.
+endpoint `X402-06` reads to verify the settlement on-chain. Its optional
+`readOnly` (a boolean) skips the payment checks `X402-06` to `10` even when a
+payer key is set: it is the safe way to try Wasit on a service you have not
+tested before.
 
 ## Resource
 

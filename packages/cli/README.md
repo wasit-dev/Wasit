@@ -184,7 +184,7 @@ All keys are **testnet only**. `wasit` also reads a `.env` file in the current w
 
 ## What's checked
 
-Thirteen checks across x402 and MPP, each traced to a written spec clause — the full catalogue, with pass criteria and spec references, is in [`docs/CHECKS.md`](https://github.com/wasit-dev/wasit/blob/main/docs/CHECKS.md).
+Sixteen checks across x402 and MPP, each traced to a written spec clause — the full catalogue, with pass criteria and spec references, is in [`docs/CHECKS.md`](https://github.com/wasit-dev/wasit/blob/main/docs/CHECKS.md).
 
 ## Related
 
