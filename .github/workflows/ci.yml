@@ -72,6 +72,17 @@ jobs:
       - name: Test @wasit-dev/cli
         run: npm run test -w packages/cli
 
+      # The MCP server's own tests start the built server over stdio, the way
+      # an MCP client does, and call its tools with a network that is not a
+      # test network: nothing may be paid. Offline: the target and the RPC
+      # endpoint are local listeners on 127.0.0.1, and every key is generated
+      # in the test and holds nothing.
+      - name: Type-check @wasit-dev/server tests
+        run: npm run typecheck -w packages/server
+
+      - name: Test @wasit-dev/server
+        run: npm run test -w packages/server
+
       # Everything above this line runs against the working tree, where
       # npm has deduplicated one dependency graph across all three
       # workspaces. That is not the tree an installer gets, so a green

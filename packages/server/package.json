@@ -38,6 +38,8 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "test": "node --import tsx --test \"test/unit/**/*.test.ts\"",
+    "typecheck": "tsc -p test/tsconfig.json",
     "prepack": "node -e \"const fs=require('fs');fs.mkdirSync('docs',{recursive:true});fs.copyFileSync('../../docs/CHECKS.md','docs/CHECKS.md')\""
   },
   "dependencies": {

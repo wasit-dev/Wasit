@@ -203,10 +203,11 @@ program
   .requiredOption("--target <url>", "URL of the service to test")
   .option(
     "--network <network>",
-    "Network the payment checks pay on: stellar:testnet, stellar:pubnet, " +
+    "Network the payment checks pay on: stellar:testnet, " +
       "eip155:84532 (Base Sepolia), eip155:11155111 (Ethereum Sepolia) or " +
-      "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1 (Solana devnet). X402-01..05 " +
-      "apply to a challenge on any chain.",
+      "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1 (Solana devnet). Test networks " +
+      "only: on any other network, stellar:pubnet included, the payment checks " +
+      "stop before anything is signed. X402-01..05 apply to a challenge on any chain.",
     "stellar:testnet",
   )
   .option(
@@ -368,7 +369,11 @@ program
     "--commitment-key <hex>",
     "Raw ed25519 commitment seed, hex (default: COMMITMENT_SECRET_HEX)",
   )
-  .option("--network <network>", "CAIP-2 network id (default: MPP_STELLAR_NETWORK)")
+  .option(
+    "--network <network>",
+    "CAIP-2 network id, stellar:testnet only; any other network is refused before " +
+      "anything is sent (default: MPP_STELLAR_NETWORK, else stellar:testnet)",
+  )
   .option("--rpc-url <url>", "Override the default Soroban RPC endpoint")
   .option(
     "--channel <address>",
@@ -445,7 +450,11 @@ program
   .description("Run the MPP charge-mode check (MPP-01) against a target service")
   .requiredOption("--target <url>", "URL of the paid resource to test")
   .option("--payer-key <key>", "Payer secret key, S... (default: MPP_PAYER_SECRET)")
-  .option("--network <network>", "CAIP-2 network id (default: MPP_STELLAR_NETWORK)")
+  .option(
+    "--network <network>",
+    "CAIP-2 network id, stellar:testnet only; any other network is refused before " +
+      "anything is sent (default: MPP_STELLAR_NETWORK, else stellar:testnet)",
+  )
   .option("--rpc-url <url>", "Override the default Soroban RPC endpoint")
   .option("--json", "Print results as JSON instead of formatted text", false)
   .addHelpText(

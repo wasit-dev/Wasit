@@ -6,6 +6,7 @@ import {
   assertHttpUrl,
   fetchTarget,
 } from "../errors.js";
+import { assertPaymentNetworkAllowed } from "../guard/networks.js";
 import { checkNetworkIdentifier, checkRequiredFields } from "./requirements.js";
 
 export type { CheckResult };
@@ -495,6 +496,10 @@ async function preparePayment(
   alter?: (selected: PaymentRequirements) => AlteredSigning | Promise<AlteredSigning>,
   beforeSigning?: (selected: PaymentRequirements) => Promise<void>,
 ) {
+  // L0 again at the one function every x402 signature goes through, whoever
+  // reaches it: nothing is fetched or signed on a network that is not a test
+  // network.
+  assertPaymentNetworkAllowed("x402", options.network);
   const chain = chainFor(options.network);
   const { client, httpClient } = await buildX402Client(
     chain,
@@ -1097,6 +1102,10 @@ export async function runX402PaymentChecks(
     // money moves, so a run that could not finish is stopped here rather than
     // after paying.
     const chain = chainFor(options.network);
+    // L0: an adapter for the network is not permission to pay on it. Only a
+    // test network passes; stellar:pubnet waits for the mainnet opt-in, which
+    // this version does not have.
+    assertPaymentNetworkAllowed("x402", options.network);
     chain.resolveRpcUrl(options.network, options.rpcUrl);
     // A key for another chain, or a malformed one, would otherwise surface
     // mid-payment as a harness error. Checked here, it is what it is: the

@@ -186,10 +186,12 @@ server.registerTool(
         .optional()
         .describe(
           'Network the payment checks pay on: "stellar:testnet" (default), ' +
-            '"stellar:pubnet", "eip155:84532" (Base Sepolia), "eip155:11155111" ' +
+            '"eip155:84532" (Base Sepolia), "eip155:11155111" ' +
             '(Ethereum Sepolia) or ' +
-            '"solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1" (Solana devnet). The ' +
-            "read-only checks apply to a challenge on any chain.",
+            '"solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1" (Solana devnet). Test ' +
+            'networks only: on any other network, "stellar:pubnet" included, the ' +
+            "payment checks stop before anything is signed. The read-only checks " +
+            "apply to a challenge on any chain.",
         ),
       readOnly: z
         .boolean()
@@ -275,7 +277,13 @@ server.registerTool(
       "refused before anything is signed. Testnet only.",
     inputSchema: {
       target: z.string().describe("Full URL of the paid resource, including scheme"),
-      network: z.string().optional().describe('CAIP-2 network id, default "stellar:testnet"'),
+      network: z
+        .string()
+        .optional()
+        .describe(
+          'CAIP-2 network id, default "stellar:testnet". "stellar:testnet" only: ' +
+            "any other network is refused before anything is sent.",
+        ),
       rpcUrl: z
         .string()
         .optional()
@@ -308,7 +316,13 @@ server.registerTool(
 
 const channelInputShape = {
   target: z.string().describe("Full URL of the paid resource, including scheme"),
-  network: z.string().optional().describe('CAIP-2 network id, default "stellar:testnet"'),
+  network: z
+    .string()
+    .optional()
+    .describe(
+      'CAIP-2 network id, default "stellar:testnet". "stellar:testnet" only: ' +
+        "any other network is refused before anything is sent.",
+    ),
   rpcUrl: z.string().optional().describe("Override the Soroban RPC endpoint"),
   channel: z
     .string()

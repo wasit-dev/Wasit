@@ -21,6 +21,15 @@ export type { CheckCatalogueEntry, ProtocolId } from "./catalogue.js";
 
 export * from "./errors.js";
 
+// L0, the network guard every signing entry point runs.
+export {
+  NETWORK_CLASSES,
+  PaymentNetworkRefusedError,
+  assertPaymentNetworkAllowed,
+  networkClass,
+} from "./guard/networks.js";
+export type { NetworkClass, PaymentProtocol } from "./guard/networks.js";
+
 export * from "./x402/simulator.js";
 export * from "./mpp/channel.js";
 export * from "./mpp/charge.js";

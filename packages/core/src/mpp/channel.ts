@@ -10,6 +10,7 @@ import {
   submitCredential,
 } from "./channel-credential.js";
 import { assertMppNetwork, networkPassphrase, resolveRpcUrl } from "./network.js";
+import { assertPaymentNetworkAllowed } from "../guard/networks.js";
 
 export interface MppChannelDeployCheckOptions {
   channelContract: string;
@@ -81,6 +82,20 @@ export interface MppChannelCheckOptions {
   network: string;
   /** Overrides the default RPC endpoint for the network. */
   rpcUrl?: string;
+}
+
+/**
+ * L0 for a channel check called on its own: these checks sign commitments, and
+ * MPP-13 closes the channel on-chain, so they run on test networks only. The
+ * suite runs the same guard once at preflight.
+ */
+function refusedNetwork(id: string, name: string, network: string): CheckResult[] | undefined {
+  try {
+    assertPaymentNetworkAllowed("mpp-channel", network);
+    return undefined;
+  } catch (error) {
+    return [errored(id, name, error)];
+  }
 }
 
 function failure(id: string, name: string, detail: string): CheckResult[] {
@@ -190,6 +205,8 @@ export async function runMppChannelOrderingCheck(
   const id = "MPP-11";
   const name = "Cumulative Commitment Ordering";
   const { target, commitmentSecretHex, network, rpcUrl } = options;
+  const refused = refusedNetwork(id, name, network);
+  if (refused) return refused;
 
   try {
     const { amount: baseline } = await advanceCumulative(options);
@@ -287,6 +304,8 @@ export async function runMppChannelReplayCheck(
   const id = "MPP-12";
   const name = "Challenge Replay Rejection";
   const { target } = options;
+  const refused = refusedNetwork(id, name, options.network);
+  if (refused) return refused;
 
   try {
     const { credential } = await advanceCumulative(options);
@@ -330,6 +349,8 @@ export async function runMppChannelCommitmentReplayCheck(
   const id = "MPP-14";
   const name = "Commitment Replay Rejection";
   const { target } = options;
+  const refused = refusedNetwork(id, name, options.network);
+  if (refused) return refused;
 
   try {
     const { amount, signature } = await advanceCumulative(options);
@@ -397,6 +418,11 @@ export async function runMppChannelCloseCheck(
     closePollAttempts = 6,
     closePollDelayMs = 2_000,
   } = options;
+
+  // Before the destructive switch is even looked at: a close on a network
+  // that is not a test network is refused, enabled or not.
+  const refused = refusedNetwork(id, name, network);
+  if (refused) return refused;
 
   if (!allowDestructive) {
     return [
