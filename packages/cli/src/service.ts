@@ -1,0 +1,255 @@
+/**
+ * `wasit run --start`: start the builder's service, wait until it answers, and
+ * stop it again (spec A8 #1, A-A02).
+ *
+ * Why this lives in the CLI and not in the Action: a composite action is one
+ * step for the workflow that uses it, so a variable set on the action reaches
+ * every step inside, the one that starts the service included. Here the
+ * child's environment is built in one place, from the parent's with the
+ * variables Wasit keeps away from a service removed (see `denied-env.ts` in
+ * core), and the same code runs on a laptop and in CI.
+ *
+ * Stopping is the part that must not fail quietly. A service is a shell command
+ * (`npm start`), so the process that starts is a shell and the service is its
+ * child or grandchild. On POSIX the command is started in a process group of
+ * its own and the whole group is signalled: SIGTERM first, SIGKILL after a grace
+ * period. The service is stopped when a run ends normally, when it fails, on
+ * SIGINT, SIGTERM and SIGHUP, and, as a last synchronous resort, when the Node
+ * process exits. A SIGKILL of Wasit itself cannot be caught.
+ *
+ * Windows: the group kill is `taskkill /pid <pid> /T /F`. That path has NOT been
+ * run on Windows; no Windows machine was available.
+ */
+
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { constants as osConstants } from "node:os";
+
+import { deniedEnvValues, isLoopbackUrl, sanitizeText, scrubEnv, urlOrigin } from "@wasit-dev/core";
+
+/** The service did not start, did not answer, or exited. Nothing was learned about the target: exit 2. */
+export class ServiceError extends Error {
+  public constructor(message: string) {
+    super(message);
+    this.name = "ServiceError";
+  }
+}
+
+export interface ServiceOptions {
+  /** `service.start`: one shell command, as trusted as the repository's own code. */
+  readonly command: string;
+  /** `service.ready`: any HTTP answer counts. Held to this machine. */
+  readonly ready: { readonly url: string; readonly timeoutSeconds: number };
+  /** The environment to derive the child's from. The denied variables are removed. */
+  readonly env: Readonly<Record<string, string | undefined>>;
+  readonly cwd?: string;
+  /** Where the service's output goes, one line at a time. Default `console.error`: stdout stays for `--json`. */
+  readonly log?: (line: string) => void;
+  /** How long SIGTERM gets before SIGKILL. Default 5000. */
+  readonly stopGraceMs?: number;
+  /** After this many bytes of output, the rest is not printed (the service is not blocked). Default 256 KiB. */
+  readonly maxLogBytes?: number;
+  /** Default 250. */
+  readonly pollIntervalMs?: number;
+}
+
+export interface StartedService {
+  readonly pid: number;
+  /** Stops the service and everything it started. Safe to call twice. */
+  readonly stop: () => Promise<void>;
+}
+
+const SIGNALS = ["SIGINT", "SIGTERM", "SIGHUP"] as const;
+const PROBE_TIMEOUT_MS = 2000;
+const KILL_WAIT_MS = 2000;
+const MAX_PENDING_LINE = 8192;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitFor(condition: () => boolean, ms: number): Promise<boolean> {
+  const end = Date.now() + ms;
+  while (!condition()) {
+    if (Date.now() >= end) return false;
+    await sleep(25);
+  }
+  return true;
+}
+
+/** Any HTTP answer, whatever the status. Never follows a redirect. */
+async function answers(url: string): Promise<boolean> {
+  try {
+    const response = await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
+    await response.body?.cancel().catch(() => undefined);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function startService(options: ServiceOptions): Promise<StartedService> {
+  const { command, ready } = options;
+  const origin = urlOrigin(ready.url);
+  // Defence in depth: the config loader holds the url to this machine, and so does this.
+  if (!isLoopbackUrl(ready.url)) {
+    throw new ServiceError(
+      "service.ready.url must be an address on this machine (localhost, 127.x.x.x or [::1]): " +
+        "the wait probes the service the run starts, nothing else",
+    );
+  }
+
+  const log = options.log ?? ((line: string) => console.error(line));
+  const secrets = deniedEnvValues(options.env);
+  const posix = process.platform !== "win32";
+  const maxLogBytes = options.maxLogBytes ?? 256 * 1024;
+
+  const child: ChildProcess = spawn(command, {
+    shell: true,
+    ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+    env: scrubEnv(options.env),
+    stdio: ["ignore", "pipe", "pipe"],
+    // Its own process group, so the whole tree can be signalled at once.
+    detached: posix,
+    windowsHide: true,
+  });
+
+  let spawnError: Error | undefined;
+  let exitInfo: { code: number | null; signal: NodeJS.Signals | null } | undefined;
+  child.once("error", (error) => {
+    spawnError = error;
+  });
+  child.once("exit", (code, signal) => {
+    exitInfo = { code, signal };
+  });
+
+  // The service's output, line by line, through the sanitiser and behind a
+  // prefix: it is text the repository chose, and a line that starts with `::`
+  // is a command to the GitHub runner.
+  let printed = 0;
+  let cut = false;
+  const emitLine = (raw: string): void => {
+    if (cut) return;
+    printed += raw.length + 1;
+    if (printed > maxLogBytes) {
+      cut = true;
+      log(`[service] output cut: more than ${Math.round(maxLogBytes / 1024)} KiB, the rest is not shown`);
+      return;
+    }
+    log(`[service] ${sanitizeText(raw, { redact: secrets })}`);
+  };
+  for (const stream of [child.stdout, child.stderr]) {
+    if (stream === null) continue;
+    let pending = "";
+    stream.setEncoding("utf-8");
+    stream.on("data", (chunk: string) => {
+      pending += chunk;
+      let newline = pending.indexOf("\n");
+      while (newline >= 0) {
+        emitLine(pending.slice(0, newline));
+        pending = pending.slice(newline + 1);
+        newline = pending.indexOf("\n");
+      }
+      if (pending.length > MAX_PENDING_LINE) {
+        emitLine(pending);
+        pending = "";
+      }
+    });
+    stream.on("end", () => {
+      if (pending !== "") emitLine(pending);
+      pending = "";
+    });
+    stream.on("error", () => undefined);
+  }
+
+  const pid = child.pid;
+  if (pid === undefined) {
+    await sleep(0);
+    throw new ServiceError(
+      `could not start the service${spawnError === undefined ? "" : ` (${(spawnError as NodeJS.ErrnoException).code ?? "spawn failed"})`}`,
+    );
+  }
+
+  const groupAlive = (): boolean => {
+    try {
+      process.kill(-pid, 0);
+      return true;
+    } catch (error) {
+      return (error as NodeJS.ErrnoException).code === "EPERM";
+    }
+  };
+  const signalGroup = (signal: NodeJS.Signals): void => {
+    try {
+      process.kill(-pid, signal);
+    } catch {
+      // Already gone.
+    }
+  };
+  const taskkill = (): void => {
+    const killer = spawn("taskkill", ["/pid", String(pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
+    killer.on("error", () => undefined);
+  };
+
+  const terminate = async (): Promise<void> => {
+    const grace = options.stopGraceMs ?? 5000;
+    if (posix) {
+      if (!groupAlive()) return;
+      signalGroup("SIGTERM");
+      if (await waitFor(() => !groupAlive(), grace)) return;
+      signalGroup("SIGKILL");
+      await waitFor(() => !groupAlive(), KILL_WAIT_MS);
+      return;
+    }
+    if (exitInfo !== undefined) return;
+    taskkill();
+    await waitFor(() => exitInfo !== undefined, grace);
+  };
+
+  // Last resort, synchronous: Node is exiting and a service is still there.
+  const onProcessExit = (): void => {
+    if (posix) {
+      signalGroup("SIGKILL");
+    } else if (exitInfo === undefined) {
+      spawnSync("taskkill", ["/pid", String(pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
+    }
+  };
+  const signalHandlers = SIGNALS.map((signal) => {
+    const handler = (): void => {
+      // Stop the service, then leave with the conventional code for the signal.
+      void stop().finally(() => process.exit(128 + (osConstants.signals[signal] ?? 0)));
+    };
+    process.on(signal, handler);
+    return [signal, handler] as const;
+  });
+  process.on("exit", onProcessExit);
+
+  let stopping: Promise<void> | undefined;
+  function stop(): Promise<void> {
+    stopping ??= terminate().finally(() => {
+      for (const [signal, handler] of signalHandlers) process.removeListener(signal, handler);
+      process.removeListener("exit", onProcessExit);
+    });
+    return stopping;
+  }
+
+  const fail = async (message: string): Promise<never> => {
+    await stop();
+    throw new ServiceError(message);
+  };
+
+  const deadline = Date.now() + ready.timeoutSeconds * 1000;
+  const interval = options.pollIntervalMs ?? 250;
+  for (;;) {
+    if (exitInfo !== undefined) {
+      const how =
+        exitInfo.code !== null ? `exited with code ${exitInfo.code}` : `was ended by ${exitInfo.signal ?? "a signal"}`;
+      return fail(`the service ${how} before it answered at ${origin}; its output is above`);
+    }
+    if (spawnError !== undefined) return fail("could not start the service");
+    if (await answers(ready.url)) return { pid, stop };
+    if (Date.now() >= deadline) {
+      const seconds = ready.timeoutSeconds;
+      return fail(`no answer from ${origin} within ${seconds} second${seconds === 1 ? "" : "s"}; the service was stopped`);
+    }
+    await sleep(interval);
+  }
+}

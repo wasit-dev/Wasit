@@ -37,7 +37,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "node --import tsx --test \"test/unit/**/*.test.ts*\"",
+    "test": "node --import tsx --test --test-timeout=120000 \"test/unit/**/*.test.ts*\"",
     "typecheck": "tsc -p test/tsconfig.json"
   },
   "dependencies": {

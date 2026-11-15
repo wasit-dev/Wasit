@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import "dotenv/config";
+import { createRequire } from "node:module";
 import { createElement } from "react";
 import { render } from "ink";
 import { Command } from "commander";
@@ -15,21 +15,38 @@ import {
   validateServeOptions,
   type ServeMode,
 } from "./serve.js";
+import { executeCiReport } from "./ci-report-command.js";
+import { note, report } from "./output.js";
+import { executeRun } from "./run.js";
 import {
   CHECK_CATALOGUE,
   PROTOCOL_IDS,
-  checkStatus,
-  fixFor,
+  deniedEnvValues,
   paymentChainFor,
   runMppChannelSuite,
   runMppChargeSuite,
   runX402PaymentChecks,
   runX402ReadChecks,
-  summarize,
-  toStructuredRun,
-  type CheckResult,
+  sanitizeText,
   type ProtocolId,
 } from "@wasit-dev/core";
+
+const require = createRequire(import.meta.url);
+
+/**
+ * Loads `.env` from the working directory exactly as `import "dotenv/config"`
+ * did when it sat at the top of this file (it reads the DOTENV_CONFIG_*
+ * variables and arguments too). A command runs it before its action; see the
+ * hook below for the commands that do not.
+ */
+function loadDotenv(): void {
+  require("dotenv/config");
+}
+
+/** CI sets one of these; the value does not matter, `false` included: when in doubt, it is CI. */
+function inCi(env: NodeJS.ProcessEnv): boolean {
+  return (env["CI"] ?? "") !== "" || (env["GITHUB_ACTIONS"] ?? "") !== "";
+}
 
 /** Which wasit subcommand runs each protocol's checks — for `wasit checks` output. */
 const COMMAND_BY_PROTOCOL: Record<ProtocolId, string> = {
@@ -82,65 +99,28 @@ Full check catalogue (every check ID, spec reference, pass criteria):
   https://github.com/wasit-dev/wasit/blob/main/docs/CHECKS.md`,
   );
 
-/**
- * Prints an advisory/status line meant for a human watching the terminal —
- * never part of the run's actual result. Routed to stderr when --json is
- * set, so stdout stays parseable JSON and a script piping it (jq, etc.)
- * never has to skip past prose first.
- */
-function note(json: boolean, message: string): void {
-  if (json) {
-    console.error(message);
-  } else {
-    console.log(message);
-  }
+// `.env` is loaded before a command's action, as it always was, with two
+// exceptions (spec A8 #2, A-A01): `wasit run` does not load it in CI, where the
+// working directory is a checked-out pull request and a `.env` it added could
+// steer the run; `wasit ci-report` never does, it has no use for it. CI is read
+// from the real environment, before any `.env` could change it.
+program.hook("preAction", (_program, action) => {
+  const name = action.name();
+  if (name === "ci-report") return;
+  if (name === "run" && inCi(process.env)) return;
+  loadDotenv();
+});
+
+/** Waits until what was written to stdout and stderr has been handed to the system, so `process.exit` cannot cut a long report. */
+async function flushOutput(): Promise<void> {
+  await Promise.all(
+    [process.stdout, process.stderr].map((stream) => new Promise<void>((resolve) => stream.write("", () => resolve()))),
+  );
 }
 
-/**
- * Prints results and returns the process exit code.
- *
- * A skipped check carries `pass: false` so it can never be counted as
- * conformance, but it is not a failure and must not fail the run. An errored
- * check produced no verdict at all and is reported separately again.
- *
- * `--json` reuses `toStructuredRun()` from core — the same reshape the MCP
- * server calls for its own structured output — rather than defining a
- * second JSON shape here that could drift from it.
- */
-function report(results: CheckResult[], json: boolean): number {
-  const counts = summarize(results);
-
-  if (json) {
-    console.log(JSON.stringify(toStructuredRun(results), null, 2));
-    return counts.exitCode;
-  }
-
-  for (const result of results) {
-    const flag = result.destructive ? "  [destructive]" : "";
-    console.log(`${checkStatus(result)}  ${result.id}  ${result.name}${flag}`);
-    console.log(`      ${result.detail}`);
-    const guidance = fixFor(result);
-    if (guidance !== undefined) {
-      console.log(`      Fix: ${guidance.fix}`);
-      if (guidance.docs !== undefined) console.log(`      Docs: ${guidance.docs}`);
-    }
-    console.log("");
-  }
-
-  const line = [`${counts.passed} passed`];
-  if (counts.failed > 0) line.push(`${counts.failed} failed`);
-  if (counts.errored > 0) line.push(`${counts.errored} could not run`);
-  if (counts.skipped > 0) line.push(`${counts.skipped} skipped`);
-  console.log(`${line.join(", ")}.`);
-
-  if (counts.errored > 0 && counts.failed === 0) {
-    console.log(
-      "\nNo verdict: some checks never reached the target or the run is " +
-        "misconfigured. This is not a statement about the target's conformance.",
-    );
-  }
-
-  return counts.exitCode;
+/** A mistake on the command line learned nothing about a service: exit 2, not commander's 1. */
+function exitTwoOnUsageError(error: { exitCode: number }): never {
+  process.exit(error.exitCode === 0 ? 0 : 2);
 }
 
 program
@@ -283,7 +263,117 @@ authorization). See docs/CHECKS.md for what each check ID verifies.`,
       );
     }
 
-    process.exit(report(results, jsonMode));
+    // One endpoint: a service Wasit could not grade exits 2, not 0 (spec A8 #3).
+    process.exit(report(results, jsonMode, { protocol: "x402" }));
+  });
+
+program
+  .command("run")
+  .description("Run the endpoints of a wasit.config.json and write one report (read-only in this version)")
+  .option("--config <path>", "The config file", "wasit.config.json")
+  .option("--env <name>", "The environment to run (default: defaultEnvironment, else the only one)")
+  .option(
+    "--endpoint <name>",
+    "Run only this endpoint, by name. Repeatable.",
+    (value: string, previous: string[]) => [...previous, value],
+    [] as string[],
+  )
+  .option(
+    "--read-only",
+    "Run the unpaid challenge checks (X402-01..05). They send no payment and sign nothing. The only tier in this version, so it is required.",
+    false,
+  )
+  .option("--json", "Print the report as JSON instead of text", false)
+  .option("--out <file>", "Write the JSON report to this file as well")
+  .option(
+    "--start",
+    "Run service.start from the config, wait for service.ready, run, and stop the service afterwards. " +
+      "The service does not receive Wasit's key variables, header variables or WASIT_RPC_URL.",
+    false,
+  )
+  .option(
+    "--start-if-local",
+    "Like --start, but only when service.start is set and the environment is on this machine (localhost, 127.x.x.x or [::1]); " +
+      "otherwise the configured baseUrl is read as it is, which is how a deployed endpoint is checked. Not with --start.",
+    false,
+  )
+  .option(
+    "--baseline <file>",
+    "The report of the default branch: an endpoint graded there that is unsupported or without a verdict now is a regression (exit 1)",
+  )
+  .addHelpText(
+    "after",
+    `
+Examples:
+  $ wasit run --read-only
+  $ wasit run --read-only --env staging --endpoint weather --json --out wasit-report.json
+  $ wasit run --read-only --start
+  $ wasit run --read-only --start-if-local --env mainnet
+
+Exit codes: 0 every graded endpoint conforms; 1 an endpoint does not conform, or one
+graded on the baseline is not graded now; 2 no verdict (nothing could be graded, a
+check could not run, the config or the service could not be used).
+In CI (CI or GITHUB_ACTIONS set) a .env file in the working directory is not read.`,
+  )
+  .exitOverride(exitTwoOnUsageError)
+  .action(async (opts) => {
+    let code: number;
+    try {
+      code = await executeRun(
+        {
+          config: opts.config as string,
+          ...(opts.env === undefined ? {} : { env: opts.env as string }),
+          endpoint: opts.endpoint as string[],
+          readOnly: opts.readOnly === true,
+          json: opts.json === true,
+          ...(opts.out === undefined ? {} : { out: opts.out as string }),
+          start: opts.start === true,
+          startIfLocal: opts.startIfLocal === true,
+          ...(opts.baseline === undefined ? {} : { baseline: opts.baseline as string }),
+        },
+        { env: process.env, stdout: (line) => console.log(line), stderr: (line) => console.error(line) },
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(sanitizeText(`wasit run: unexpected error: ${message}`, { redact: deniedEnvValues(process.env) }));
+      code = 2;
+    }
+    await flushOutput();
+    process.exit(code);
+  });
+
+program
+  .command("ci-report")
+  .description("Write the pull request comment and the job summary from the report of wasit run")
+  .requiredOption("--report <file>", "The report written by wasit run --json --out")
+  .option("--baseline <file>", "The baseline of the default branch, for \"Changed since main\" and the recent failures")
+  .option("--comment <file>", "Where the comment goes", "comment.md")
+  .option("--summary <file>", "The job summary file, appended to (default: $GITHUB_STEP_SUMMARY)")
+  .option(
+    "--baseline-out <file>",
+    "Write the next baseline here: this report with its history. For a push to the default branch.",
+  )
+  .exitOverride(exitTwoOnUsageError)
+  .action(async (opts) => {
+    let code: number;
+    try {
+      code = await executeCiReport(
+        {
+          report: opts.report as string,
+          ...(opts.baseline === undefined ? {} : { baseline: opts.baseline as string }),
+          comment: opts.comment as string,
+          ...(opts.summary === undefined ? {} : { summary: opts.summary as string }),
+          ...(opts.baselineOut === undefined ? {} : { baselineOut: opts.baselineOut as string }),
+        },
+        { env: process.env, stdout: (line) => console.log(line), stderr: (line) => console.error(line) },
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(sanitizeText(`wasit ci-report: unexpected error: ${message}`, { redact: deniedEnvValues(process.env) }));
+      code = 2;
+    }
+    await flushOutput();
+    process.exit(code);
   });
 
 program
@@ -496,6 +586,7 @@ const isBareInteractiveInvocation =
   process.argv.length <= 2 && process.stdout.isTTY === true;
 
 if (isBareInteractiveInvocation) {
+  loadDotenv();
   render(createElement(App));
 } else {
   program.parse();
