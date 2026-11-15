@@ -68,7 +68,7 @@ The comment on pull request 1 reads (copy):
 
 - 🟡 **Windows.** Not run.
 - 🟡 **The version number.** The comment names the commit a build came from, but the packages declare 0.7.0 until the pre-release, so it reads "Wasit 0.7.0, built from commit ...".
-- 🟡 **Reading a deployed service on mainnet.** The plan allows the read-only checks to read a deployed mainnet service. It was run only against a local stand-in whose answer names the main network: five checks passed, no payment made. It was not run against a deployed service.
+- 🟡 **Reading a deployed service on mainnet.** The plan allows the read-only checks to read a deployed mainnet service. It was run only against a local stand-in whose answer names the main network, first on the maintainer's machine and then in the Action ([pull request 6](https://github.com/dzakwannajmi/x402-example-paywall/pull/6)): five checks passed, no payment made. It was not run against a deployed service.
 
 ## Result
 
