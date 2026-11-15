@@ -37,6 +37,7 @@ Further proofs of D1 (not SOW rows):
 | The comment is updated on each push | ✅ | [Pull request 2](https://github.com/dzakwannajmi/x402-example-paywall/pull/2) · [before](week-1/copies/pr-2-comment-before-update.md) · [after](week-1/copies/pr-2-comment.md) |
 | "Unsupported" is not a failure | ✅ | [Pull request 4](https://github.com/dzakwannajmi/x402-example-paywall/pull/4) · [copy](week-1/copies/pr-4-comment.md) |
 | "Nothing could be tested" fails the job | ✅ | [Pull request 3](https://github.com/dzakwannajmi/x402-example-paywall/pull/3) · [copy](week-1/copies/pr-3-comment.md) |
+| A pull request from a fork: the Action posts no comment and the check still reports | ✅ | [Pull request 5](https://github.com/dzakwannajmi/x402-example-paywall/pull/5) · [run](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43722428182) · [copy of the log](week-1/copies/run-pr5-fork.log.txt) |
 | The code, offered for review, with passing automated checks | ✅ | [Draft pull request 23](https://github.com/wasit-dev/Wasit/pull/23) · [CI run](https://github.com/wasit-dev/Wasit/actions/runs/43706023137) |
 
 ## Deliverable 2 — Payment checks in CI, a new check, and MPP (weeks 2 and 3)
@@ -46,7 +47,7 @@ Further proofs of D1 (not SOW rows):
 | Payment-tier runs with a Stellar Expert link to each transaction | ⬜ | Week 2, after the payment tier (job 02) |
 | A run of the new check showing the refused request and the chain read with no transfer | ⬜ | Week 2 (job 02) |
 | MPP charge and channel runs | ⬜ | Week 3 (job 03) |
-| A run on a pull request from a fork showing the payment checks were not run | ⬜ | Week 2, needs a fork of the example project (job 02) |
+| A run on a pull request from a fork showing the payment checks were not run | ⬜ | Week 2, after the payment tier (job 02). The fork handling of the read-only tier is already shown by [pull request 5](https://github.com/dzakwannajmi/x402-example-paywall/pull/5) |
 | The new check's entry in `docs/CHECKS.md` | ⬜ | With the release |
 | A paying run without the opt-in refusing `stellar:pubnet` before anything is signed | 🟡 | Offline tests: [`runners.test.ts`](https://github.com/wasit-dev/Wasit/blob/sow2/s1-action/packages/cli/test/unit/runners.test.ts) (the MPP commands refuse `stellar:pubnet` and send nothing). A recorded run and the Action run come in week 2 |
 | The read-only checks passing on a challenge that names `stellar:pubnet` | 🟡 | Run on the maintainer's machine against a local stand-in on 2026-11-15 (five checks passed, no payment); output not published. An Action run comes in week 2 |
