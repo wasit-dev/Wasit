@@ -39,6 +39,7 @@ command line, without the opt-in, goes to beta testers at the end of the week.
 | --- | --- | --- |
 | The first layer of the guard, with tests for the library, the command line, the dashboard and the MCP server | ✅ (code and tests) | [Draft pull request 23](https://github.com/wasit-dev/Wasit/pull/23) · [CI run](https://github.com/wasit-dev/Wasit/actions/runs/43706023137) |
 | A payment check on `stellar:pubnet` without the opt-in is refused before anything is signed | 🟡 | Offline tests: [`runners.test.ts`](https://github.com/wasit-dev/Wasit/blob/sow2/s1-action/packages/cli/test/unit/runners.test.ts). A recorded run and an Action run come next |
+| The read-only checks pass on a challenge that names `stellar:pubnet` | ✅ | [Pull request 6](https://github.com/dzakwannajmi/x402-example-paywall/pull/6) · [run](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43724229283) · [copy of the comment](week-2/copies/pr-6-comment.md) · [copy of the log](week-2/copies/run-pr6-pubnet.log.txt): the seller on `127.0.0.1` names `stellar:pubnet`, X402-01 to X402-05 pass, the payment checks are skipped by the read-only tier, no payment is made and nothing is signed. It is a local seller, not a deployed mainnet service |
 | The pieces below | ⬜ | Not started |
 
 ## Result
@@ -47,3 +48,8 @@ Partial progress 2026-11-15: the first layer of the guard is built, tested and
 offered as the draft pull request. The plan, the caps, the payment tier in the
 Action, the new check, the opt-in switch, the independent review and the
 pre-release are the next work.
+
+Update 2026-11-15 (later): the read-only tier was shown in the Action on a
+challenge that names `stellar:pubnet` (pull request 6 of the example project,
+local seller, no payment, nothing signed). This is one of the week 2 proofs that
+does not need the payment tier.

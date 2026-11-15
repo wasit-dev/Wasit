@@ -11,8 +11,8 @@ items and the session log. Each numbered file is one job, with its goal, its
 acceptance criteria and a `Result` section filled in as the job progresses.
 `07-evidence-submission.md` maps every SOW evidence row to its proof.
 
-`week-1/copies/` holds text copies of the pull request comments and job logs that
-the live links show. They are kept as an archive. The example project is public,
+`week-1/copies/` (and `week-2/copies/` for the second week) hold text copies of the
+pull request comments and job logs that the live links show. They are kept as an archive. The example project is public,
 so the live link is the authoritative one.
 
 Marks used everywhere: ✅ built and shown in a real run or a public page · 🟡 built

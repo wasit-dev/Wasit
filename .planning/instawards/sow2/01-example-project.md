@@ -35,7 +35,7 @@ Repository: <https://github.com/dzakwannajmi/x402-example-paywall> (public since
 | `main` conforms (green) | ✅ | [Run](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43706042000) (second run, Action at `5c498cd`) · [copy](week-1/copies/run-main-after-fix.log.txt) · first run: [run](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43697947796) |
 | A deliberate defect gives the red run | ✅ | [Pull request 1](https://github.com/dzakwannajmi/x402-example-paywall/pull/1): a "friendlier network name" breaks check X402-05 |
 
-Five pull requests are kept open on purpose, as proof. They must not be merged.
+Six pull requests are kept open on purpose, as proof. They must not be merged.
 
 | Pull request | The change | What the comment shows |
 | --- | --- | --- |
@@ -44,6 +44,7 @@ Five pull requests are kept open on purpose, as proof. They must not be merged.
 | [3](https://github.com/dzakwannajmi/x402-example-paywall/pull/3) | Changes the default port, so the service never answers where the config looks | "No verdict": nothing was graded, the job fails |
 | [4](https://github.com/dzakwannajmi/x402-example-paywall/pull/4) | Puts the payment request in the body, the old x402 version 1 style | "Unsupported", not a failure |
 | [5](https://github.com/dzakwannajmi/x402-example-paywall/pull/5) | Adds `*.log` to `.gitignore`, opened from a fork of the repository | No comment, because the token of a fork is read-only; the check passes |
+| [6](https://github.com/dzakwannajmi/x402-example-paywall/pull/6) | The seller names `stellar:pubnet` in its payment request (local seller and local stand-in facilitator; no payment can be made) | Green: "1 graded on local, stellar:pubnet"; the comment says the payment checks were not run and nothing was signed. Week 2 proof, see job 02 |
 
 ## Not shown yet
 
@@ -63,3 +64,7 @@ License text is unchanged; its copyright line now names the project's author.
 
 Update 2026-11-15 (fork): pull request 5, opened from a fork, ran the read-only
 workflow without a comment (see job 00). It is kept open with the other four.
+
+Update 2026-11-15 (pubnet): pull request 6 changes what the local seller names
+in its payment request to `stellar:pubnet`, and the read-only workflow passes on
+it (see job 02). It is kept open too; none of the six may be merged.
