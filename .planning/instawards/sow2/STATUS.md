@@ -5,7 +5,9 @@
 
 Last updated: 2026-11-15: week 1 is done and shown in real runs (job 00 and
 job 01). The first layer of the network guard is built (job 02). The payment
-tier, the new check, the opt-in and the pre-release are the next work.
+tier, the new check, the opt-in and the pre-release are the next work. The
+example project is now public, so every link in the review table opens without
+a login.
 
 ---
 
@@ -57,11 +59,11 @@ or shown only in part · ⬜ planned for a later week.
 | GitHub repo | <https://github.com/wasit-dev/Wasit> (public) |
 | Published packages | `@wasit-dev/core`, `cli`, `server` at 0.7.0 on npm. A pre-release is planned for the end of week 2. |
 | The Action's code | Directory `action/` on branch `sow2/s1-action`, offered as the draft [pull request 23](https://github.com/wasit-dev/Wasit/pull/23). It is merged with the pre-release, not before. |
-| Example project | <https://github.com/dzakwannajmi/x402-example-paywall> — **private at the time of this review**; each link to it has a text copy in `week-1/copies/` |
+| Example project | <https://github.com/dzakwannajmi/x402-example-paywall> — **public since 2026-11-15** (MIT License); every link to it opens without a login |
 | Tests | Offline, no keys, no network. At the last commit on the maintainer's machine: command line 175, core 620, server 10, Action 152, none failing. CI on the draft pull request passes: [run](https://github.com/wasit-dev/Wasit/actions/runs/43706023137) |
 | Network | Payment checks run on test networks. Any other network is refused (first layer built). The read-only checks only read the service's answer. |
 | Calendar | Week 1: 14 to 20 Nov · week 2: 21 to 27 Nov · week 3: 28 Nov to 4 Dec · week 4: 5 to 11 Dec · 12 and 13 Dec: final report |
-| Where proofs are copied | `week-1/copies/` — the comments and job logs that the live links show, for a reviewer without access to the example project. The live link is authoritative. |
+| Where proofs are copied | `week-1/copies/` — text copies of the comments and job logs that the live links show, kept as an archive in case a run or a comment is later changed or removed. The live link is authoritative. |
 
 ---
 
@@ -91,8 +93,7 @@ or shown only in part · ⬜ planned for a later week.
 
 ## Open items
 
-- **Reviewer access to the example project.** It is private at the time of this review. Until it is public (planned with the pre-release), the copies in `week-1/copies/` show what the live pages show.
-- **A pull request from a fork.** The code handles it (a fork gets a read-only token, so the comment is skipped with a message and the check still reports). It has not been run from a real fork, which needs a second GitHub account.
+- **A pull request from a fork.** The code handles it (a fork gets a read-only token, so the comment is skipped with a message and the check still reports). It has not been run from a real fork yet. The example project is public now, so a fork can be made without any change of settings.
 - **Windows.** Not run. The Action supports Linux runners in this SOW.
 - **Version number.** The comment names the commit a build came from, but the packages still declare 0.7.0 until the pre-release changes it.
 - **The draft pull request 23** waits for the pre-release.
@@ -104,5 +105,6 @@ or shown only in part · ⬜ planned for a later week.
 
 | Date | Focus | Outcome |
 | --- | --- | --- |
+| 2026-11-15 | The example project made public | Before the change, the files, the whole history and the four pull requests were searched for keys and for text that does not belong on a public page; none was found, and the repository holds no secret. It was then made public, earlier than planned, so the proof links open without a login. The copyright line of the MIT License now names the project's author. The four evidence pull requests stay open. |
 | 2026-11-15 | Week 1: build, runs and proof | **The read-only Action runs on pull requests in the example project.** Green on a service that conforms ([run on `main`](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43697947796)); red on a deliberately broken one ([pull request 1](https://github.com/dzakwannajmi/x402-example-paywall/pull/1)); the same comment updated red to green after a second push ([pull request 2](https://github.com/dzakwannajmi/x402-example-paywall/pull/2)); "no verdict" when the service never answered ([pull request 3](https://github.com/dzakwannajmi/x402-example-paywall/pull/3)); "unsupported" for an x402 v1 service ([pull request 4](https://github.com/dzakwannajmi/x402-example-paywall/pull/4)). After the first runs, the comment gained the commit a build came from and a capital letter under "Not graded", and the Action's own references were pinned to commit SHAs; pull requests 3 and 4 were re-run on the new Action. The first layer of the network guard and `stellar-sdk` 16.4.1 (the test network is on protocol 30) went into the same draft pull request. |
 | 2026-11-14 | Sprint start: design before code | The design of the three deliverables was written and checked before any code: the configuration file, the Action, the network guard and the opt-in, `wasit init`. The example project is rendered from the workshop starter kit and holds the workflow. |

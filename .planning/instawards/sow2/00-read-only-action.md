@@ -37,7 +37,7 @@ Tests, offline: command line 175, core 620, server 10, Action 152, none failing 
 
 ## Proof
 
-Base of the example project: <https://github.com/dzakwannajmi/x402-example-paywall> (private at the time of this review; text copies in `week-1/copies/`).
+Base of the example project: <https://github.com/dzakwannajmi/x402-example-paywall> (public since 2026-11-15; text copies in `week-1/copies/` are kept as an archive).
 
 | What the plan says | Status | Proof |
 | --- | --- | --- |
@@ -65,7 +65,7 @@ The comment on pull request 1 reads (copy):
 
 ## Not shown yet
 
-- 🟡 **A pull request from a fork.** Handled in the code, not run from a real fork (needs a second GitHub account).
+- 🟡 **A pull request from a fork.** Handled in the code, not run from a real fork yet (it needs a fork of the example project, which is public now).
 - 🟡 **Windows.** Not run.
 - 🟡 **The version number.** The comment names the commit a build came from, but the packages declare 0.7.0 until the pre-release, so it reads "Wasit 0.7.0, built from commit ...".
 - 🟡 **Reading a deployed service on mainnet.** The plan allows the read-only checks to read a deployed mainnet service. It was run only against a local stand-in whose answer names the main network: five checks passed, no payment made. It was not run against a deployed service.
@@ -77,3 +77,5 @@ Done 2026-11-15: every item of the week 1 plan for D1 is shown in a real run on 
 Partial progress 2026-11-15 (first runs): the green run on `main` and the red run on pull request 1, with the comment showing the comparison with `main`. Pull requests 2, 3 and 4 then showed the update of the comment on a new push, the "no verdict" result and the "unsupported" result.
 
 Partial progress 2026-11-15 (second runs): two small defects seen in the first comments were fixed and shown again. The comment names the commit a build came from, and the reason under "Not graded" starts with a capital letter. The Action's own third-party references are pinned to commit SHAs. Pull requests 3 and 4 were re-run on the new Action and their comments were edited in place; pull requests 1 and 2 keep the comments of the first version.
+
+Update 2026-11-15 (later): the example project is public, so the links above open without a login. The text copies stay as an archive.

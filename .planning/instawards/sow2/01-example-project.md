@@ -13,13 +13,13 @@ own repository. It is also where the payment-tier and MPP runs of D2 are shown.
 - [x] The example project exists with the Wasit workflow (week 1).
 - [x] `main` conforms, and a pull request with a deliberate defect gives the red run (week 1).
 - [ ] Payment-tier runs, each with a Stellar Expert link (week 2, job 02).
-- [ ] A pull request from a fork shows the payment checks were not run (week 2, needs a second GitHub account).
+- [ ] A pull request from a fork shows the payment checks were not run (week 2, needs a fork of the repository).
 - [ ] MPP charge and channel routes with runs in the same comment format (week 3, job 03).
-- [ ] The repository is public (with the pre-release).
+- [x] The repository is public (since 2026-11-15, earlier than planned).
 
 ## What shipped
 
-Repository: <https://github.com/dzakwannajmi/x402-example-paywall> (private at the time of this review).
+Repository: <https://github.com/dzakwannajmi/x402-example-paywall> (public since 2026-11-15; every link below opens without a login).
 
 - **The seller.** A small x402 seller on the Stellar test network with one paid route, `GET /paid`, rendered from the workshop starter kit.
 - **`scripts/serve.mjs`.** Starts the seller with a small local stand-in for the facilitator, so the job needs no internet access for the service and contacts no third-party service. The stand-in can only answer "what do you support", so this tier cannot verify or settle a payment.
@@ -47,10 +47,15 @@ Four pull requests are kept open on purpose, as proof. They must not be merged.
 ## Not shown yet
 
 - ⬜ Payment-tier runs, MPP routes, and a pull request from a fork (later weeks).
-- ⬜ A public repository: planned with the pre-release.
 
 ## Result
 
 Partial progress 2026-11-15: the workflow runs on pull requests and on `main`
 in the example project; green and red runs, the update of the comment, "no
 verdict" and "unsupported" are shown (see job 00).
+
+Update 2026-11-15 (later): the repository was made public, earlier than the
+plan (the pre-release). Before the change, its files, its whole history and the
+four pull requests were searched for keys and for text that does not belong on a
+public page; none was found, and the repository holds no secret. The MIT
+License text is unchanged; its copyright line now names the project's author.

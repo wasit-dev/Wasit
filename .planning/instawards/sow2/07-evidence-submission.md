@@ -19,7 +19,7 @@ closing package is assembled from it and nothing is hunted for later.
 Marks: ✅ shown in a real run or a public page · 🟡 built and tested, or shown only in part · ⬜ not yet.
 
 Base of the example project: <https://github.com/dzakwannajmi/x402-example-paywall>
-(private at the time of this review; text copies in `week-1/copies/`).
+(public since 2026-11-15; text copies in `week-1/copies/` are kept as an archive).
 
 ## Deliverable 1 — Wasit in CI, read-only tier (week 1)
 
@@ -46,7 +46,7 @@ Further proofs of D1 (not SOW rows):
 | Payment-tier runs with a Stellar Expert link to each transaction | ⬜ | Week 2, after the payment tier (job 02) |
 | A run of the new check showing the refused request and the chain read with no transfer | ⬜ | Week 2 (job 02) |
 | MPP charge and channel runs | ⬜ | Week 3 (job 03) |
-| A run on a pull request from a fork showing the payment checks were not run | ⬜ | Week 2, needs a second GitHub account (job 02) |
+| A run on a pull request from a fork showing the payment checks were not run | ⬜ | Week 2, needs a fork of the example project (job 02) |
 | The new check's entry in `docs/CHECKS.md` | ⬜ | With the release |
 | A paying run without the opt-in refusing `stellar:pubnet` before anything is signed | 🟡 | Offline tests: [`runners.test.ts`](https://github.com/wasit-dev/Wasit/blob/sow2/s1-action/packages/cli/test/unit/runners.test.ts) (the MPP commands refuse `stellar:pubnet` and send nothing). A recorded run and the Action run come in week 2 |
 | The read-only checks passing on a challenge that names `stellar:pubnet` | 🟡 | Run on the maintainer's machine against a local stand-in on 2026-11-15 (five checks passed, no payment); output not published. An Action run comes in week 2 |
@@ -87,6 +87,6 @@ new check and the opt-in are not started. The two D2 rows that already have
 partial support (the refusal of `stellar:pubnet`, and the read of a challenge
 that names it) say exactly what exists and what does not.
 
-A proof that points to the example project opens only for someone who can open
-that repository. Until it is public, the text copies in `week-1/copies/` are the
-fallback.
+The example project has been public since 2026-11-15, so every proof that points
+to it opens without a login. The text copies in `week-1/copies/` stay as an
+archive.

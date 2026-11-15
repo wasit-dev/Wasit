@@ -12,8 +12,8 @@ acceptance criteria and a `Result` section filled in as the job progresses.
 `07-evidence-submission.md` maps every SOW evidence row to its proof.
 
 `week-1/copies/` holds text copies of the pull request comments and job logs that
-the live links show, for a reviewer who cannot open the example project while it is
-private. The live link is the authoritative one.
+the live links show. They are kept as an archive. The example project is public,
+so the live link is the authoritative one.
 
 Marks used everywhere: ✅ built and shown in a real run or a public page · 🟡 built
 and tested, or shown only in part · ⬜ planned for a later week.
