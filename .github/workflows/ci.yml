@@ -83,6 +83,12 @@ jobs:
       - name: Test @wasit-dev/server
         run: npm run test -w packages/server
 
+      # The Action's scripts and its action.yml, offline: the gh call is
+      # injected, and four cases run the built CLI against a service on
+      # 127.0.0.1. It needs the builds above.
+      - name: Test the Action
+        run: npm run test:action
+
       # Everything above this line runs against the working tree, where
       # npm has deduplicated one dependency graph across all three
       # workspaces. That is not the tree an installer gets, so a green

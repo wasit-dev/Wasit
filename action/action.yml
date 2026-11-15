@@ -1,0 +1,124 @@
+name: Wasit
+description: >-
+  Runs Wasit's read-only x402 challenge checks against your service inside the
+  job, comments the result on the pull request, and compares it with main.
+  Linux runners. Needs Node 22 or later (add actions/setup-node before this
+  step). The payment tier is not available in this version.
+
+inputs:
+  config:
+    description: Path of the wasit.config.json to run, relative to the working directory.
+    required: false
+    default: wasit.config.json
+  environment:
+    description: The environment of the config to run. Default is the config's defaultEnvironment, else its only environment.
+    required: false
+    default: ""
+  tier:
+    description: >-
+      read-only runs the unpaid challenge checks (X402-01 to X402-05): they send
+      no payment and sign nothing. payment is not available in this version and
+      is refused.
+    required: false
+    default: read-only
+  endpoints:
+    description: Names of the endpoints to run, separated by commas or line breaks. Default is every endpoint of the config.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    # Each step gets only what it needs, as env. No input and no event value is
+    # written into a run block: they reach the scripts as environment variables.
+    # The token (GH_TOKEN) is given to the two steps that call gh and to no other,
+    # and never to the step that starts the service.
+
+    - name: Check the runner
+      shell: bash
+      run: |
+        if [ "$RUNNER_OS" != "Linux" ]; then
+          echo "Wasit: this action runs on Linux runners in this version." >&2
+          exit 2
+        fi
+        if ! command -v node >/dev/null 2>&1; then
+          echo "Wasit: Node 22 or later is needed and node was not found. Add actions/setup-node with node-version: 22 before this step." >&2
+          exit 2
+        fi
+        major="$(node -p 'process.versions.node.split(".")[0]')"
+        if [ "$major" -lt 22 ]; then
+          echo "Wasit: Node 22 or later is needed and this runner has Node $major. Add actions/setup-node with node-version: 22 before this step." >&2
+          exit 2
+        fi
+
+    - name: Check the inputs
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_ENVIRONMENT: ${{ inputs.environment }}
+        INPUT_TIER: ${{ inputs.tier }}
+        INPUT_ENDPOINTS: ${{ inputs.endpoints }}
+      run: node "$ACTION_PATH/scripts/wasit.mjs" check
+
+    # Wasit is built from the ref this action was fetched at, with the lockfile
+    # of that ref: one pin covers the action and the CLI.
+    - name: Install Wasit
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        cd "$ACTION_PATH/.."
+        npm ci --ignore-scripts --no-audit --no-fund
+        npm run build -w packages/core
+        npm run build -w packages/cli
+        npm run build -w packages/server
+
+    - name: Find the baseline
+      id: baseline
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        GH_TOKEN: ${{ github.token }}
+      run: node "$ACTION_PATH/scripts/baseline.mjs"
+
+    # The job's result is the exit code of this step. It has no condition and no
+    # continue-on-error, and it is not given the token.
+    - name: Run Wasit
+      id: run
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_ENVIRONMENT: ${{ inputs.environment }}
+        INPUT_TIER: ${{ inputs.tier }}
+        INPUT_ENDPOINTS: ${{ inputs.endpoints }}
+        BASELINE_PATH: ${{ steps.baseline.outputs.path }}
+      run: node "$ACTION_PATH/scripts/wasit.mjs" run
+
+    - name: Write the report
+      if: ${{ always() && steps.run.conclusion != 'skipped' }}
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        BASELINE_PATH: ${{ steps.baseline.outputs.path }}
+      run: node "$ACTION_PATH/scripts/wasit.mjs" report
+
+    - name: Comment on the pull request
+      if: ${{ always() && steps.run.conclusion != 'skipped' && github.event_name == 'pull_request' }}
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        GH_TOKEN: ${{ github.token }}
+        WASIT_COMMENT_FILE: ${{ runner.temp }}/wasit/comment.md
+      run: node "$ACTION_PATH/scripts/comment.mjs"
+
+    # Pin to a commit SHA before release (not verified offline); a version tag
+    # is used here and no SHA is invented.
+    - name: Upload the baseline
+      if: ${{ always() && steps.run.conclusion != 'skipped' && github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: wasit-baseline
+        path: ${{ runner.temp }}/wasit/baseline-next.json
+        if-no-files-found: warn
