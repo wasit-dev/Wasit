@@ -1,7 +1,9 @@
 export {
+  SKIP_KINDS,
   checkStatus,
   errored,
   fixFor,
+  quoteValue,
   skipped,
   skippedDestructive,
   summarize,
@@ -12,9 +14,109 @@ export type {
   CheckStatus,
   FailureGuidance,
   RunSummary,
+  SkipKind,
   StructuredCheckResult,
   StructuredRun,
 } from "./check.js";
+
+// The one sanitiser: everything printed or written into a report passes through it.
+export { MARKDOWN_VALUE_MAX, sanitizeForMarkdown, sanitizeText } from "./sanitize.js";
+export type { MarkdownOptions, SanitizeOptions } from "./sanitize.js";
+
+// wasit.config.json, version 1.
+export {
+  CONFIG_VERSION,
+  ConfigError,
+  describeRun,
+  headerEnvName,
+  headersFromEnv,
+  isLoopbackUrl,
+  joinTarget,
+  parseConfig,
+  readConfigFile,
+  resolveRun,
+  urlOrigin,
+  validateConfig,
+} from "./config.js";
+export type {
+  ChannelExpectation,
+  ConfigIssue,
+  EndpointConfig,
+  EnvironmentConfig,
+  JsonValue,
+  PinConfig,
+  ReadyConfig,
+  RejectConfig,
+  ResolvedEndpoint,
+  ResolvedReject,
+  ResolvedRun,
+  RunSelection,
+  ServiceConfig,
+  WasitConfig,
+} from "./config.js";
+
+// The run report, the endpoint outcome and the versions a result names.
+export {
+  buildEndpointReport,
+  buildRunReport,
+  checkGroup,
+  describeTotals,
+  endpointOutcome,
+  paymentGroupUnsupported,
+  exitCodeForEndpoint,
+  groupCounts,
+  redactReport,
+  redactValue,
+  reportTotals,
+  skippedPaymentChecks,
+  toGradedRun,
+} from "./report.js";
+export type {
+  CheckGroup,
+  EndpointInput,
+  EndpointOutcome,
+  EndpointReport,
+  GroupCounts,
+  RunReport,
+  RunReportInput,
+  RunTotals,
+} from "./report.js";
+export { readPackageVersion, readToolVersions } from "./versions.js";
+export type { ToolVersions } from "./versions.js";
+
+// The baseline of the default branch, the diff against it, and the exit rule of a run.
+export {
+  HISTORY_LIMIT,
+  MAX_BASELINE_BYTES,
+  ReportFormatError,
+  baselineProblem,
+  diffReports,
+  findRegressions,
+  parseRunReport,
+  readBaseline,
+  recentFailures,
+  selectBaseline,
+  serializeBaseline,
+  updateHistory,
+} from "./baseline.js";
+export type {
+  Baseline,
+  BaselineResult,
+  Change,
+  ChangeKind,
+  History,
+  RecentFailure,
+  Regression,
+} from "./baseline.js";
+export { runExitCode } from "./verdict.js";
+export type { RunVerdict } from "./verdict.js";
+
+// The pull request comment and the job summary.
+export { COMMENT_MARKER, renderComment, renderNoReportComment, renderNoReportSummary, renderSummary } from "./ci-report.js";
+export type { CiReportInput } from "./ci-report.js";
+
+// Variables kept away from a service Wasit starts, and values kept out of output.
+export { DENIED_ENV_NAMES, deniedEnvValues, isDeniedEnvName, scrubEnv } from "./denied-env.js";
 
 export { CHECK_CATALOGUE, PROTOCOL_IDS, catalogueEntry, docsUrlFor } from "./catalogue.js";
 export type { CheckCatalogueEntry, ProtocolId } from "./catalogue.js";

@@ -276,7 +276,9 @@ describe("payment checks on a challenge Wasit cannot pay", () => {
     });
   }
 
-  it("stops before paying when asked to pay on a network it cannot pay on", async () => {
+  // Spec A3: a network Wasit does not pay on is "unsupported", a SKIP of the
+  // payment group, not a PREFLIGHT error (it used to be one). Nothing is sent.
+  it("skips the payment checks as unsupported when asked to pay on a network it cannot pay on", async () => {
     // BNB Smart Chain testnet: read-only only.
     const target = await serveV2(v2(option("eip155:97")));
     try {
@@ -285,9 +287,11 @@ describe("payment checks on a challenge Wasit cannot pay", () => {
         network: "eip155:97",
         payerSecretKey,
       });
-      assert.equal(results.length, 1);
-      assert.equal(results[0]?.id, "PREFLIGHT");
-      assert.equal(results[0]?.error?.kind, "configuration");
+      assert.deepEqual(
+        results.map((result) => [result.id, result.skipped, result.skipKind]),
+        ["X402-06", "X402-07", "X402-08", "X402-09", "X402-10"].map((id) => [id, true, "unsupported"]),
+      );
+      assert.match(results[0]?.skipReason ?? "", /pay on .*stellar:testnet.*"eip155:97" is not one of them/);
       assert.equal(target.paymentHeadersSeen(), 0);
     } finally {
       await target.close();

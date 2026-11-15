@@ -4,6 +4,38 @@
 
 import { catalogueEntry, docsUrlFor } from "./catalogue.js";
 import { type CheckError, classifyCheckError } from "./errors.js";
+import { sanitizeText } from "./sanitize.js";
+
+/**
+ * Why a check did not run, for a reader who has to tell "Wasit cannot grade
+ * this" from "you asked for less" from "an earlier check failed". The four
+ * statuses stay as they are; this refines SKIP and nothing else.
+ *
+ * - `unsupported`: Wasit cannot grade it (an x402 v1 challenge, a network it
+ *   does not pay on). Not a FAIL, and not a pass either.
+ * - `resource-consumed`: the first payment used up a single-use resource.
+ * - `needs-payer`: the check pays and no payer key was given.
+ * - `read-only`: the run was asked not to pay.
+ * - `not-applicable`: the target gives the check nothing to test.
+ * - `dependency`: an earlier check failed or gave no verdict, so there is
+ *   nothing for this one to inspect.
+ */
+export type SkipKind =
+  | "unsupported"
+  | "resource-consumed"
+  | "needs-payer"
+  | "read-only"
+  | "not-applicable"
+  | "dependency";
+
+export const SKIP_KINDS: readonly SkipKind[] = [
+  "unsupported",
+  "resource-consumed",
+  "needs-payer",
+  "read-only",
+  "not-applicable",
+  "dependency",
+];
 
 export interface CheckResult {
   /** Stable catalogue identifier, e.g. "MPP-11". Must match docs/CHECKS.md. */
@@ -19,6 +51,16 @@ export interface CheckResult {
    */
   hint?: string;
   /**
+   * What the check expected, and what the service sent instead, in a few words
+   * each ("status 402", "status 200"). Set by the check that knows them, on a
+   * FAIL, so a report can show the reason, the expected and the actual value,
+   * and the fix. `detail` and `hint` say the same in prose and are unchanged.
+   * Both quote the service, so both pass through the sanitiser on the way out,
+   * and are cut to a short length there, after the secrets are removed.
+   */
+  expected?: string;
+  actual?: string;
+  /**
    * True when the check did not run. A skipped check is neither a pass nor a
    * failure: `pass` is false so it can never be counted as conformance, and
    * reporters must render it separately rather than as a defect.
@@ -26,6 +68,8 @@ export interface CheckResult {
   skipped?: boolean;
   /** Why the check was skipped. Required whenever `skipped` is true. */
   skipReason?: string;
+  /** What kind of reason it is, when the code that skipped it knows. Meaningful only on a SKIP. */
+  skipKind?: SkipKind;
   /**
    * True when running this check permanently alters the target's state.
    * Destructive checks are skipped unless the operator explicitly opts in,
@@ -145,16 +189,35 @@ export function errored(id: string, name: string, error: unknown): CheckResult {
   };
 }
 
-/** Builds the result for a check that was not run, for a non-destructive reason. */
-export function skipped(id: string, name: string, reason: string): CheckResult {
+/**
+ * Builds the result for a check that was not run, for a non-destructive reason.
+ * `kind` says what sort of reason it is; leave it out when the code does not know.
+ */
+export function skipped(id: string, name: string, reason: string, kind?: SkipKind): CheckResult {
   return {
     id,
     name,
     pass: false,
     skipped: true,
     skipReason: reason,
+    ...(kind === undefined ? {} : { skipKind: kind }),
     detail: `Skipped: ${reason}`,
   };
+}
+
+/**
+ * A value a service sent, quoted for the `actual` of a FAIL: a string in JSON
+ * quotes (control characters written out, not carried), anything else as JSON.
+ *
+ * Not cut here unless `max` is given. A cut made before the secrets of the run
+ * are removed can leave the start of a secret in the output, so the cut is made
+ * by the sinks that remove them (`redactValue`, the comment renderer).
+ */
+export function quoteValue(value: unknown, max?: number): string {
+  const quoted = typeof value === "string" ? JSON.stringify(value) : (JSON.stringify(value) ?? String(value));
+  if (max === undefined) return quoted;
+  const characters = Array.from(quoted);
+  return characters.length <= max ? quoted : `${characters.slice(0, Math.max(1, max - 1)).join("")}…`;
 }
 
 /** What to do about a failure, and where it is documented. */
@@ -188,6 +251,12 @@ export interface StructuredCheckResult {
    * unreachable | configuration | harness | setup.
    */
   readonly errorKind?: string;
+  /** Present only when `status` is "SKIP" and the reason has a kind: see {@link SkipKind}. */
+  readonly skipKind?: SkipKind;
+  /** Present only when `status` is "FAIL" and the check recorded it: what it expected. */
+  readonly expected?: string;
+  /** Present only when `status` is "FAIL" and the check recorded it: what the service sent. */
+  readonly actual?: string;
   /** Present only when `status` is "FAIL": what to change (see {@link fixFor}). */
   readonly fix?: string;
   /** Present only when `status` is "FAIL": the check's docs page. */
@@ -232,14 +301,25 @@ export function toStructuredRun(results: CheckResult[]): StructuredRun {
     skipped: counts.skipped,
     results: results.map((result) => {
       const guidance = fixFor(result);
+      const status = checkStatus(result);
       return {
         id: result.id,
-        name: result.name,
-        status: checkStatus(result),
-        detail: result.detail,
+        // Text a service chose can reach these three fields; the report is a
+        // sink for the one sanitiser (spec A8 #6).
+        name: sanitizeText(result.name),
+        status,
+        detail: sanitizeText(result.detail),
         destructive: result.destructive === true,
         ...(result.error ? { errorKind: result.error.kind } : {}),
-        ...(guidance ?? {}),
+        ...(status === "SKIP" && result.skipKind !== undefined ? { skipKind: result.skipKind } : {}),
+        ...(status === "FAIL" && result.expected !== undefined ? { expected: sanitizeText(result.expected) } : {}),
+        ...(status === "FAIL" && result.actual !== undefined ? { actual: sanitizeText(result.actual) } : {}),
+        ...(guidance === undefined
+          ? {}
+          : {
+              fix: sanitizeText(guidance.fix),
+              ...(guidance.docs === undefined ? {} : { docs: guidance.docs }),
+            }),
       };
     }),
   };

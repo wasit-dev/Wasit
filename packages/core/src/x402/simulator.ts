@@ -1,4 +1,4 @@
-import { errored, skipped, type CheckResult } from "../check.js";
+import { errored, quoteValue, skipped, type CheckResult } from "../check.js";
 import {
   CheckSetupError,
   ConfigurationError,
@@ -7,6 +7,7 @@ import {
   fetchTarget,
 } from "../errors.js";
 import { assertPaymentNetworkAllowed } from "../guard/networks.js";
+import { sanitizeText } from "../sanitize.js";
 import { checkNetworkIdentifier, checkRequiredFields } from "./requirements.js";
 
 export type { CheckResult };
@@ -154,7 +155,7 @@ function statusHint(status: number): string {
 function skipAfter(id: string, reason: string): CheckResult[] {
   const index = READ_CHECKS.findIndex(([candidate]) => candidate === id);
   return READ_CHECKS.slice(index + 1).map(([checkId, name]) =>
-    skipped(checkId, name, reason),
+    skipped(checkId, name, reason, "dependency"),
   );
 }
 
@@ -183,6 +184,12 @@ export function readV1BodyChallenge(body: string): Record<string, unknown> | und
   return record?.["x402Version"] === 1 && Array.isArray(record["accepts"]) ? record : undefined;
 }
 
+/** What a header that did not decode to JSON held, quoted. The service chose it; the sinks cut it. */
+function decodedStart(headerValue: string): string {
+  const decoded = Buffer.from(headerValue, "base64").toString("utf-8");
+  return decoded === "" ? "an empty value" : `a value that starts with ${quoteValue(decoded)}`;
+}
+
 /** A body that cannot be read is simply not a v1 challenge. */
 async function readText(response: Response): Promise<string> {
   try {
@@ -190,6 +197,22 @@ async function readText(response: Response): Promise<string> {
   } catch {
     return "";
   }
+}
+
+/**
+ * Why an x402 v1 challenge is not graded: the reason on X402-02..05 and on the
+ * endpoint. Kept under 300 characters, the longest a value goes into a pull
+ * request comment, so the way to get graded is not cut off.
+ */
+const V1_UNSUPPORTED_REASON =
+  "the service sent an x402 v1 challenge in its response body. Wasit grades x402 v2, and the " +
+  "`exact` scheme on Stellar exists for v2 only, so this endpoint is unsupported, not failed. " +
+  "To have it graded, move to x402 v2: send the challenge base64-encoded in a PAYMENT-REQUIRED " +
+  "response header.";
+
+/** What a check found on a challenge Wasit does not grade, to be shown as a note. */
+function noteOf(result: CheckResult): string {
+  return result.skipped === true ? (result.skipReason ?? result.detail) : result.detail;
 }
 
 /**
@@ -222,7 +245,9 @@ export async function runX402ReadChecks(
 
   let response: Response;
   try {
-    response = await fetchTarget(target, init);
+    // The unpaid request of the read-only tier: a redirect to another origin
+    // is reported and gives no verdict, never followed (spec A8 #5).
+    response = await fetchTarget(target, init, { redirects: "same-origin" });
   } catch (error) {
     return emit([
       errored("X402-01", "402 Response Status", error),
@@ -241,7 +266,9 @@ export async function runX402ReadChecks(
     detail: statusPass
       ? "Server responded with 402 as required."
       : `Expected status 402, got ${response.status}.`,
-    ...(statusPass ? {} : { hint: statusHint(response.status) }),
+    ...(statusPass
+      ? {}
+      : { hint: statusHint(response.status), expected: "status 402", actual: `status ${response.status}` }),
   };
 
   if (!statusPass) {
@@ -260,12 +287,27 @@ export async function runX402ReadChecks(
   const headerValue =
     response.headers.get("PAYMENT-REQUIRED") ?? response.headers.get("X-Payment");
 
-  // x402 v1 signals payment in the response body rather than a header. The
-  // `exact` scheme on Stellar is defined for v2 only, so a missing header is
-  // still X402-02's failure — but a v1 challenge in the body still has terms
-  // worth checking, and skipping them would hide which ones diverge.
+  // x402 v1 signals payment in the response body rather than a header, and the
+  // `exact` scheme on Stellar is defined for v2 only. Wasit grades v2, so a v1
+  // service is unsupported, not failed (spec A3): X402-02..05 are skipped with
+  // that reason. The v1 terms are still read and reported as notes, so an
+  // operator sees which of them diverge without being handed a verdict.
   const v1Payload =
     headerValue === null ? readV1BodyChallenge(await readText(response)) : undefined;
+  if (headerValue === null && v1Payload !== undefined) {
+    const notes = new Map<string, string>([
+      ["X402-04", noteOf(checkRequiredFields(v1Payload))],
+      ["X402-05", noteOf(checkNetworkIdentifier(v1Payload))],
+    ]);
+    return emit([
+      r1,
+      ...READ_CHECKS.slice(1).map(([id, name]) => {
+        const skip = skipped(id, name, V1_UNSUPPORTED_REASON, "unsupported");
+        const note = notes.get(id);
+        return note === undefined ? skip : { ...skip, detail: `${skip.detail} Note, not a verdict: ${note}` };
+      }),
+    ]);
+  }
 
   const r2: CheckResult = {
     id: "X402-02",
@@ -274,41 +316,17 @@ export async function runX402ReadChecks(
     detail:
       headerValue !== null
         ? "Payment header found."
-        : v1Payload !== undefined
-          ? `Neither PAYMENT-REQUIRED nor X-Payment header was present. The ` +
-            `response body carries an x402 v1 challenge instead; x402 v2 signals ` +
-            `payment in the PAYMENT-REQUIRED header, and the \`exact\` scheme on ` +
-            `Stellar is defined for v2 only.`
-          : "Neither PAYMENT-REQUIRED nor X-Payment header was present.",
+        : "Neither PAYMENT-REQUIRED nor X-Payment header was present.",
     ...(headerValue !== null
       ? {}
       : {
           hint:
-            v1Payload !== undefined
-              ? "Move to x402 v2: send the challenge base64-encoded in a " +
-                "PAYMENT-REQUIRED response header instead of the body, with " +
-                "x402Version 2 and v2 field names."
-              : "Send the challenge as base64-encoded JSON in a PAYMENT-REQUIRED " +
-                "response header, as the x402 v2 HTTP transport defines.",
+            "Send the challenge as base64-encoded JSON in a PAYMENT-REQUIRED " +
+            "response header, as the x402 v2 HTTP transport defines.",
+          expected: "a PAYMENT-REQUIRED header",
+          actual: "no PAYMENT-REQUIRED or X-Payment header",
         }),
   };
-
-  if (headerValue === null && v1Payload !== undefined) {
-    return emit([
-      r1,
-      r2,
-      {
-        id: "X402-03",
-        name: "Header Payload Decodable",
-        pass: true,
-        detail:
-          "No header to decode; the x402 v1 challenge in the response body " +
-          "decoded to valid JSON.",
-      },
-      checkRequiredFields(v1Payload),
-      checkNetworkIdentifier(v1Payload),
-    ]);
-  }
 
   if (headerValue === null) {
     return emit([
@@ -337,6 +355,8 @@ export async function runX402ReadChecks(
         hint:
           "Base64-encode the JSON PaymentRequired object for the header; raw " +
           "JSON or a truncated value does not decode.",
+        expected: "a base64 value that decodes to JSON",
+        actual: decodedStart(headerValue),
       },
       ...skipAfter(
         "X402-03",
@@ -397,19 +417,34 @@ class PaymentNotAttemptedError extends Error {
 }
 
 /**
- * The adapter for the run's network. Throws `ConfigurationError` for a
- * network the payment checks cannot pay on; preflight calls this before
+ * No payment adapter pays on this network, so the payment checks cannot be
+ * graded here. A `ConfigurationError`, so a caller that does not know the class
+ * still reads it as no verdict; preflight turns it into a skip of kind
+ * `unsupported` (spec A3). It is not the guard's refusal: `stellar:pubnet` has
+ * an adapter and is refused by `assertPaymentNetworkAllowed`, as an error.
+ */
+export class UnsupportedPaymentNetworkError extends ConfigurationError {
+  public readonly network: string;
+
+  public constructor(network: string) {
+    super(
+      `Wasit's payment checks pay on ${paymentNetworks().join(", ")}; ` +
+        `${sanitizeText(JSON.stringify(String(network)))} is not one of them, so no payment ` +
+        `was attempted. X402-01..05 still apply to a challenge on any chain.`,
+    );
+    this.name = "UnsupportedPaymentNetworkError";
+    this.network = String(network);
+  }
+}
+
+/**
+ * The adapter for the run's network. Throws `UnsupportedPaymentNetworkError`
+ * for a network the payment checks cannot pay on; preflight calls this before
  * anything is sent.
  */
 function chainFor(network: string): PaymentChain {
   const chain = paymentChainFor(network);
-  if (chain === undefined) {
-    throw new ConfigurationError(
-      `The payment checks pay on ${paymentNetworks().join(", ")}; "${network}" is ` +
-        `not one of them. X402-01..05 still apply to a challenge on any chain ` +
-        `(--read-only, MCP readOnly).`,
-    );
-  }
+  if (chain === undefined) throw new UnsupportedPaymentNetworkError(network);
   return chain;
 }
 
@@ -1120,6 +1155,16 @@ export async function runX402PaymentChecks(
       );
     }
   } catch (error) {
+    // A network no adapter pays on is not a failure of the run: Wasit does not
+    // grade it (spec A3). Every payment check is skipped as unsupported, and
+    // nothing was fetched or signed. The guard's refusals are not this: they
+    // are other errors, and stay a PREFLIGHT error below.
+    if (error instanceof UnsupportedPaymentNetworkError) {
+      const unsupported = [["X402-06", "Signature Resubmit Accepted"], ...NEGATIVE_CHECKS.map(([id, name]) => [id, name])]
+        .map(([id, name]) => skipped(id!, name!, error.message, "unsupported"));
+      for (const result of unsupported) options.onResult?.(result);
+      return unsupported;
+    }
     const preflight = errored("PREFLIGHT", "Run Preflight", error);
     options.onResult?.(preflight);
     return [preflight];

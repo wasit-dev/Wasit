@@ -14,6 +14,8 @@
  * the call site knows what it was doing and wraps accordingly.
  */
 
+import { sanitizeText } from "./sanitize.js";
+
 /** Why a check could not produce a verdict about the target. */
 export type CheckErrorKind =
   | "unreachable"
@@ -72,6 +74,18 @@ export class CheckSetupError extends Error {
   public constructor(message: string) {
     super(message);
     this.name = "CheckSetupError";
+  }
+}
+
+/**
+ * The target answered with a redirect that Wasit will not follow, or will not
+ * follow again. Nothing is learned about the target's conformance, only that the
+ * route does not stay inside the origin the run was pointed at.
+ */
+export class RedirectRefusedError extends ConfigurationError {
+  public constructor(message: string) {
+    super(message);
+    this.name = "RedirectRefusedError";
   }
 }
 
@@ -178,11 +192,128 @@ function baseFetch(): typeof fetch {
   return current;
 }
 
+/** How `fetchTarget` treats a redirect. */
+export interface FetchTargetOptions {
+  /**
+   * `"follow"` (the default) is fetch's own behaviour, any redirect to any
+   * host, and is what every call that carries or precedes a payment still
+   * uses. `"same-origin"` is the rule for the read-only tier: a redirect inside
+   * the origin of `target` is followed once, anything else is refused with a
+   * {@link RedirectRefusedError} and nothing is sent to the other origin.
+   */
+  readonly redirects?: "follow" | "same-origin";
+}
+
+const REDIRECT_STATUSES: ReadonlySet<number> = new Set([301, 302, 303, 307, 308]);
+
+/** Request-body headers that must not outlive a redirect that drops the body. */
+const BODY_HEADERS = ["content-type", "content-length", "content-encoding", "content-language", "content-location"];
+
+/** The origin of a URL for a message: http(s) origins only, never a path, query or credentials. */
+function describeOrigin(url: URL): string {
+  return url.protocol === "http:" || url.protocol === "https:" ? url.origin : `a ${url.protocol} URL`;
+}
+
+/**
+ * Where a response sends the request next, or undefined when it is not a
+ * redirect. A 3xx without a `Location` (or a 300 or 304) is not a redirect to
+ * follow: it is returned as the answer, and the check reports its status.
+ */
+function redirectLocation(response: Response, from: URL): URL | undefined {
+  const location = response.headers.get("location");
+  if (!REDIRECT_STATUSES.has(response.status) || location === null) return undefined;
+
+  let next: URL;
+  try {
+    next = new URL(location, from);
+  } catch {
+    throw new RedirectRefusedError(
+      `The route answers ${response.status} with a Location that is not a valid URL, so ` +
+        `Wasit did not follow it.`,
+    );
+  }
+  if (next.username !== "" || next.password !== "") {
+    throw new RedirectRefusedError(
+      `The route redirects to a URL that carries credentials, so Wasit did not follow it.`,
+    );
+  }
+  return next;
+}
+
+/** The request a redirect leads to: a POST on 301 to 303, and any non-HEAD on 303, becomes a GET without a body. */
+function redirectedInit(init: RequestInit | undefined, status: number): RequestInit {
+  const method = (init?.method ?? "GET").toUpperCase();
+  const becomesGet =
+    (status === 303 && method !== "GET" && method !== "HEAD") ||
+    ((status === 301 || status === 302) && method === "POST");
+  if (!becomesGet) return init ?? {};
+
+  const { body: _body, headers, ...rest } = init ?? {};
+  const kept = new Headers(headers);
+  for (const name of BODY_HEADERS) kept.delete(name);
+  return { ...rest, method: "GET", headers: kept };
+}
+
+/** One request, never following a redirect, with the same "never connected" wrapping as `fetchTarget`. */
+async function fetchOnce(target: string, init: RequestInit | undefined): Promise<Response> {
+  try {
+    return await baseFetch()(target, { ...init, redirect: "manual" });
+  } catch (error) {
+    throw new TargetUnreachableError(target, error);
+  }
+}
+
+/** Frees the connection of a response whose body nobody will read. */
+async function discard(response: Response): Promise<void> {
+  try {
+    await response.body?.cancel();
+  } catch {
+    // The connection is closed either way.
+  }
+}
+
+/**
+ * The same-origin rule: follow one redirect inside the origin, refuse any other.
+ *
+ * A second redirect is refused even when it stays inside the origin: a chain
+ * is not something a paywall needs, and a loop must end.
+ */
+async function fetchSameOrigin(target: string, init: RequestInit | undefined): Promise<Response> {
+  const from = new URL(target);
+  const first = await fetchOnce(target, init);
+  const next = redirectLocation(first, from);
+  if (next === undefined) return first;
+  await discard(first);
+
+  if (next.origin !== from.origin || (next.protocol !== "http:" && next.protocol !== "https:")) {
+    throw new RedirectRefusedError(
+      `The route redirects to ${sanitizeText(describeOrigin(next))}, which is not the origin ` +
+        `${sanitizeText(from.origin)} this run was pointed at. Wasit did not follow it. ` +
+        `Point the run at the URL the redirect leads to, if that is the service you operate.`,
+    );
+  }
+
+  const second = await fetchOnce(next.href, redirectedInit(init, first.status));
+  const again = redirectLocation(second, next);
+  if (again === undefined) return second;
+  await discard(second);
+  throw new RedirectRefusedError(
+    again.origin === from.origin
+      ? `The route answers with more than one redirect (${first.status}, then ${second.status}). ` +
+          `Wasit follows one redirect inside the origin and did not follow the second.`
+      : `The route redirects to ${sanitizeText(describeOrigin(again))} after one redirect inside ` +
+          `${sanitizeText(from.origin)}. Wasit did not follow it.`,
+  );
+}
+
 export async function fetchTarget(
   target: string,
   init?: Parameters<typeof fetch>[1],
+  options?: FetchTargetOptions,
 ): Promise<Awaited<ReturnType<typeof fetch>>> {
   assertHttpUrl(target);
+
+  if (options?.redirects === "same-origin") return fetchSameOrigin(target, init);
 
   try {
     return await baseFetch()(target, init);

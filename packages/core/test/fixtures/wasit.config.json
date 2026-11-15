@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "service": {
+    "start": "npm start",
+    "ready": { "url": "http://127.0.0.1:3000/", "timeoutSeconds": 60 }
+  },
+  "defaultEnvironment": "local",
+  "environments": {
+    "local": {
+      "baseUrl": "http://127.0.0.1:3000",
+      "network": "stellar:testnet",
+      "operatedByMe": true
+    },
+    "staging": {
+      "baseUrl": "https://staging.example.com/v1",
+      "network": "stellar:testnet",
+      "operatedByMe": true,
+      "pinned": {
+        "payTo": "GBNCC3VFT7PGUMGDQU5O35SXVWWTAHCO4LFFWLYFBLQCD56DNWYWM6ZS",
+        "asset": "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA"
+      },
+      "rpcUrl": "https://rpc.example.com/soroban",
+      "maxRunUsd": 2
+    },
+    "mainnet": {
+      "baseUrl": "https://api.example.com",
+      "network": "stellar:pubnet",
+      "operatedByMe": true
+    }
+  },
+  "endpoints": [
+    { "name": "weather", "protocol": "x402", "path": "/api/weather", "method": "GET" },
+    {
+      "name": "summarize",
+      "protocol": "x402",
+      "path": "/api/summarize",
+      "method": "POST",
+      "headers": { "x-tenant": "demo" },
+      "body": { "text": "hello" },
+      "reject": { "body": { "text": "" }, "note": "empty text must be refused" }
+    },
+    { "name": "raw", "protocol": "x402", "path": "/api/raw?mode=fast", "method": "POST", "body": "{\"verbatim\":true}" },
+    { "name": "chat", "protocol": "mpp-charge", "path": "/mpp/chat" },
+    {
+      "name": "stream",
+      "protocol": "mpp-channel",
+      "path": "/mpp/stream",
+      "channel": "CABQGAYDAMBQGAYDAMBQGAYDAMBQGAYDAMBQGAYDAMBQGAYDAMBQGCK3",
+      "expect": {
+        "token": "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
+        "from": "GAAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQDZ7H",
+        "to": "GBNCC3VFT7PGUMGDQU5O35SXVWWTAHCO4LFFWLYFBLQCD56DNWYWM6ZS",
+        "refundWaitingPeriod": 17280
+      }
+    }
+  ]
+}
