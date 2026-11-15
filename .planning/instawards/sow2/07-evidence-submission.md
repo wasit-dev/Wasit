@@ -37,7 +37,7 @@ Further proofs of D1 (not SOW rows):
 | The comment is updated on each push | ✅ | [Pull request 2](https://github.com/dzakwannajmi/x402-example-paywall/pull/2) · [before](week-1/copies/pr-2-comment-before-update.md) · [after](week-1/copies/pr-2-comment.md) |
 | "Unsupported" is not a failure | ✅ | [Pull request 4](https://github.com/dzakwannajmi/x402-example-paywall/pull/4) · [copy](week-1/copies/pr-4-comment.md) |
 | "Nothing could be tested" fails the job | ✅ | [Pull request 3](https://github.com/dzakwannajmi/x402-example-paywall/pull/3) · [copy](week-1/copies/pr-3-comment.md) |
-| A pull request from a fork: the Action posts no comment and the check still reports | ✅ | [Pull request 5](https://github.com/dzakwannajmi/x402-example-paywall/pull/5) · [run](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43722428182) · [copy of the log](week-1/copies/run-pr5-fork.log.txt) |
+| A pull request from a fork: the Action posts no comment and the check still reports | ✅ | [Pull request 5](https://github.com/dzakwannajmi/x402-example-paywall/pull/5) · [run](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43722428182) · [copy of the log](week-1/copies/run-pr5-fork.log.txt) · [copy of the job summary](week-1/copies/pr-5-job-summary.md) |
 | The code, offered for review, with passing automated checks | ✅ | [Draft pull request 23](https://github.com/wasit-dev/Wasit/pull/23) · [CI run](https://github.com/wasit-dev/Wasit/actions/runs/43706023137) |
 
 ## Deliverable 2 — Payment checks in CI, a new check, and MPP (weeks 2 and 3)
