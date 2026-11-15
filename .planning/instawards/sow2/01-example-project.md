@@ -13,7 +13,7 @@ own repository. It is also where the payment-tier and MPP runs of D2 are shown.
 - [x] The example project exists with the Wasit workflow (week 1).
 - [x] `main` conforms, and a pull request with a deliberate defect gives the red run (week 1).
 - [ ] Payment-tier runs, each with a Stellar Expert link (week 2, job 02).
-- [ ] A pull request from a fork shows the payment checks were not run (week 2, needs a fork of the repository).
+- [ ] A pull request from a fork shows the payment checks were not run (week 2: a fork and pull request 5 exist, but this needs the payment tier first).
 - [ ] MPP charge and channel routes with runs in the same comment format (week 3, job 03).
 - [x] The repository is public (since 2026-11-15, earlier than planned).
 
@@ -35,7 +35,7 @@ Repository: <https://github.com/dzakwannajmi/x402-example-paywall> (public since
 | `main` conforms (green) | ✅ | [Run](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43706042000) (second run, Action at `5c498cd`) · [copy](week-1/copies/run-main-after-fix.log.txt) · first run: [run](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43697947796) |
 | A deliberate defect gives the red run | ✅ | [Pull request 1](https://github.com/dzakwannajmi/x402-example-paywall/pull/1): a "friendlier network name" breaks check X402-05 |
 
-Four pull requests are kept open on purpose, as proof. They must not be merged.
+Five pull requests are kept open on purpose, as proof. They must not be merged.
 
 | Pull request | The change | What the comment shows |
 | --- | --- | --- |
@@ -43,10 +43,11 @@ Four pull requests are kept open on purpose, as proof. They must not be merged.
 | [2](https://github.com/dzakwannajmi/x402-example-paywall/pull/2) | Removes the receiving address from the payment request, then puts it back | Red after the first push, green after the second; the same comment is updated |
 | [3](https://github.com/dzakwannajmi/x402-example-paywall/pull/3) | Changes the default port, so the service never answers where the config looks | "No verdict": nothing was graded, the job fails |
 | [4](https://github.com/dzakwannajmi/x402-example-paywall/pull/4) | Puts the payment request in the body, the old x402 version 1 style | "Unsupported", not a failure |
+| [5](https://github.com/dzakwannajmi/x402-example-paywall/pull/5) | Adds `*.log` to `.gitignore`, opened from a fork of the repository | No comment, because the token of a fork is read-only; the check passes |
 
 ## Not shown yet
 
-- ⬜ Payment-tier runs, MPP routes, and a pull request from a fork (later weeks).
+- ⬜ Payment-tier runs, MPP routes, and the payment-tier half of the fork case (payment checks not run on a fork) (later weeks).
 
 ## Result
 
@@ -59,3 +60,6 @@ plan (the pre-release). Before the change, its files, its whole history and the
 four pull requests were searched for keys and for text that does not belong on a
 public page; none was found, and the repository holds no secret. The MIT
 License text is unchanged; its copyright line now names the project's author.
+
+Update 2026-11-15 (fork): pull request 5, opened from a fork, ran the read-only
+workflow without a comment (see job 00). It is kept open with the other four.
