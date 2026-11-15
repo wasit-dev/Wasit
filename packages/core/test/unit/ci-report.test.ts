@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url";
 import { describe, it } from "node:test";
 
 import { type Baseline, updateHistory } from "../../src/baseline.js";
-import { COMMENT_MARKER, renderComment, renderSummary } from "../../src/ci-report.js";
+import { COMMENT_MARKER, renderComment, renderNoReportComment, renderSummary } from "../../src/ci-report.js";
 import { catalogueEntry } from "../../src/catalogue.js";
 import { type CheckResult, errored, skipped } from "../../src/check.js";
 import { ConfigurationError } from "../../src/errors.js";
@@ -272,6 +272,68 @@ describe("the shape of a comment", () => {
     assert.match(comment, /chat/);
     assert.match(comment, /MPP charge not run: read-only tier/);
     assert.match(comment, /1 no verdict/);
+  });
+});
+
+describe("the version line", () => {
+  const withBuild: ToolVersions = { ...VERSIONS, wasit: { ...VERSIONS.wasit, build: "0123456" } };
+
+  function reportWith(versions: ToolVersions): RunReport {
+    return buildRunReport({
+      environment: "local",
+      network: "stellar:testnet",
+      startedAt: "2026-11-15T10:00:00.000Z",
+      versions,
+      endpoints: [endpoint("weather", conformant())],
+      notes: [],
+    });
+  }
+
+  it("names the commit an Action build came from, so a build of a branch does not pass for a release", () => {
+    const [, second] = lines(renderComment({ report: reportWith(withBuild) }));
+    assert.match(second ?? "", /Wasit 0\.7\.0 \(core 0\.7\.0\), built from commit 0123456, x402 v2/);
+  });
+
+  it("says nothing about a build when the report names none", () => {
+    const [, second] = lines(renderComment({ report: reportWith(VERSIONS) }));
+    assert.ok(!/built from/.test(second ?? ""));
+  });
+
+  it("does the same in the comment for a run that left no report", () => {
+    assert.match(renderNoReportComment(withBuild), /Wasit 0\.7\.0 \(core 0\.7\.0\), built from commit 0123456, x402 v2/);
+    assert.ok(!/built from/.test(renderNoReportComment(VERSIONS)));
+  });
+
+  it("prints a build only if it is seven lower-case hex characters, whatever the report says", () => {
+    const forged = reportWith(withBuild);
+    for (const bad of ["main", "0123456\n::error::x", "<b>x</b>", "ABCDEF0"]) {
+      const comment = renderComment({ report: { ...forged, wasit: { ...forged.wasit, build: bad } } });
+      const [, versionLine] = lines(comment);
+      assert.ok(!/built from/.test(comment), JSON.stringify(bad));
+      assert.ok(!(versionLine ?? "").includes(bad), JSON.stringify(bad));
+      assert.ok(!lines(comment).some((line) => line.includes("::error::")), JSON.stringify(bad));
+    }
+  });
+});
+
+describe("the reason under Not graded", () => {
+  it("starts a sentence with a capital after the outcome, not in lower case after a full stop", () => {
+    const comment = renderComment({ report: report([endpoint("old", v1())]) });
+    const line = lines(comment).find((l) => l.startsWith("- **old**:")) ?? "";
+    assert.match(line, /^- \*\*old\*\*: unsupported\. [A-Z]/);
+    assert.ok(!/(unsupported|no-verdict)\. [a-z]/.test(comment));
+  });
+
+  it("keeps a reason that already starts with a capital, or with a digit or quote, as it is", () => {
+    const text = (reason: string): string =>
+      renderComment({
+        report: {
+          ...report([endpoint("old", v1())]),
+          endpoints: [{ ...report([endpoint("old", v1())]).endpoints[0]!, reason }],
+        },
+      });
+    assert.match(text("The route redirects."), /unsupported\. The route redirects\./);
+    assert.match(text("402 was expected."), /unsupported\. 402 was expected\./);
   });
 });
 

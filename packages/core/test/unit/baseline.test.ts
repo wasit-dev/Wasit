@@ -69,6 +69,29 @@ describe("parseRunReport", () => {
     assert.deepEqual(parsed, original);
   });
 
+  it("keeps the build a report names, and refuses one that is not seven lower-case hex characters", () => {
+    const original = buildRunReport({
+      environment: "local",
+      network: "stellar:testnet",
+      startedAt: "2026-11-15T10:00:00.000Z",
+      versions: readToolVersions("0.7.0", "0123456"),
+      endpoints: [endpoint("weather", conformant())],
+      notes: [],
+    });
+    const parsed = parseRunReport(JSON.parse(JSON.stringify(original)));
+    assert.equal(parsed.wasit.build, "0123456");
+    for (const bad of ["main", "ABCDEF0", "0123456789", "012345\n::error::x", 7]) {
+      const forged = JSON.parse(JSON.stringify(original));
+      forged.wasit.build = bad;
+      assert.throws(() => parseRunReport(forged), ReportFormatError, JSON.stringify(bad));
+    }
+  });
+
+  it("reads an older report that names no build", () => {
+    const parsed = parseRunReport(JSON.parse(JSON.stringify(report([endpoint("weather", conformant())]))));
+    assert.equal("build" in parsed.wasit, false);
+  });
+
   it("keeps expected and actual on a FAIL, sanitised and cut, and adds none where there were none", () => {
     const withValues: CheckResult = { ...fail("X402-01"), expected: "status 402", actual: "status 200" };
     const original = report([endpoint("weather", [withValues, pass("X402-02")])]);

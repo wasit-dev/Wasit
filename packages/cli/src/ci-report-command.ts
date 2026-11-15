@@ -19,6 +19,7 @@ import {
   deniedEnvValues,
   parseRunReport,
   readBaseline,
+  readBuildCommit,
   readToolVersions,
   renderComment,
   renderNoReportComment,
@@ -78,7 +79,7 @@ export async function executeCiReport(options: CiReportOptions, context: CiRepor
   const writeNoReport = (message: string, code: 0 | 2): number => {
     context.stderr(sanitizeText(message, { redact: secrets }));
     try {
-      const versions = readToolVersions(CLI_VERSION);
+      const versions = readToolVersions(CLI_VERSION, readBuildCommit(context.env));
       writeFileSync(options.comment, renderNoReportComment(versions));
       context.stdout(`Wrote ${options.comment}`);
       const summary = options.summary ?? context.env["GITHUB_STEP_SUMMARY"];

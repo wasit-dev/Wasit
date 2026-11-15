@@ -7,7 +7,7 @@
 | summarize | x402 | unsupported | challenge 1/5, 4 skipped; payment not run: read-only tier |
 
 ### Not graded
-- **summarize**: unsupported. the service sent an x402 v1 challenge in its response body. To have it graded, move to x402 v2: send the challenge base64-encoded in a PAYMENT-REQUIRED response header.
+- **summarize**: unsupported. The service sent an x402 v1 challenge in its response body. To have it graded, move to x402 v2: send the challenge base64-encoded in a PAYMENT-REQUIRED response header.
 
 ### Changed since main
 - Regression: summarize was conformant on main and is now unsupported.

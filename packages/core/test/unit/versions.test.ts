@@ -14,7 +14,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, it } from "node:test";
 
-import { readPackageVersion, readToolVersions } from "../../src/versions.js";
+import { readBuildCommit, readPackageVersion, readToolVersions } from "../../src/versions.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const coreManifest = JSON.parse(readFileSync(join(here, "../../package.json"), "utf-8")) as { version: string };
@@ -86,5 +86,31 @@ describe("readToolVersions", () => {
   it("says unknown for a CLI version it was not given or that is not a version", () => {
     assert.equal(readToolVersions().wasit.cli, "unknown");
     assert.equal(readToolVersions("1.0.0\n::error::x").wasit.cli, "unknown");
+  });
+});
+
+describe("readBuildCommit", () => {
+  const sha = "0123456789abcdef0123456789abcdef01234567";
+
+  it("gives the first seven characters of a full lower-case commit id", () => {
+    assert.equal(readBuildCommit({ WASIT_BUILD_COMMIT: sha }), "0123456");
+  });
+
+  it("gives nothing for a tag, a branch, a short or upper-case id, a value with a newline, or no value", () => {
+    for (const value of ["v0.8.0-beta.1", "main", sha.slice(0, 12), sha.toUpperCase(), `${sha}\n::error::x`, `${sha}0`, ""]) {
+      assert.equal(readBuildCommit({ WASIT_BUILD_COMMIT: value }), undefined, JSON.stringify(value));
+    }
+    assert.equal(readBuildCommit({ WASIT_BUILD_COMMIT: undefined }), undefined);
+    assert.equal(readBuildCommit({}), undefined);
+  });
+});
+
+describe("readToolVersions with a build", () => {
+  it("names the build only when it is seven lower-case hex characters", () => {
+    assert.equal(readToolVersions("0.7.0", "0123456").wasit.build, "0123456");
+    for (const bad of ["0123456789", "ABCDEF0", "main", "012345\n", ""]) {
+      assert.equal("build" in readToolVersions("0.7.0", bad).wasit, false, JSON.stringify(bad));
+    }
+    assert.equal("build" in readToolVersions("0.7.0").wasit, false, "no build given, none named");
   });
 });

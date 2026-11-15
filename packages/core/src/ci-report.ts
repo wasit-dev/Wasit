@@ -21,7 +21,7 @@ import {
 import type { SkipKind } from "./check.js";
 import { checkGroup, describeTotals, type CheckGroup, type EndpointReport, type RunReport } from "./report.js";
 import { sanitizeForMarkdown } from "./sanitize.js";
-import type { ToolVersions } from "./versions.js";
+import { isShortCommit, type ToolVersions } from "./versions.js";
 import { runExitCode } from "./verdict.js";
 
 /** The comment that starts with this is the one Wasit updates. */
@@ -78,6 +78,17 @@ function version(value: string): string {
   return VERSION.test(value) ? value : "unknown";
 }
 
+/** "Wasit 0.7.0 (core 0.7.0)", and ", built from commit 0123456" when an Action build names its commit. */
+function wasitText(wasit: ToolVersions["wasit"]): string {
+  const build = isShortCommit(wasit.build) ? `, built from commit ${wasit.build}` : "";
+  return `Wasit ${version(wasit.cli)} (core ${version(wasit.core)})${build}`;
+}
+
+/** The reason follows "unsupported." in the list, so it starts a sentence. */
+function upperFirst(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 /** "challenge 5/5", or "payment not run: read-only tier" when the whole group was skipped for one reason. */
 function groupText(endpoint: EndpointReport, group: CheckGroup): string | undefined {
   const results = endpoint.results.filter((result) => checkGroup(result.id, endpoint.protocol) === group);
@@ -126,7 +137,7 @@ function renderBody(input: CiReportInput): string {
   const sdk = report.sdk;
   const out: string[] = [
     `**Wasit: ${word}.** ${describeTotals(report.totals)} on ${md(report.environment)}, ${md(report.network)}. ` +
-      `Wasit ${version(report.wasit.cli)} (core ${version(report.wasit.core)}), x402 v2, ` +
+      `${wasitText(report.wasit)}, x402 v2, ` +
       `@x402/core ${version(sdk["@x402/core"])}, @x402/stellar ${version(sdk["@x402/stellar"])}, ` +
       `@stellar/mpp ${version(sdk["@stellar/mpp"])}, mppx ${version(sdk.mppx)}, ` +
       `@stellar/stellar-sdk ${version(sdk["@stellar/stellar-sdk"])}.`,
@@ -143,7 +154,7 @@ function renderBody(input: CiReportInput): string {
   );
   if (notGraded.length > 0) {
     out.push("", "### Not graded");
-    for (const endpoint of notGraded) out.push(`- **${md(endpoint.name)}**: ${endpoint.outcome}. ${md(endpoint.reason ?? "")}`);
+    for (const endpoint of notGraded) out.push(`- **${md(endpoint.name)}**: ${endpoint.outcome}. ${md(upperFirst(endpoint.reason ?? ""))}`);
   }
 
   out.push("", "### Changed since main");
@@ -246,7 +257,7 @@ function renderNoReportBody(versions: ToolVersions): string {
   const sdk = versions.sdk;
   return [
     "**Wasit: no verdict.** The run ended before it wrote a report, so nothing was graded. " +
-      `Wasit ${version(versions.wasit.cli)} (core ${version(versions.wasit.core)}), x402 v2, ` +
+      `${wasitText(versions.wasit)}, x402 v2, ` +
       `@x402/core ${version(sdk["@x402/core"])}, @x402/stellar ${version(sdk["@x402/stellar"])}, ` +
       `@stellar/mpp ${version(sdk["@stellar/mpp"])}, mppx ${version(sdk.mppx)}, ` +
       `@stellar/stellar-sdk ${version(sdk["@stellar/stellar-sdk"])}.`,

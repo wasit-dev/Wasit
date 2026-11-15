@@ -108,6 +108,18 @@ describe("wasit run", () => {
       assert.match(report.sdk["@x402/core"], /^\d+\.\d+\.\d+/);
     });
 
+    it("names the commit an Action build came from in the report, only when the action ref is a full commit id", async () => {
+      paywall = await startPaywall();
+      const config = await writeConfig(dir, { baseUrl: paywall.base });
+      const sha = "0123456789abcdef0123456789abcdef01234567";
+      assert.equal((await run({ config, json: true }, { WASIT_BUILD_COMMIT: sha })).report().wasit.build, "0123456");
+      for (const ref of ["v0.8.0-beta.1", "main", `${sha}\n::error::x`, ""]) {
+        const report = (await run({ config, json: true }, { WASIT_BUILD_COMMIT: ref })).report();
+        assert.equal("build" in report.wasit, false, JSON.stringify(ref));
+      }
+      assert.equal("build" in (await run({ config, json: true })).report().wasit, false, "no variable, no build");
+    });
+
     it("sends the one unpaid request and nothing else: no payment header, no second request", async () => {
       paywall = await startPaywall();
       const config = await writeConfig(dir, { baseUrl: paywall.base });

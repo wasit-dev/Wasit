@@ -200,8 +200,8 @@ describe("action.yml", () => {
   describe("third-party actions", () => {
     const used = steps.filter((step) => step.uses !== undefined).map((step) => step.uses);
 
-    it("uses only actions/upload-artifact, on a version tag", () => {
-      assert.deepEqual(used, ["actions/upload-artifact@v4"]);
+    it("uses only actions/upload-artifact, pinned to a full commit SHA", () => {
+      assert.deepEqual(used, ["actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02"]);
     });
 
     it("never names a branch or an invented commit", () => {
@@ -238,9 +238,9 @@ describe("the template workflow for builders", () => {
   it("checks out without keeping the token in .git/config, installs Node 22, then calls the Action", () => {
     const [job] = Object.values(workflow.jobs);
     const uses = job.steps.map((step) => step.uses);
-    assert.equal(uses[0], "actions/checkout@v4");
+    assert.equal(uses[0], "actions/checkout@11d5960a326750d5838078e36cf38b85af677262");
     assert.equal(job.steps[0].with["persist-credentials"], false);
-    assert.equal(uses[1], "actions/setup-node@v4");
+    assert.equal(uses[1], "actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020");
     assert.equal(String(job.steps[1].with["node-version"]), "22");
     assert.match(uses[2], /^wasit-dev\/wasit\/action@/);
   });
@@ -258,5 +258,33 @@ describe("the template workflow for builders", () => {
   it("passes no secret to the Action by default, and says where a header value would go", () => {
     assert.ok(!/secrets\./.test(text.replace(/#.*$/gm, "")), "no secret is used in the template as it stands");
     assert.match(text, /WASIT_HEADER_/);
+  });
+});
+
+describe("pinned references and the build commit", () => {
+  const FULL_SHA = /^[^@\s]+\/[^@\s]+(?:\/[^@\s]+)?@[0-9a-f]{40}$/;
+
+  it("pins every third-party action in action.yml to a full commit SHA, with the version it was read at in a comment", () => {
+    const text = read("action.yml");
+    for (const step of steps.filter((candidate) => candidate.uses !== undefined)) {
+      assert.match(step.uses, FULL_SHA, step.uses);
+    }
+    assert.match(text, /uses: actions\/upload-artifact@[0-9a-f]{40} # v4\.6\.2/);
+  });
+
+  it("pins the checkout and setup-node of the template workflow to full commit SHAs too", () => {
+    const workflow = parse(read("examples/wasit.yml"));
+    const [job] = Object.values(workflow.jobs);
+    assert.match(job.steps[0].uses, FULL_SHA);
+    assert.match(job.steps[1].uses, FULL_SHA);
+    assert.match(read("examples/wasit.yml"), /# v4\.\d+\.\d+/);
+  });
+
+  it("gives the action ref to the steps that run Wasit and write the report, as the build commit, and to no other step", () => {
+    for (const name of ["Run Wasit", "Write the report"]) {
+      assert.equal(stepByName(name).env?.WASIT_BUILD_COMMIT, "${{ github.action_ref }}", name);
+    }
+    const others = steps.filter((step) => !["Run Wasit", "Write the report"].includes(step.name));
+    for (const step of others) assert.ok(step.env?.WASIT_BUILD_COMMIT === undefined, `${step.name} does not get it`);
   });
 });

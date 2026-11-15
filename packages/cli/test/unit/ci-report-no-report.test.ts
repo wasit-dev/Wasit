@@ -28,7 +28,7 @@ describe("wasit ci-report without a usable report", () => {
     await rm(dir, { recursive: true, force: true });
   });
 
-  async function ciReport(options: Partial<CiReportOptions> & { report: string }, name: string) {
+  async function ciReport(options: Partial<CiReportOptions> & { report: string }, name: string, extraEnv: Record<string, string> = {}) {
     const comment = path.join(dir, `${name}.comment.md`);
     const summary = path.join(dir, `${name}.summary.md`);
     const baselineOut = path.join(dir, `${name}.baseline.json`);
@@ -36,7 +36,7 @@ describe("wasit ci-report without a usable report", () => {
     const err: string[] = [];
     const code = await executeCiReport(
       { comment, summary, baselineOut, ...options },
-      { env: { PATH: process.env["PATH"] ?? "" }, stdout: (line) => out.push(line), stderr: (line) => err.push(line) },
+      { env: { PATH: process.env["PATH"] ?? "", ...extraEnv }, stdout: (line) => out.push(line), stderr: (line) => err.push(line) },
     );
     return { code, stdout: out.join("\n"), stderr: err.join("\n"), comment, summary, baselineOut };
   }
@@ -59,6 +59,14 @@ describe("wasit ci-report without a usable report", () => {
     const result = await ciReport({ report: path.join(dir, "missing-2.report.json") }, "versions");
     const comment = await readFile(result.comment, "utf-8");
     assert.match(comment, /Wasit \d+\.\d+\.\d+\S* \(core \d+\.\d+\.\d+\S*\), x402 v2, @x402\/core /);
+  });
+
+  it("names the commit an Action build came from, when the action ref is a full commit id", async () => {
+    const sha = "89abcdef0123456789abcdef0123456789abcdef";
+    const named = await ciReport({ report: path.join(dir, "missing-3.report.json") }, "build", { WASIT_BUILD_COMMIT: sha });
+    assert.match(await readFile(named.comment, "utf-8"), /\(core \d+\.\d+\.\d+\S*\), built from commit 89abcde, x402 v2/);
+    const tagged = await ciReport({ report: path.join(dir, "missing-4.report.json") }, "tag", { WASIT_BUILD_COMMIT: "v0.8.0-beta.1" });
+    assert.ok(!/built from/.test(await readFile(tagged.comment, "utf-8")), "a tag is not a commit");
   });
 
   it("never writes a baseline: a run that graded nothing must not become the baseline of main", async () => {

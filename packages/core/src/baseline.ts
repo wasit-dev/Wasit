@@ -25,6 +25,7 @@ import {
   type RunReport,
 } from "./report.js";
 import { sanitizeText } from "./sanitize.js";
+import { isShortCommit } from "./versions.js";
 
 /** How many runs of the default branch the history keeps. */
 export const HISTORY_LIMIT = 20;
@@ -138,6 +139,10 @@ export function parseRunReport(value: unknown): RunReport {
 
   const wasit = record(root["wasit"], "wasit");
   const sdk = record(root["sdk"], "sdk");
+  const build = wasit["build"];
+  if (build !== undefined && !isShortCommit(build)) {
+    throw new ReportFormatError("wasit.build", "must be seven lower-case hex characters");
+  }
   if (sdk["x402Version"] !== 2) throw new ReportFormatError("sdk.x402Version", "must be 2");
 
   const endpoints = list(root["endpoints"], "endpoints", MAX_ENDPOINTS).map((item, index) =>
@@ -153,7 +158,11 @@ export function parseRunReport(value: unknown): RunReport {
 
   return {
     schema: 1,
-    wasit: { cli: text(wasit["cli"], "wasit.cli", 40), core: text(wasit["core"], "wasit.core", 40) },
+    wasit: {
+      cli: text(wasit["cli"], "wasit.cli", 40),
+      core: text(wasit["core"], "wasit.core", 40),
+      ...(build === undefined ? {} : { build }),
+    },
     sdk: {
       x402Version: 2,
       "@x402/core": text(sdk["@x402/core"], "sdk.@x402/core", 40),

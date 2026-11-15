@@ -94,6 +94,7 @@ runs:
         INPUT_TIER: ${{ inputs.tier }}
         INPUT_ENDPOINTS: ${{ inputs.endpoints }}
         BASELINE_PATH: ${{ steps.baseline.outputs.path }}
+        WASIT_BUILD_COMMIT: ${{ github.action_ref }}
       run: node "$ACTION_PATH/scripts/wasit.mjs" run
 
     - name: Write the report
@@ -102,6 +103,7 @@ runs:
       env:
         ACTION_PATH: ${{ github.action_path }}
         BASELINE_PATH: ${{ steps.baseline.outputs.path }}
+        WASIT_BUILD_COMMIT: ${{ github.action_ref }}
       run: node "$ACTION_PATH/scripts/wasit.mjs" report
 
     - name: Comment on the pull request
@@ -113,11 +115,10 @@ runs:
         WASIT_COMMENT_FILE: ${{ runner.temp }}/wasit/comment.md
       run: node "$ACTION_PATH/scripts/comment.mjs"
 
-    # Pin to a commit SHA before release (not verified offline); a version tag
-    # is used here and no SHA is invented.
+    # Pinned to the commit of v4.6.2 (read from the GitHub API on 2026-11-15).
     - name: Upload the baseline
       if: ${{ always() && steps.run.conclusion != 'skipped' && github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
       with:
         name: wasit-baseline
         path: ${{ runner.temp }}/wasit/baseline-next.json

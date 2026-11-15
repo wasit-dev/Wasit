@@ -81,7 +81,7 @@ export type {
   RunReportInput,
   RunTotals,
 } from "./report.js";
-export { readPackageVersion, readToolVersions } from "./versions.js";
+export { readBuildCommit, readPackageVersion, readToolVersions } from "./versions.js";
 export type { ToolVersions } from "./versions.js";
 
 // The baseline of the default branch, the diff against it, and the exit rule of a run.

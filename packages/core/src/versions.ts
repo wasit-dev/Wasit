@@ -65,8 +65,35 @@ function ownVersion(): string {
   }
 }
 
+/** A commit id as an Action ref gives it: all 40 characters, lower case. Anything else (a tag, a branch) is not a commit. */
+const FULL_COMMIT = /^[0-9a-f]{40}$/;
+
+/** What a result names of a commit: its first seven characters. */
+const SHORT_COMMIT = /^[0-9a-f]{7}$/;
+
+/** True for exactly seven lower-case hex characters: the only build text that reaches a comment. */
+export function isShortCommit(value: unknown): value is string {
+  return typeof value === "string" && SHORT_COMMIT.test(value);
+}
+
+/**
+ * The commit this build of Wasit was made from, when the Action says so: the
+ * action ref (`WASIT_BUILD_COMMIT`) if it is a full commit id. A tag or a branch
+ * name is not a commit, and says nothing here: a pinned tag already names the
+ * version, and a result must not name a build it cannot show.
+ */
+export function readBuildCommit(env: Readonly<Record<string, string | undefined>>): string | undefined {
+  const value = env["WASIT_BUILD_COMMIT"];
+  return value !== undefined && FULL_COMMIT.test(value) ? value.slice(0, 7) : undefined;
+}
+
 export interface ToolVersions {
-  readonly wasit: { readonly cli: string; readonly core: string };
+  readonly wasit: {
+    readonly cli: string;
+    readonly core: string;
+    /** The first seven characters of the commit an Action build came from. Absent for an installed package. */
+    readonly build?: string;
+  };
   readonly sdk: {
     /** The x402 version Wasit grades. */
     readonly x402Version: 2;
@@ -82,7 +109,7 @@ export interface ToolVersions {
  * The versions of this run. The CLI knows its own version (core cannot read the
  * CLI's `package.json`), so it passes it in.
  */
-export function readToolVersions(cliVersion?: string): ToolVersions {
+export function readToolVersions(cliVersion?: string, build?: string): ToolVersions {
   const here = dirname(fileURLToPath(import.meta.url));
   // `@x402/core` is a dependency of `@x402/fetch`; when npm does not hoist it, it sits under that package.
   const fetchDir = (() => {
@@ -104,6 +131,7 @@ export function readToolVersions(cliVersion?: string): ToolVersions {
     wasit: {
       cli: cliVersion !== undefined && VERSION.test(cliVersion) ? cliVersion : UNKNOWN,
       core: ownVersion(),
+      ...(isShortCommit(build) ? { build } : {}),
     },
     sdk: {
       x402Version: 2,

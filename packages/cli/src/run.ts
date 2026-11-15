@@ -25,6 +25,7 @@ import {
   isLoopbackUrl,
   readBaseline,
   readConfigFile,
+  readBuildCommit,
   readToolVersions,
   redactReport,
   resolveRun,
@@ -205,7 +206,7 @@ export async function executeRun(options: RunCommandOptions, context: RunContext
       environment: resolved.environment,
       network: resolved.network,
       startedAt,
-      versions: readToolVersions(CLI_VERSION),
+      versions: readToolVersions(CLI_VERSION, readBuildCommit(context.env)),
       endpoints,
     };
     const preliminary = buildRunReport({ ...input, notes: [TIER_NOTE] });
