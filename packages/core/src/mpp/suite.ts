@@ -16,8 +16,9 @@ import {
   runMppChannelReplayCheck,
 } from "./channel.js";
 import { fetchChannelChallenge } from "./channel-credential.js";
-import { assertMppNetwork } from "./network.js";
+import { assertMppNetwork, resolveRpcUrl } from "./network.js";
 import { assertPaymentNetworkAllowed } from "../guard/networks.js";
+import { assertRpcServesNetwork } from "../guard/rpc-identity.js";
 
 const DEPLOY_ID = "MPP-10";
 const DEPLOY_NAME = "Channel Deploy";
@@ -178,6 +179,9 @@ export async function runMppChannelSuite(
     assertHttpUrl(target);
     assertMppNetwork(network);
     assertPaymentNetworkAllowed("mpp-channel", network);
+    // Commitments are prepared and the channel read through this endpoint: it
+    // must serve the run's network before the target is asked anything (D-023).
+    await assertRpcServesNetwork(network, resolveRpcUrl(network, rpcUrl));
   } catch (error) {
     const preflight = errored("PREFLIGHT", "Run Preflight", error);
     options.onResult?.(preflight);

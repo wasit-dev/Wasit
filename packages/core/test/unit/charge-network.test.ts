@@ -13,13 +13,14 @@
 import assert from "node:assert/strict";
 import http from "node:http";
 import net from "node:net";
-import { describe, it } from "node:test";
+import { afterEach, beforeEach, describe, it } from "node:test";
 
-import { Keypair } from "@stellar/stellar-sdk";
+import { Keypair, Networks } from "@stellar/stellar-sdk";
 import { charge as chargeClient } from "@stellar/mpp/charge/client";
 import { Mppx, Store, charge } from "@stellar/mpp/charge/server";
 
 import { classifyCheckError } from "../../src/errors.js";
+import { setRpcIdentityTransportForTesting } from "../../src/guard/rpc-identity.js";
 import { payCharge, runMppChargeChecks } from "../../src/mpp/charge.js";
 import type { MppNetwork } from "../../src/mpp/network.js";
 
@@ -108,6 +109,13 @@ async function rejection(promise: Promise<unknown>): Promise<unknown> {
 }
 
 describe("MPP-01 and the challenge's network", () => {
+  // The run's RPC here is an https address nothing can answer (see
+  // countingRpc), so the RPC identity check (D-023, rpc-identity.test.ts) is
+  // given a stand-in that says testnet. The connections countingRpc sees are
+  // then the SDK's own, which is what these tests are about.
+  beforeEach(() => setRpcIdentityTransportForTesting(async () => ({ passphrase: Networks.TESTNET })));
+  afterEach(() => setRpcIdentityTransportForTesting(undefined));
+
   // A stellar:pubnet run no longer reaches the challenge at all: L0 refuses it
   // first (network-guard.test.ts). The run-network rule below still guards a
   // testnet run against a challenge that asks for pubnet.

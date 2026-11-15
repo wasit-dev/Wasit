@@ -8,6 +8,7 @@ import {
   fetchTarget,
 } from "../errors.js";
 import { assertPaymentNetworkAllowed } from "../guard/networks.js";
+import { assertRpcServesNetwork } from "../guard/rpc-identity.js";
 import { sanitizeText } from "../sanitize.js";
 import { checkNetworkIdentifier, checkRequiredFields } from "./requirements.js";
 
@@ -1141,7 +1142,7 @@ export async function runX402PaymentChecks(
     // test network passes; stellar:pubnet waits for the mainnet opt-in, which
     // this version does not have.
     assertPaymentNetworkAllowed("x402", options.network);
-    chain.resolveRpcUrl(options.network, options.rpcUrl);
+    const rpcUrl = chain.resolveRpcUrl(options.network, options.rpcUrl);
     // A key for another chain, or a malformed one, would otherwise surface
     // mid-payment as a harness error. Checked here, it is what it is: the
     // run's configuration. The message never echoes the key.
@@ -1154,6 +1155,9 @@ export async function runX402PaymentChecks(
           `or --payer-key).`,
       );
     }
+    // The RPC signs and settles nothing itself, but the payment is built and
+    // its settlement read through it: it must serve the run's network (D-023).
+    await assertRpcServesNetwork(options.network, rpcUrl);
   } catch (error) {
     // A network no adapter pays on is not a failure of the run: Wasit does not
     // grade it (spec A3). Every payment check is skipped as unsupported, and

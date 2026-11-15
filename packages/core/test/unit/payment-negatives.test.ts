@@ -113,24 +113,32 @@ async function standIn(options: {
 }
 
 /**
- * A JSON-RPC endpoint that answers every `eth_call` (the ERC-20 `balanceOf`
- * X402-06 reads) with `balance`, or fails every request with 500.
+ * A JSON-RPC endpoint that says it serves `chainId` (the RPC identity check,
+ * D-023) and answers every `eth_call` (the ERC-20 `balanceOf` X402-06 reads)
+ * with `balance`, or fails every balance read with 500. `calls` counts the
+ * balance reads only.
  */
 async function rpcStandIn(
   balance: bigint | "unreadable",
+  chainId = 84532n,
 ): Promise<{ url: string; calls: () => number; close: () => Promise<void> }> {
   let calls = 0;
   const server = http.createServer((request, response) => {
     let body = "";
     request.on("data", (chunk) => (body += chunk));
     request.on("end", () => {
+      const { id, method } = JSON.parse(body) as { id: number; method: string };
+      if (method === "eth_chainId") {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({ jsonrpc: "2.0", id, result: `0x${chainId.toString(16)}` }));
+        return;
+      }
       calls++;
       if (balance === "unreadable") {
         response.writeHead(500);
         response.end();
         return;
       }
-      const { id, method } = JSON.parse(body) as { id: number; method: string };
       response.writeHead(200, { "content-type": "application/json" });
       response.end(
         JSON.stringify(
@@ -314,34 +322,39 @@ describe("on Ethereum Sepolia", () => {
   // Circle's Sepolia USDC is not an SDK default asset, and the SDK client's
   // spend controls refuse non-default assets unless they are allowed.
   it("pays in Circle's Sepolia USDC, up to the SDK's own $1 cap", async () => {
-    for (const [amount, paid] of [
-      ["10000", true],
-      ["1000001", false],
-    ] as const) {
-      const target = await standIn({
-        mode: "refuse",
-        amount,
-        network: "eip155:11155111",
-        asset: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
-      });
-      try {
-        const r = byId(
-          await runX402PaymentChecks({
-            target: target.url,
-            network: "eip155:11155111",
-            payerSecretKey: generatePrivateKey(),
-            rpcUrl: funded.url,
-          }),
-        );
-        assert.equal(target.received.length, paid ? 1 : 0, amount);
-        if (paid) assert.match(r["X402-06"]?.detail ?? "", /got 402/);
-        else {
-          assert.equal(r["X402-06"]?.error?.kind, "setup");
-          assert.match(r["X402-06"]?.detail ?? "", /asks for 1000001 base units .* more than the \$1 a payment/);
+    const sepolia = await rpcStandIn(10n ** 12n, 11155111n);
+    try {
+      for (const [amount, paid] of [
+        ["10000", true],
+        ["1000001", false],
+      ] as const) {
+        const target = await standIn({
+          mode: "refuse",
+          amount,
+          network: "eip155:11155111",
+          asset: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+        });
+        try {
+          const r = byId(
+            await runX402PaymentChecks({
+              target: target.url,
+              network: "eip155:11155111",
+              payerSecretKey: generatePrivateKey(),
+              rpcUrl: sepolia.url,
+            }),
+          );
+          assert.equal(target.received.length, paid ? 1 : 0, amount);
+          if (paid) assert.match(r["X402-06"]?.detail ?? "", /got 402/);
+          else {
+            assert.equal(r["X402-06"]?.error?.kind, "setup");
+            assert.match(r["X402-06"]?.detail ?? "", /asks for 1000001 base units .* more than the \$1 a payment/);
+          }
+        } finally {
+          await target.close();
         }
-      } finally {
-        await target.close();
       }
+    } finally {
+      await sepolia.close();
     }
   });
 });

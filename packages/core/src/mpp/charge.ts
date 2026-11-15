@@ -32,6 +32,7 @@ import {
 } from "../errors.js";
 import { type MppNetwork, assertMppNetwork, isMppNetwork, resolveRpcUrl } from "./network.js";
 import { assertPaymentNetworkAllowed } from "../guard/networks.js";
+import { assertRpcServesNetwork } from "../guard/rpc-identity.js";
 import { verifySettlement } from "../settlement.js";
 
 const CHECK_ID = "MPP-01";
@@ -282,6 +283,10 @@ export async function runMppChargeChecks(
         `https RPC endpoint, and ${endpoint} is http. Nothing was sent.`,
     );
   }
+
+  // The payment is built and its settlement read through this endpoint: it
+  // must serve the run's network before the target is asked anything (D-023).
+  await assertRpcServesNetwork(runNetwork, endpoint);
 
   const advertised = await fetchChargeChallenge(target);
   assertRunNetwork(advertised.network, runNetwork);
