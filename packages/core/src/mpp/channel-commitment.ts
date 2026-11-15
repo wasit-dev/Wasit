@@ -9,6 +9,12 @@
  * Mirrors `verifyCommitmentSignature` in @stellar/mpp channel/server: simulate
  * `prepare_commitment(amount)` read-only, take the returned Bytes, and sign them
  * with the raw ed25519 commitment key. No transaction is submitted, no fee paid.
+ *
+ * The bytes come from an RPC the caller chooses, and the contract writes the
+ * network it runs on into them. So before signing, the bytes are decoded and
+ * must name this channel, this amount and the run's network
+ * ({@link assertCommitmentBinds}), as the SDK's own client does: the network the
+ * guard allowed is then also the network the signature is valid on.
  */
 
 import {
@@ -16,11 +22,14 @@ import {
   Contract,
   Keypair,
   TransactionBuilder,
+  hash,
   nativeToScVal,
   rpc,
   scValToNative,
   xdr,
 } from "@stellar/stellar-sdk";
+
+import { ConfigurationError } from "../errors.js";
 
 /**
  * Format-valid all-zero account used purely as a simulation source. It need not
@@ -44,6 +53,79 @@ export class CommitmentSimulationError extends Error {
   public constructor(message: string, public readonly cause?: unknown) {
     super(message);
     this.name = "CommitmentSimulationError";
+  }
+}
+
+/**
+ * The commitment the RPC returned is not one for this run's channel, amount and
+ * network. A `ConfigurationError`: it says nothing about the target's
+ * conformance, only that the RPC or the channel the run was given does not
+ * belong to the run's network, or answered with something that is not a
+ * commitment. Nothing is signed when it is thrown.
+ */
+export class CommitmentBindingError extends ConfigurationError {
+  public constructor(reason: string) {
+    super(`Refusing to sign the channel commitment: ${reason} Nothing was signed.`);
+    this.name = "CommitmentBindingError";
+  }
+}
+
+/** The domain separator in every one-way-channel commitment (`symbol_short!("chancmmt")` in the contract). */
+export const COMMITMENT_DOMAIN = "chancmmt";
+
+export interface CommitmentExpectation {
+  /** The channel contract (C...) this run pays through. */
+  readonly channelContract: string;
+  /** The cumulative amount this run means to sign, in base units. */
+  readonly amount: bigint;
+  /** The passphrase of the run's network, the one the network guard allowed. */
+  readonly networkPassphrase: string;
+}
+
+/**
+ * Throws unless `bytes` decode to a commitment for exactly this channel, amount
+ * and network, under the commitment domain.
+ *
+ * The same rule as `assertCommitmentBinds` in @stellar/mpp 0.7.1
+ * (`dist/channel/commitment.js`), which the package does not export: the network
+ * field is the SHA-256 of the network's passphrase, written by the contract from
+ * the ledger it runs on, so it says which network the signature would be valid
+ * on whatever the run was told.
+ *
+ * @throws {CommitmentBindingError} On any mismatch, or bytes that are not a commitment.
+ */
+export function assertCommitmentBinds(bytes: Uint8Array, expected: CommitmentExpectation): void {
+  let decoded: unknown;
+  try {
+    decoded = scValToNative(xdr.ScVal.fromXDR(Buffer.from(bytes)));
+  } catch {
+    throw new CommitmentBindingError("prepare_commitment did not return a decodable commitment.");
+  }
+  if (decoded === null || typeof decoded !== "object" || Array.isArray(decoded) || decoded instanceof Uint8Array) {
+    throw new CommitmentBindingError("prepare_commitment did not return a commitment struct.");
+  }
+  const { domain, network, channel, amount } = decoded as Record<string, unknown>;
+  if (domain !== COMMITMENT_DOMAIN) {
+    throw new CommitmentBindingError("the commitment does not carry the commitment domain.");
+  }
+  if (channel !== expected.channelContract) {
+    throw new CommitmentBindingError("the commitment is for another channel than the one this run pays through.");
+  }
+  let committed: bigint;
+  try {
+    committed = BigInt(amount as string | number | bigint);
+  } catch {
+    throw new CommitmentBindingError("the commitment amount is not an integer.");
+  }
+  if (committed !== expected.amount) {
+    throw new CommitmentBindingError(`the commitment is for ${committed} base units, not the ${expected.amount} this run means to sign.`);
+  }
+  const runNetwork = hash(Buffer.from(expected.networkPassphrase));
+  if (!(network instanceof Uint8Array) || !Buffer.from(network).equals(runNetwork)) {
+    throw new CommitmentBindingError(
+      "the commitment is for another network than the run's. The RPC or the channel belongs to another network " +
+        "(a mainnet RPC on a test-network run, for example); point the run at an RPC of its own network.",
+    );
   }
 }
 
@@ -285,18 +367,33 @@ export async function prepareCommitmentBytes(
   return Buffer.from(returnValue.bytes());
 }
 
+/** What `signChannelCommitment` can be given instead of its own steps, for tests. */
+export interface SignChannelCommitmentDeps {
+  /** In place of the simulation of `prepare_commitment` on the RPC. */
+  readonly prepare?: (params: PrepareCommitmentParams) => Promise<Buffer>;
+}
+
 /**
- * Signs a channel commitment for an explicit cumulative amount.
+ * Signs a channel commitment for an explicit cumulative amount, after
+ * {@link assertCommitmentBinds} has checked what it is about to sign.
  *
  * @returns The raw 64-byte ed25519 signature, hex-encoded, ready to be placed
  *   in the credential payload's `signature` field.
  */
 export async function signChannelCommitment(
   params: SignChannelCommitmentParams,
+  deps: SignChannelCommitmentDeps = {},
 ): Promise<string> {
   const { commitmentSecretHex, ...prepareParams } = params;
   const keypair = commitmentKeypairFromHex(commitmentSecretHex);
-  const commitmentBytes = await prepareCommitmentBytes(prepareParams);
+  const commitmentBytes = await (deps.prepare ?? prepareCommitmentBytes)(prepareParams);
+  // Before the key touches the bytes: they must commit to this channel, this
+  // amount and the run's network, whatever the RPC that produced them.
+  assertCommitmentBinds(commitmentBytes, {
+    channelContract: prepareParams.channelContract,
+    amount: prepareParams.amount,
+    networkPassphrase: prepareParams.networkPassphrase,
+  });
   const signature = keypair.sign(commitmentBytes);
 
   if (signature.length !== ED25519_SIGNATURE_BYTES) {
