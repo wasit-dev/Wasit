@@ -28,6 +28,7 @@ import {
   MalformedResponseError,
   assertHttpUrl,
   fetchTarget,
+  fetchWithoutRedirects,
 } from "../errors.js";
 import { type MppNetwork, assertMppNetwork, isMppNetwork, resolveRpcUrl } from "./network.js";
 import { assertPaymentNetworkAllowed } from "../guard/networks.js";
@@ -213,6 +214,9 @@ export async function payCharge(
     methods: [onNetwork(method, network)],
     polyfill: false,
     maxPaymentRetries: 1,
+    // Every request mppx makes here refuses a redirect (D-022c): it pays at the
+    // URL it read the challenge from, never at a URL the target sends it on to.
+    fetch: fetchWithoutRedirects,
   });
   return mppx.fetch(target);
 }

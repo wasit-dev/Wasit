@@ -4,6 +4,7 @@ import {
   ConfigurationError,
   MalformedResponseError,
   assertHttpUrl,
+  fetchPaymentChallenge,
   fetchTarget,
 } from "../errors.js";
 import { assertPaymentNetworkAllowed } from "../guard/networks.js";
@@ -543,7 +544,9 @@ async function preparePayment(
     chain.resolveRpcUrl(options.network, options.rpcUrl),
   );
 
-  const challenge = await fetchTarget(options.target, buildInit(options));
+  // The payment goes where this challenge came from, never through a redirect
+  // (D-022c): `payUrl` is the target, or the URL one same-origin redirect led to.
+  const { response: challenge, url: payUrl } = await fetchPaymentChallenge(options.target, buildInit(options));
 
   let paymentRequired;
   try {
@@ -599,7 +602,7 @@ async function preparePayment(
     const paymentPayload = await withinSpendControls(options.network, selected, () =>
       client.createPaymentPayload(paymentRequired),
     );
-    return { httpClient, paymentPayload, selected, idempotent };
+    return { httpClient, paymentPayload, selected, idempotent, payUrl };
   }
 
   const altered = await alter(selected);
@@ -610,7 +613,7 @@ async function preparePayment(
     }),
   );
   const paymentPayload = { ...signed, accepted: selected };
-  return { httpClient, paymentPayload, selected, idempotent };
+  return { httpClient, paymentPayload, selected, idempotent, payUrl };
 }
 
 /**
@@ -679,6 +682,8 @@ interface HonestPayment {
   readonly accepted: boolean;
   /** The exact headers the honest payment was sent with. */
   readonly headers: Record<string, string>;
+  /** Where the honest payment was sent: the replay goes to the same URL. */
+  readonly url: string;
   /** True when the challenge advertised the payment-identifier extension. */
   readonly idempotent: boolean;
 }
@@ -733,18 +738,16 @@ async function checkSignatureAccepted(options: X402PaymentCheckOptions): Promise
   const name = "Signature Resubmit Accepted";
   const fail = (detail: string, hint: string): CheckResult => ({ id, name, pass: false, detail, hint });
 
-  const { httpClient, paymentPayload, idempotent } = await preparePayment(options, undefined, (selected) =>
+  const { httpClient, paymentPayload, idempotent, payUrl } = await preparePayment(options, undefined, (selected) =>
     assertPayerCanPay(options, selected),
   );
   const paymentHeaders = httpClient.encodePaymentSignatureHeader(paymentPayload);
-  const paid = await fetchTarget(
-    options.target,
-    withPaymentHeaders(options, paymentHeaders),
-  );
+  const paid = await fetchTarget(payUrl, withPaymentHeaders(options, paymentHeaders));
   const honest = (result: CheckResult, accepted: boolean): HonestPayment => ({
     result,
     accepted,
     headers: paymentHeaders,
+    url: payUrl,
     idempotent,
   });
 
@@ -835,7 +838,7 @@ async function checkSignatureAccepted(options: X402PaymentCheckOptions): Promise
 async function checkInvalidSignatureRejected(
   options: X402PaymentCheckOptions,
 ): Promise<CheckResult> {
-  const { httpClient, paymentPayload } = await preparePayment(options);
+  const { httpClient, paymentPayload, payUrl } = await preparePayment(options);
 
   const corrupted = {
     ...paymentPayload,
@@ -843,10 +846,7 @@ async function checkInvalidSignatureRejected(
   };
 
   const paymentHeaders = httpClient.encodePaymentSignatureHeader(corrupted);
-  const response = await fetchTarget(
-    options.target,
-    withPaymentHeaders(options, paymentHeaders),
-  );
+  const response = await fetchTarget(payUrl, withPaymentHeaders(options, paymentHeaders));
 
   return signatureRejectionVerdict(response.status, await refusalReason(response));
 }
@@ -949,7 +949,7 @@ async function checkReplayRejected(
         "server may answer a repeated payment with its cached response.",
     );
   }
-  const response = await fetchTarget(options.target, withPaymentHeaders(options, honest.headers));
+  const response = await fetchTarget(honest.url, withPaymentHeaders(options, honest.headers));
   return replayVerdict(response.status, await refusalReason(response));
 }
 
@@ -1013,9 +1013,9 @@ async function checkUnderpaymentRejected(options: X402PaymentCheckOptions): Prom
     }
     throw error;
   }
-  const { httpClient, paymentPayload } = prepared;
+  const { httpClient, paymentPayload, payUrl } = prepared;
   const response = await fetchTarget(
-    options.target,
+    payUrl,
     withPaymentHeaders(options, httpClient.encodePaymentSignatureHeader(paymentPayload)),
   );
   return underpaymentVerdict(response.status, offered, advertised, await refusalReason(response));
@@ -1065,14 +1065,14 @@ async function checkExpiredRejected(options: X402PaymentCheckOptions): Promise<C
   const chain = chainFor(options.network);
   const rpcUrl = chain.resolveRpcUrl(options.network, options.rpcUrl);
   let holdMs = 0;
-  const { httpClient, paymentPayload } = await preparePayment(options, async (selected) => {
+  const { httpClient, paymentPayload, payUrl } = await preparePayment(options, async (selected) => {
     const expired = await chain.expiredSigning(selected, rpcUrl);
     holdMs = expired.holdMs;
     return expired.terms;
   });
   await new Promise<void>((done) => setTimeout(done, holdMs));
   const response = await fetchTarget(
-    options.target,
+    payUrl,
     withPaymentHeaders(options, httpClient.encodePaymentSignatureHeader(paymentPayload)),
   );
   return expiredVerdict(response.status, await refusalReason(response));

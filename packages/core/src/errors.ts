@@ -195,13 +195,17 @@ function baseFetch(): typeof fetch {
 /** How `fetchTarget` treats a redirect. */
 export interface FetchTargetOptions {
   /**
-   * `"follow"` (the default) is fetch's own behaviour, any redirect to any
-   * host, and is what every call that carries or precedes a payment still
-   * uses. `"same-origin"` is the rule for the read-only tier: a redirect inside
-   * the origin of `target` is followed once, anything else is refused with a
-   * {@link RedirectRefusedError} and nothing is sent to the other origin.
+   * `"never"` (the default): one request, and a redirect answer is refused
+   * with a {@link RedirectRefusedError}; nothing is sent to its Location. Every
+   * request that carries a payment uses it (D-022c): `fetch` would keep a
+   * header such as `PAYMENT-SIGNATURE` on the way, and deliver the signed
+   * payment to a second URL that can settle it while the check grades the
+   * first. Being the default, a call that forgets to choose cannot leak one.
+   * `"same-origin"` is the rule for the read-only tier: a redirect inside the
+   * origin of `target` is followed once, anything else is refused and nothing
+   * is sent to the other origin.
    */
-  readonly redirects?: "follow" | "same-origin";
+  readonly redirects?: "never" | "same-origin";
 }
 
 const REDIRECT_STATUSES: ReadonlySet<number> = new Set([301, 302, 303, 307, 308]);
@@ -240,13 +244,18 @@ function redirectLocation(response: Response, from: URL): URL | undefined {
   return next;
 }
 
+/** Whether fetch would turn the request into a GET on this redirect: a POST on 301 to 303, any non-HEAD on 303. */
+function redirectBecomesGet(init: RequestInit | undefined, status: number): boolean {
+  const method = (init?.method ?? "GET").toUpperCase();
+  return (
+    (status === 303 && method !== "GET" && method !== "HEAD") ||
+    ((status === 301 || status === 302) && method === "POST")
+  );
+}
+
 /** The request a redirect leads to: a POST on 301 to 303, and any non-HEAD on 303, becomes a GET without a body. */
 function redirectedInit(init: RequestInit | undefined, status: number): RequestInit {
-  const method = (init?.method ?? "GET").toUpperCase();
-  const becomesGet =
-    (status === 303 && method !== "GET" && method !== "HEAD") ||
-    ((status === 301 || status === 302) && method === "POST");
-  if (!becomesGet) return init ?? {};
+  if (!redirectBecomesGet(init, status)) return init ?? {};
 
   const { body: _body, headers, ...rest } = init ?? {};
   const kept = new Headers(headers);
@@ -278,11 +287,15 @@ async function discard(response: Response): Promise<void> {
  * A second redirect is refused even when it stays inside the origin: a chain
  * is not something a paywall needs, and a loop must end.
  */
-async function fetchSameOrigin(target: string, init: RequestInit | undefined): Promise<Response> {
+async function followSameOrigin(
+  target: string,
+  init: RequestInit | undefined,
+  keepRequest: boolean,
+): Promise<{ readonly response: Response; readonly url: string }> {
   const from = new URL(target);
   const first = await fetchOnce(target, init);
   const next = redirectLocation(first, from);
-  if (next === undefined) return first;
+  if (next === undefined) return { response: first, url: target };
   await discard(first);
 
   if (next.origin !== from.origin || (next.protocol !== "http:" && next.protocol !== "https:")) {
@@ -292,10 +305,18 @@ async function fetchSameOrigin(target: string, init: RequestInit | undefined): P
         `Point the run at the URL the redirect leads to, if that is the service you operate.`,
     );
   }
+  if (keepRequest && redirectBecomesGet(init, first.status)) {
+    throw new RedirectRefusedError(
+      `The route answers ${first.status} with a redirect that turns this ` +
+        `${(init?.method ?? "GET").toUpperCase()} into a GET. Wasit pays only where the request ` +
+        `arrives unchanged, so it did not follow it and nothing was paid. Point the run at the ` +
+        `URL the route answers on.`,
+    );
+  }
 
   const second = await fetchOnce(next.href, redirectedInit(init, first.status));
   const again = redirectLocation(second, next);
-  if (again === undefined) return second;
+  if (again === undefined) return { response: second, url: next.href };
   await discard(second);
   throw new RedirectRefusedError(
     again.origin === from.origin
@@ -306,6 +327,54 @@ async function fetchSameOrigin(target: string, init: RequestInit | undefined): P
   );
 }
 
+/** Refuses `response` when it is a redirect, after freeing its connection; returns it otherwise. */
+async function refuseRedirect(response: Response, from: URL): Promise<Response> {
+  const next = redirectLocation(response, from);
+  if (next === undefined) return response;
+  await discard(response);
+  throw new RedirectRefusedError(
+    `The route answers ${response.status} with a redirect to ` +
+      `${sanitizeText(describeOrigin(next))}. Wasit does not follow a redirect on a request that ` +
+      `pays, so nothing was sent there and the payment was not sent again. Point the run at the ` +
+      `URL the route answers on.`,
+  );
+}
+
+/**
+ * The unpaid request a payment check reads its fresh challenge from, and the
+ * URL the payment is then sent to (D-022c).
+ *
+ * One redirect inside the origin is followed, as the read-only tier does, but
+ * only when it keeps the request: a POST that a 301, 302 or 303 turns into a
+ * GET would have the payment signed for one request and sent with another. The
+ * payment goes to `url`, with redirects refused ({@link fetchTarget}'s default).
+ */
+export async function fetchPaymentChallenge(
+  target: string,
+  init: RequestInit | undefined,
+): Promise<{ readonly response: Response; readonly url: string }> {
+  assertHttpUrl(target);
+  return followSameOrigin(target, init, true);
+}
+
+/**
+ * A `fetch` that never follows a redirect, for a payment client that makes
+ * its own requests (mppx): every request it makes refuses a redirect answer.
+ * MPP pays at the URL it read the challenge from, so a route that redirects
+ * gets no verdict rather than a payment delivered to a second URL.
+ */
+export const fetchWithoutRedirects: typeof fetch = async (input, init) => {
+  const target = input instanceof Request ? input.url : input instanceof URL ? input.href : String(input);
+  assertHttpUrl(target);
+  let response: Response;
+  try {
+    response = await baseFetch()(input, { ...init, redirect: "manual" });
+  } catch (error) {
+    throw new TargetUnreachableError(target, error);
+  }
+  return refuseRedirect(response, new URL(target));
+};
+
 export async function fetchTarget(
   target: string,
   init?: Parameters<typeof fetch>[1],
@@ -313,13 +382,9 @@ export async function fetchTarget(
 ): Promise<Awaited<ReturnType<typeof fetch>>> {
   assertHttpUrl(target);
 
-  if (options?.redirects === "same-origin") return fetchSameOrigin(target, init);
+  if (options?.redirects === "same-origin") return (await followSameOrigin(target, init, false)).response;
 
-  try {
-    return await baseFetch()(target, init);
-  } catch (error) {
-    throw new TargetUnreachableError(target, error);
-  }
+  return refuseRedirect(await fetchOnce(target, init), new URL(target));
 }
 
 /** Maps a thrown value onto the taxonomy. */

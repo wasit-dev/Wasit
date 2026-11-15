@@ -243,13 +243,11 @@ describe("fetchTarget with redirects: same-origin", () => {
 });
 
 describe("fetchTarget by default (the calls that carry a payment)", () => {
-  it("still follows a redirect to another origin, as before this change", async () => {
+  it("refuses a redirect to another origin and never connects there (D-022c; paid-request-redirects.test.ts)", async () => {
     const b = await site((_request, response) => { response.writeHead(402); response.end("elsewhere"); });
     const a = await site((_request, response) => { response.writeHead(302, { location: `${b.origin}/x` }); response.end(); });
-    const response = await fetchTarget(`${a.origin}/paid`);
-    assert.equal(response.status, 402);
-    assert.equal(await response.text(), "elsewhere");
-    assert.equal(b.seen.length, 1);
+    await refusal(fetchTarget(`${a.origin}/paid`));
+    assert.equal(b.seen.length, 0);
   });
 });
 
