@@ -4,7 +4,7 @@ Status: ✅ **DONE** (2026-09-28) — superseded by the public evidence package 
 Depends on: #1, #2, #3
 
 ## Goal
-Compile everything into one document the Chapter Lead (Kenny) can review and
+Compile everything into one document the Chapter Lead can review and
 submit, mapping every SOW evidence item to live, verifiable proof — the same
 role `EVIDENCE-SUBMISSION.md` plays in the reference layout this job board
 was modeled on.
@@ -14,7 +14,7 @@ was modeled on.
 - [ ] All links checked live in the same session the doc is finalized.
 - [ ] Any SOW deviation (there are none identified so far, unlike hosting-provider
       changes some other projects had) is called out explicitly if one turns up.
-- [ ] Handed to Kenny for submission.
+- [ ] Handed to the Chapter Lead for submission.
 
 ## Template (fill in as Jobs 1–3 close out)
 
@@ -51,7 +51,7 @@ was modeled on.
 | Evidence (per SOW) | Proof |
 |---|---|
 | Live website | https://usewasit.dev |
-| One-page completion summary | [docs/evidence/2026-09-20-completion-summary.md](https://github.com/wasit-dev/wasit/blob/main/docs/evidence/2026-09-20-completion-summary.md) — draft, not yet reviewed by Kenny; the walkthrough-video row it links to is still pending |
+| One-page completion summary | [docs/evidence/2026-09-20-completion-summary.md](https://github.com/wasit-dev/wasit/blob/main/docs/evidence/2026-09-20-completion-summary.md) — draft, not yet reviewed by the Chapter Lead; the walkthrough-video row it links to is still pending |
 | Two-minute walkthrough video | https://youtu.be/5SbNf7j4dbc (published 2026-09-25) |
 
 ### Upstream contributions (supporting evidence, not a SOW line item)
@@ -94,7 +94,7 @@ depends on Job 2. Every remaining `_pending_` row depends on Job 3.
 
 _(Superseded 2026-09-24: Job 3 has since delivered D1 and D3; the only Job 3 row still pending is the walkthrough video.)_
 
-Partial progress 2026-09-20: drafted the one-page completion summary at `docs/evidence/2026-09-20-completion-summary.md`, mapping every SOW deliverable to its current evidence and stating the two open gaps plainly (third-party authorization still unconverted, no registry parity run for 0.4.0's MPP half). It also corrects an assumption from the 2026-09-17 session: the `v0.4.0` GitHub Release already has the MCP session video embedded in its description, confirmed by following the `user-attachments` link in the release body to its underlying `video/mp4` asset: that row does not need redoing. The walkthrough video itself stays deliberately deferred: its script and shot list, referenced as already written in `CONTINUATION-PROMPT.md`, could not be found anywhere in the repo, `.planning/`, or project memory, and Najmi chose to set it aside rather than have one drafted from scratch this session. Draft is unreviewed by Kenny.
+Partial progress 2026-09-20: drafted the one-page completion summary at `docs/evidence/2026-09-20-completion-summary.md`, mapping every SOW deliverable to its current evidence and stating the two open gaps plainly (third-party authorization still unconverted, no registry parity run for 0.4.0's MPP half). It also corrects an assumption from the 2026-09-17 session: the `v0.4.0` GitHub Release already has the MCP session video embedded in its description, confirmed by following the `user-attachments` link in the release body to its underlying `video/mp4` asset: that row does not need redoing. The walkthrough video itself stays deliberately deferred: its script and shot list, referenced as already written in `CONTINUATION-PROMPT.md`, could not be found anywhere in the repo, `.planning/`, or project memory, and Najmi chose to set it aside rather than have one drafted from scratch this session. Draft is unreviewed by the Chapter Lead.
 
 Partial progress 2026-09-24: filled the D1 and D3 recording rows, which had stayed `_pending_` after both recordings landed. Rows still pending: D2's written findings document and third-party authorization (both Job 02), and the walkthrough video (Job 03). Job 02 now has no candidate that could convert without a reply (see the local-only Job 02 notes), so those two D2 rows wait on the fallback decision.
 
