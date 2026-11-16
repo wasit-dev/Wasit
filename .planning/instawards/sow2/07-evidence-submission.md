@@ -44,7 +44,7 @@ Further proofs of D1 (not SOW rows):
 
 | Evidence (per SOW) | Status | Proof |
 | --- | --- | --- |
-| Payment-tier runs with a Stellar Expert link to each transaction | ⬜ | Week 2, after the payment tier (job 02) |
+| Payment-tier runs with a Stellar Expert link to each transaction | ✅ | [Run on `main` of the example project](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43816426654) · [X402-06's payment on Stellar Expert](https://stellar.expert/explorer/testnet/tx/beb0a5f94e2c5cb41cad8f5fe1110020dd004c30022b53b853b30ae5ef905a86) · [copy of the log](week-2/copies/run-main-payment-tier.log.txt). X402-07 to X402-10 send payments the service must refuse; it refused them, so they have no transaction |
 | A run of the new check showing the refused request and the chain read with no transfer | ⬜ | Week 2 (job 02) |
 | MPP charge and channel runs | ⬜ | Week 3 (job 03) |
 | A run on a pull request from a fork showing the payment checks were not run | ⬜ | Week 2, after the payment tier (job 02). The fork handling of the read-only tier is already shown by [pull request 5](https://github.com/dzakwannajmi/x402-example-paywall/pull/5) |
