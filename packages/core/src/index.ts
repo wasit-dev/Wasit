@@ -68,6 +68,7 @@ export {
   redactReport,
   redactValue,
   reportTotals,
+  paymentChecksSkipped,
   skippedPaymentChecks,
   toGradedRun,
 } from "./report.js";
@@ -131,6 +132,10 @@ export {
   networkClass,
 } from "./guard/networks.js";
 export type { NetworkClass, PaymentProtocol } from "./guard/networks.js";
+
+// Which GitHub events may run the payment tier (D-022a), and which key variables are set.
+export { inGithubActions, payerKeyVariables, paymentEventGate, readGithubEvent } from "./guard/ci-event.js";
+export type { PaymentEventGate } from "./guard/ci-event.js";
 
 // L1 and L2: the plan, and the caps every signature is charged against.
 export {

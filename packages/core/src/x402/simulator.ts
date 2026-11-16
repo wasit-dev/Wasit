@@ -632,7 +632,8 @@ function plannedAmount(plan: EndpointPlan | undefined, check: string, selected: 
   if (plan.status !== "planned" || option === undefined) {
     throw new PaymentGuardRefusedError(
       "plan",
-      `The plan of this run did not plan a payment for ${plan.name} (${plan.status}), so ${check} does not pay it.`,
+      `The plan of this run did not plan a payment for ${plan.name} (${plan.status}), so ${check} does not pay it.` +
+        (plan.reason === undefined ? "" : ` The plan says: ${plan.reason}`),
     );
   }
   for (const field of ["scheme", "network", "payTo", "asset"] as const) {

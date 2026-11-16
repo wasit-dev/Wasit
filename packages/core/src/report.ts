@@ -140,6 +140,15 @@ export function skippedPaymentChecks(protocol: ProtocolId, kind: "read-only" | "
 }
 
 /**
+ * The same checks, skipped with a reason the caller words: the run asked to pay
+ * and a rule of the run stopped it (the GitHub event, `operatedByMe`, a key
+ * variable that is not set), or the front end does not run them.
+ */
+export function paymentChecksSkipped(protocol: ProtocolId, kind: SkipKind, reason: string): CheckResult[] {
+  return PAYMENT_CHECK_IDS[protocol].map((id) => skipped(id, catalogueEntry(id)?.name ?? id, reason, kind));
+}
+
+/**
  * The exit code of one endpoint's checks (spec A8 #3, D-021): 1 on any FAIL; 2
  * when the endpoint was not graded (`unsupported` or `no-verdict`) or a check
  * could not run; else 0. Used where there is one endpoint, `wasit test` and the
