@@ -58,7 +58,7 @@ export function checkGroup(id: string, protocol: ProtocolId): CheckGroup {
 }
 
 /**
- * True when an x402 payment check (X402-06..10) was skipped as `unsupported`:
+ * True when an x402 payment check (X402-06..11) was skipped as `unsupported`:
  * the run asked to pay and Wasit cannot pay on that network. A read-only or
  * no-payer skip is not this, and neither is a result of another protocol. An MPP
  * endpoint has no group besides its gating one, so for it this is always false.
@@ -117,7 +117,7 @@ const KEY_LABEL: Readonly<Record<ProtocolId, string>> = {
 
 /** The checks of a protocol that pay or sign. MPP-13 closes a channel for good and is never listed. */
 const PAYMENT_CHECK_IDS: Readonly<Record<ProtocolId, readonly string[]>> = {
-  x402: ["X402-06", "X402-07", "X402-08", "X402-09", "X402-10"],
+  x402: ["X402-06", "X402-07", "X402-08", "X402-09", "X402-10", "X402-11"],
   "mpp-charge": ["MPP-01"],
   "mpp-channel": ["MPP-10", "MPP-11", "MPP-12", "MPP-14"],
 };

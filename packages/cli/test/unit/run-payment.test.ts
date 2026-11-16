@@ -384,6 +384,34 @@ describe("wasit run, payment tier", () => {
     });
   });
 
+  it("hands the endpoint's reject case to X402-11; without one, X402-11 says the config has none", async () => {
+    paywall = await multiPaywall({ "/weather": [option("10000")], "/plain": [option("10000")] });
+    const config = await writePaymentConfig(dir, paywall.base, {}, [
+      { name: "weather", protocol: "x402", path: "/weather", method: "GET", reject: { headers: { "x-lang": "xx" } } },
+      { name: "plain", protocol: "x402", path: "/plain", method: "GET" },
+    ]);
+    const run = await pay({ config }, KEY);
+    assert.ok(run.report, run.stderr);
+    // The recording chain has no X402-11 watch: with a reject case the check gets as far as the chain.
+    assert.match(result(run.report, "X402-11").detail, /cannot read on Recording/);
+    assert.match(result(run.report, "X402-11", "plain").detail, /no request the service must refuse is configured/);
+  });
+
+  it("plans X402-11 for an endpoint with a reject case, on a chain it can read: the dry run lists it", async () => {
+    undo?.();
+    undo = installRecordingChain(recorder, { stubWatch: true });
+    paywall = await multiPaywall({ "/weather": [option("10000")], "/plain": [option("10000")] });
+    const config = await writePaymentConfig(dir, paywall.base, {}, [
+      { name: "weather", protocol: "x402", path: "/weather", method: "GET", reject: { headers: { "x-lang": "xx" } } },
+      { name: "plain", protocol: "x402", path: "/plain", method: "GET" },
+    ]);
+    const run = await pay({ config, dryRun: true, json: false });
+    assert.equal(run.code, 0, run.stderr);
+    assert.match(run.stdout, /X402-06 10000, X402-07 10000, X402-09 5000, X402-10 10000, X402-11 10000 \(base units\)/);
+    assert.match(run.stdout, /X402-06 10000, X402-07 10000, X402-09 5000, X402-10 10000 \(base units\)\n/);
+    assert.equal(recorder.signed.length, 0, "a dry run signs nothing");
+  });
+
   it("writes the report it printed to --out, with the payment results", async () => {
     paywall = await multiPaywall({ "/weather": [option("10000")] });
     const config = await writePaymentConfig(dir, paywall.base);

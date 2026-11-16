@@ -19,7 +19,8 @@ inputs:
     description: >-
       read-only runs the unpaid challenge checks (X402-01 to X402-05): they send
       no payment and sign nothing. payment also runs the payment checks (X402-06
-      to X402-10) on a test network, at most $1.00 a payment and $5.00 a run, on
+      to X402-11; X402-11 for an endpoint with a reject case, which can add up to
+      six minutes) on a test network, at most $1.00 a payment and $5.00 a run, on
       push to the default branch, schedule and workflow_dispatch only; on a pull
       request it runs the read-only checks and says so. Give the payer key in the
       env: of this step only, and only to runs that may pay; a key given to a

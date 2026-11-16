@@ -193,7 +193,8 @@ server.registerTool(
   {
     title: "Test x402 compliance",
     description:
-      "Runs the x402 conformance checks (X402-01..10) against a running service. " +
+      "Runs the x402 conformance checks (X402-01..10) against a running service; " +
+      "X402-11 needs the reject case of a wasit.config.json endpoint and is skipped by this tool. " +
       "Payment checks are included only when the network's payer key is set in " +
       "this server's environment (STELLAR_PRIVATE_KEY on Stellar, EVM_PRIVATE_KEY " +
       "on Base and Ethereum Sepolia, SVM_PRIVATE_KEY on Solana devnet); otherwise they are " +
@@ -219,7 +220,7 @@ server.registerTool(
       readOnly: z
         .boolean()
         .optional()
-        .describe("Skip the payment checks (X402-06..10) even if a payer key is set"),
+        .describe("Skip the payment checks (X402-06..11) even if a payer key is set"),
       rpcUrl: z
         .string()
         .optional()

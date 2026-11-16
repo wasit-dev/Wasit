@@ -183,10 +183,12 @@ describe("the negative checks against a target that takes anything", () => {
       });
       assert.deepEqual(
         results.map((result) => result.id),
-        ["X402-06", "X402-07", "X402-08", "X402-09", "X402-10"],
+        ["X402-06", "X402-07", "X402-08", "X402-09", "X402-10", "X402-11"],
       );
       const r = byId(results);
       assert.match(r["X402-06"]!.detail, /no PAYMENT-RESPONSE header/);
+      // X402-11 needs a reject case, which this run has none of: skipped, nothing signed for it.
+      assert.equal(r["X402-11"]?.skipKind, "not-applicable");
       for (const id of ["X402-07", "X402-08", "X402-09", "X402-10"]) {
         assert.equal(r[id]?.pass, false, id);
         assert.equal(r[id]?.skipped, undefined, id);

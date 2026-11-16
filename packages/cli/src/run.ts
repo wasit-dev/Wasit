@@ -125,6 +125,8 @@ type PaymentStep =
       readonly budget: RunBudget;
       readonly pin?: PinTerms;
       readonly plan: RunPlan;
+      /** Where a check's progress line goes (X402-11's wait): the same channel as the tier line. */
+      readonly progress?: (line: string) => void;
     };
 
 function skippedFor(protocol: ResolvedEndpoint["protocol"], step: Extract<PaymentStep, { pay: false }>): CheckResult[] {
@@ -157,6 +159,9 @@ async function runEndpoint(endpoint: ResolvedEndpoint, step: PaymentStep): Promi
         ...(step.pin === undefined ? {} : { pin: step.pin }),
         plan,
         ...shape,
+        // X402-11 sends a payment with the request the config says the service must refuse.
+        ...(endpoint.reject === undefined ? {} : { reject: endpoint.reject }),
+        ...(step.progress === undefined ? {} : { onProgress: step.progress }),
       });
       return [...challenge, ...payment];
     }
@@ -180,6 +185,7 @@ function planEndpoints(resolved: ResolvedRun) {
       method: endpoint.method,
       ...(endpoint.body === undefined ? {} : { body: endpoint.body }),
       ...(Object.keys(endpoint.headers).length === 0 ? {} : { headers: endpoint.headers }),
+      ...(endpoint.reject === undefined ? {} : { reject: endpoint.reject }),
     }));
 }
 
@@ -437,6 +443,7 @@ export async function executeRun(options: RunCommandOptions, context: RunContext
         budget,
         ...(resolved.pinned === undefined ? {} : { pin: resolved.pinned }),
         plan,
+        progress: say,
       };
       tierNote = "";
     }

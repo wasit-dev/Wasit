@@ -159,14 +159,16 @@ export interface PlannedSignature {
  * X402-06 the price (settles), X402-07 the price (signature then corrupted),
  * X402-09 half the price, rounded down (none when there is no smaller amount),
  * X402-10 the price with a short lifetime. X402-08 resends X402-06 and signs
- * nothing. 3.5 times the price.
+ * nothing. 3.5 times the price. With `rejectedRequest`, X402-11 the price as
+ * well (a valid payment sent with a request the service must refuse): 4.5 times.
  */
-export function plannedSignatures(price: bigint): PlannedSignature[] {
+export function plannedSignatures(price: bigint, options: { readonly rejectedRequest?: boolean } = {}): PlannedSignature[] {
   return [
     { check: "X402-06", amount: price },
     { check: "X402-07", amount: price },
     ...(price >= 2n ? [{ check: "X402-09", amount: price / 2n }] : []),
     { check: "X402-10", amount: price },
+    ...(options.rejectedRequest === true ? [{ check: "X402-11", amount: price }] : []),
   ];
 }
 

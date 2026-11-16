@@ -30,6 +30,7 @@ FIXTURES=(
   "x402-permit2:3006:packages/core/test/fixtures/x402-evm-permit2-server.ts"
   "x402-svm:3007:packages/core/test/fixtures/x402-svm-server.ts"
   "x402-sepolia:3008:packages/core/test/fixtures/x402-evm-sepolia-server.ts"
+  "x402-reject:3009:packages/core/test/fixtures/x402-reject-server.ts"
 )
 
 field() { echo "$1" | cut -d: -f"$2"; }
@@ -118,6 +119,7 @@ cmd_start() {
   echo "  x402-permit2 http://localhost:3006/protected   (Base Sepolia, Permit2 with EIP-2612 sponsoring)"
   echo "  x402-svm http://localhost:3007/protected   (Solana devnet, needs SVM_PAYEE_ADDRESS)"
   echo "  x402-sepolia http://localhost:3008/protected   (Ethereum Sepolia, own facilitator, needs EVM_FACILITATOR_PRIVATE_KEY)"
+  echo "  x402-reject http://localhost:3009/refuses, /settles-then-refuses, /serves   (X402-11; invalid = header x-wasit-invalid)"
 }
 
 cmd_stop() {

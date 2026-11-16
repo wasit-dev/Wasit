@@ -28,11 +28,15 @@ import {
   type PinTerms,
   type PlannedSignature,
 } from "../guard/budget.js";
+import { paymentChainFor } from "./chains/index.js";
+import { REJECTED_REQUEST_MAX_LIFETIME_SECONDS, type RejectCase } from "./rejected-request.js";
 import { readPaymentChallenge, type RequestShape } from "./simulator.js";
 
 export interface PlanEndpointInput extends RequestShape {
   readonly name: string;
   readonly target: string;
+  /** The request the service must refuse: X402-11 signs once more, when it can run. */
+  readonly reject?: RejectCase;
 }
 
 export interface X402PlanOptions {
@@ -148,7 +152,14 @@ async function planEndpoint(
         option,
       );
     }
-    const signatures = plannedSignatures(amount);
+    // X402-11 signs only when it can reach a verdict: a reject case, a chain whose
+    // authorizations can be read, a lifetime it waits out (D-032).
+    const rejectedRequest =
+      endpoint.reject !== undefined &&
+      paymentChainFor(network)?.authorizations !== undefined &&
+      selected.maxTimeoutSeconds > 0 &&
+      selected.maxTimeoutSeconds <= REJECTED_REQUEST_MAX_LIFETIME_SECONDS;
+    const signatures = plannedSignatures(amount, { rejectedRequest });
     const worstCase = signatures.reduce((sum, entry) => sum + entry.amount, 0n);
     return {
       name: endpoint.name,

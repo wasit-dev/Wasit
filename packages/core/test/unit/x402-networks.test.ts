@@ -289,7 +289,7 @@ describe("payment checks on a challenge Wasit cannot pay", () => {
       });
       assert.deepEqual(
         results.map((result) => [result.id, result.skipped, result.skipKind]),
-        ["X402-06", "X402-07", "X402-08", "X402-09", "X402-10"].map((id) => [id, true, "unsupported"]),
+        ["X402-06", "X402-07", "X402-08", "X402-09", "X402-10", "X402-11"].map((id) => [id, true, "unsupported"]),
       );
       assert.match(results[0]?.skipReason ?? "", /pay on .*stellar:testnet.*"eip155:97" is not one of them/);
       assert.equal(target.paymentHeadersSeen(), 0);

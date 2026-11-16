@@ -31,16 +31,16 @@ function fail(id: string): CheckResult {
   return { id, name: id, pass: false, detail: "wrong", hint: "fix it" };
 }
 const CHALLENGE = ["X402-01", "X402-02", "X402-03", "X402-04", "X402-05"];
-const PAYMENT = ["X402-06", "X402-07", "X402-08", "X402-09", "X402-10"];
+const PAYMENT = ["X402-06", "X402-07", "X402-08", "X402-09", "X402-10", "X402-11"];
 
 function v1Results(): CheckResult[] {
   return [pass("X402-01"), ...CHALLENGE.slice(1).map((id) => skipped(id, id, "x402 v1", "unsupported"))];
 }
 
 describe("skippedPaymentChecks", () => {
-  it("lists X402-06..10 for x402, each a SKIP of the kind it was given, named from the catalogue", () => {
+  it("lists X402-06..11 for x402, each a SKIP of the kind it was given, named from the catalogue", () => {
     const checks = skippedPaymentChecks("x402", "read-only");
-    assert.deepEqual(checks.map((check) => check.id), ["X402-06", "X402-07", "X402-08", "X402-09", "X402-10"]);
+    assert.deepEqual(checks.map((check) => check.id), ["X402-06", "X402-07", "X402-08", "X402-09", "X402-10", "X402-11"]);
     for (const check of checks) {
       assert.equal(checkStatus(check), "SKIP", check.id);
       assert.equal(check.skipKind, "read-only", check.id);

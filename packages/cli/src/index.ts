@@ -210,7 +210,7 @@ program
     "Extra request header the endpoint needs before it will issue a challenge. Repeatable.",
     collectHeader,
   )
-  .option("--read-only", "Skip the payment checks (X402-06..10)", false)
+  .option("--read-only", "Skip the payment checks (X402-06..11)", false)
   .option("--json", "Print results as JSON instead of formatted text", false)
   .addHelpText(
     "after",
@@ -224,7 +224,9 @@ X402-01..05 (challenge/header checks) always run and cost nothing. X402-06..10
 (real payment checks) run only when a payer key is available and --read-only
 is not set: X402-06 settles a payment; X402-07..10 send payments the target
 must refuse (a corrupted signature, a replay, an underpayment, an expired
-authorization). See docs/CHECKS.md for what each check ID verifies.`,
+authorization). X402-11 needs a request the service must refuse, the reject case
+of a wasit.config.json endpoint: it runs in wasit run and is skipped here. See
+docs/CHECKS.md for what each check ID verifies.`,
   )
   .action(async (opts) => {
     const jsonMode = opts.json === true;
@@ -328,6 +330,9 @@ The payment tier pays on test networks only: at most $1.00 a payment and $5.00 a
 In GitHub Actions it pays only on push to the default branch, schedule and
 workflow_dispatch; a pull request runs the read-only checks, and a payer key set on
 a run that may not pay is refused before the service starts.
+X402-11 runs for an endpoint with a reject case, on Stellar: it sends a valid payment
+with the request the service must refuse, then reads the chain until that payment's
+authorization has expired, up to six minutes; a lifetime above 300 s is not signed.
 In CI (CI or GITHUB_ACTIONS set) a .env file in the working directory is not read.`,
   )
   .exitOverride(exitTwoOnUsageError)

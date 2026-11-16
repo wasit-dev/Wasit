@@ -22,8 +22,8 @@ import {
 
 import { CheckSetupError } from "../../errors.js";
 import { networkPassphrase, resolveRpcUrl } from "../../mpp/network.js";
-import { verifySettlement } from "../../settlement.js";
-import type { PaymentChain } from "./types.js";
+import { readTransferData, verifySettlement } from "../../settlement.js";
+import type { AuthorizationWatch, PaymentChain, RecordedTransfer, SignedAuthorization } from "./types.js";
 
 /** A Stellar transaction hash: 64 hex characters. */
 const TRANSACTION_HASH = /^[0-9a-f]{64}$/i;
@@ -165,6 +165,126 @@ async function stellarTokenBalance(
   return entries.length === 0 ? 0n : undefined;
 }
 
+
+/**
+ * X402-11 reads (D-032, spec B16.4): the authorization a payment carries, as
+ * the payer signed it. Only an address credential is read; another form (the
+ * newer `AddressV2`, one with delegates) is not, and gives no reading rather
+ * than a guess, since its nonce handling was not read.
+ */
+export function decodeStellarAuthorization(payload: Record<string, unknown>): SignedAuthorization {
+  const transaction = payload["transaction"];
+  if (typeof transaction !== "string") {
+    throw new CheckSetupError("The payment payload carries no transaction to read its authorization from.");
+  }
+  let envelope: xdr.TransactionEnvelope;
+  try {
+    envelope = xdr.TransactionEnvelope.fromXDR(transaction, "base64");
+  } catch {
+    throw new CheckSetupError("The payment payload's transaction does not decode, so its authorization cannot be read.");
+  }
+  const operations = envelope.switch().name === "envelopeTypeTx" ? envelope.v1().tx().operations() : [];
+  const found: SignedAuthorization[] = [];
+  let otherForms = 0;
+  for (const operation of operations) {
+    if (operation.body().switch().name !== "invokeHostFunction") continue;
+    for (const entry of operation.body().invokeHostFunctionOp().auth()) {
+      const credentials = entry.credentials();
+      const kind = credentials.switch().name;
+      if (kind === "sorobanCredentialsSourceAccount") continue;
+      if (kind !== "sorobanCredentialsAddress") {
+        otherForms += 1;
+        continue;
+      }
+      const address = credentials.address();
+      found.push({
+        payer: Address.fromScAddress(address.address()).toString(),
+        nonce: address.nonce().toString(),
+        expiresAt: address.signatureExpirationLedger(),
+      });
+    }
+  }
+  if (otherForms > 0) {
+    throw new CheckSetupError(
+      "The payment's authorization uses a credential form this check does not read (it reads address credentials), " +
+        "so whether it was used cannot be read.",
+    );
+  }
+  if (found.length !== 1) {
+    throw new CheckSetupError(`The payment carries ${found.length} address authorizations; this check reads exactly one.`);
+  }
+  return found[0]!;
+}
+
+/** The ledger entry the host writes when it consumes the nonce: TEMPORARY contract data of the signer. */
+function nonceKey(authorization: SignedAuthorization): xdr.LedgerKey {
+  return xdr.LedgerKey.contractData(
+    new xdr.LedgerKeyContractData({
+      contract: new Address(authorization.payer).toScAddress(),
+      key: xdr.ScVal.scvLedgerKeyNonce(new xdr.ScNonceKey({ nonce: xdr.Int64.fromString(authorization.nonce) })),
+      durability: xdr.ContractDataDurability.temporary(),
+    }),
+  );
+}
+
+function rpcServer(rpcUrl: string): rpc.Server {
+  return new rpc.Server(rpcUrl, { allowHttp: rpcUrl.startsWith("http://") });
+}
+
+/** The most events read for one X402-11 window: far more than one run makes. */
+const EVENTS_PAGE = 100;
+const EVENTS_MAX_PAGES = 20;
+
+const stellarAuthorizations: AuthorizationWatch = {
+  unit: "ledger",
+  unitMs: 5_000,
+  decode: decodeStellarAuthorization,
+  async read(_network, rpcUrl, authorizations) {
+    const keys = authorizations.map(nonceKey);
+    const response = await rpcServer(rpcUrl).getLedgerEntries(...keys);
+    const byKey = new Map(response.entries.map((entry) => [entry.key.toXDR("base64"), entry]));
+    return {
+      latest: response.latestLedger,
+      used: keys.map((key) => {
+        const entry = byKey.get(key.toXDR("base64"));
+        return entry === undefined ? undefined : (entry.lastModifiedLedgerSeq ?? response.latestLedger);
+      }),
+    };
+  },
+  async transfers(_network, rpcUrl, query) {
+    const server = rpcServer(rpcUrl);
+    const name = xdr.ScVal.scvSymbol("transfer").toXDR("base64");
+    const from = new Address(query.from).toScVal().toXDR("base64");
+    const to = new Address(query.to).toScVal().toXDR("base64");
+    // A Stellar Asset Contract adds the asset as a fourth topic (CAP-67); a SEP-41 token may not.
+    const filters: rpc.Api.EventFilter[] = [
+      { type: "contract", contractIds: [query.asset], topics: [[name, from, to, "*"], [name, from, to]] },
+    ];
+    const transfers: RecordedTransfer[] = [];
+    let response = await server.getEvents({ startLedger: query.fromLedger, filters, limit: EVENTS_PAGE });
+    for (let page = 1; ; page += 1) {
+      for (const event of response.events) {
+        // Only an event the RPC marks as from a failed call is left out. The testnet RPC no
+        // longer sends the field at all (observed 2026-11-16, run of slice 4's live check):
+        // reading its absence as "failed" dropped every transfer.
+        if (event.inSuccessfulContractCall === false) continue;
+        const [topic, sender, receiver] = event.topic;
+        if (topic?.switch().name !== "scvSymbol" || topic.sym().toString() !== "transfer") continue;
+        if (sender === undefined || receiver === undefined) continue;
+        if (Address.fromScVal(sender).toString() !== query.from || Address.fromScVal(receiver).toString() !== query.to) continue;
+        const data = readTransferData(event.value);
+        if (data === undefined) continue;
+        transfers.push({ amount: data.amount, reference: event.txHash, ledger: event.ledger });
+      }
+      if (response.events.length < EVENTS_PAGE) break;
+      // Never a partial answer read as complete.
+      if (page >= EVENTS_MAX_PAGES) throw new Error("more transfer events than can be read in full");
+      response = await server.getEvents({ cursor: response.cursor, filters, limit: EVENTS_PAGE });
+    }
+    return { latest: response.latestLedger, transfers };
+  },
+};
+
 export const stellarChain: PaymentChain = {
   name: "Stellar",
   networks: ["stellar:testnet", "stellar:pubnet"],
@@ -187,4 +307,5 @@ export const stellarChain: PaymentChain = {
     ...payload,
     transaction: corruptAuthSignature(payload["transaction"] as string),
   }),
+  authorizations: stellarAuthorizations,
 };

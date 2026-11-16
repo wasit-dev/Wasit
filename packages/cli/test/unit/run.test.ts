@@ -97,9 +97,9 @@ describe("wasit run", () => {
       const [weather] = report.endpoints;
       assert.equal(weather?.outcome, "conformant");
       assert.equal(weather?.groups.challenge?.passed, 5);
-      assert.equal(weather?.groups.payment?.skipped, 5);
+      assert.equal(weather?.groups.payment?.skipped, 6);
       const payment = weather?.results.filter((check) => check.status === "SKIP") ?? [];
-      assert.deepEqual(payment.map((check) => check.id), ["X402-06", "X402-07", "X402-08", "X402-09", "X402-10"]);
+      assert.deepEqual(payment.map((check) => check.id), ["X402-06", "X402-07", "X402-08", "X402-09", "X402-10", "X402-11"]);
       for (const check of payment) assert.equal(check.skipKind, "read-only", check.id);
       assert.equal(report.totals.graded, 1);
       assert.ok(report.notes.some((note) => /read-only/.test(note)));

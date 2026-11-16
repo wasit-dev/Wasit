@@ -35,6 +35,8 @@ export interface RecordingChainOptions {
   readonly keyEnv?: string;
   /** Take any non-empty key, as a real chain takes any valid one. Default: only "test-payer-key". */
   readonly anyKey?: boolean;
+  /** Give the chain an X402-11 watch that only exists: the plan counts X402-11; any read of it throws. */
+  readonly stubWatch?: boolean;
 }
 
 function recordingChain(recorder: Recorder, options: RecordingChainOptions = {}): PaymentChain {
@@ -67,6 +69,23 @@ function recordingChain(recorder: Recorder, options: RecordingChainOptions = {})
     isSettlementReference: (reference) => reference.startsWith("tx-"),
     verifySettlement: async () => ({ pass: true, detail: "settled (recording chain)" }),
     corruptPayload: (payload) => ({ ...payload, signature: "corrupted" }),
+    ...(options.stubWatch === true
+      ? {
+          authorizations: {
+            unit: "ledger",
+            unitMs: 1,
+            decode: () => {
+              throw new Error("the stub watch reads nothing");
+            },
+            read: async () => {
+              throw new Error("the stub watch reads nothing");
+            },
+            transfers: async () => {
+              throw new Error("the stub watch reads nothing");
+            },
+          },
+        }
+      : {}),
   };
 }
 
