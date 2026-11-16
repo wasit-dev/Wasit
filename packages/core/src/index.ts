@@ -133,6 +133,19 @@ export {
 } from "./guard/networks.js";
 export type { NetworkClass, PaymentProtocol } from "./guard/networks.js";
 
+// The mainnet opt-in switches of this version: each one refuses (spec B12).
+export {
+  MAINNET_OPT_IN_ABSENT,
+  MainnetOptInRefusedError,
+  mainnetStartupSwitches,
+  refuseMainnetSwitch,
+} from "./guard/mainnet-optin.js";
+export type { MainnetSwitch } from "./guard/mainnet-optin.js";
+
+// Which RPC a result read the chain through, and the MCP server's start-up RPC lock (D-023c).
+export { RPC_LOCK_VARIABLE, describeRpcInUse, readRpcLock, rpcInUse } from "./guard/rpc-in-use.js";
+export type { RpcInUse, RpcSource } from "./guard/rpc-in-use.js";
+
 // Which GitHub events may run the payment tier (D-022a), and which key variables are set.
 export { inGithubActions, payerKeyVariables, paymentEventGate, readGithubEvent } from "./guard/ci-event.js";
 export type { PaymentEventGate } from "./guard/ci-event.js";
