@@ -320,8 +320,9 @@ describe("a refused valid payment", () => {
 
 describe("on Ethereum Sepolia", () => {
   // Circle's Sepolia USDC is not an SDK default asset, and the SDK client's
-  // spend controls refuse non-default assets unless they are allowed.
-  it("pays in Circle's Sepolia USDC, up to the SDK's own $1 cap", async () => {
+  // spend controls refuse non-default assets unless they are allowed. Wasit's
+  // own cap (L2) refuses above $1 first, before the SDK's (L3) is reached.
+  it("pays in Circle's Sepolia USDC, up to the $1 cap", async () => {
     const sepolia = await rpcStandIn(10n ** 12n, 11155111n);
     try {
       for (const [amount, paid] of [
@@ -347,7 +348,10 @@ describe("on Ethereum Sepolia", () => {
           if (paid) assert.match(r["X402-06"]?.detail ?? "", /got 402/);
           else {
             assert.equal(r["X402-06"]?.error?.kind, "setup");
-            assert.match(r["X402-06"]?.detail ?? "", /asks for 1000001 base units .* more than the \$1 a payment/);
+            assert.match(
+              r["X402-06"]?.detail ?? "",
+              /X402-06 would sign 1000001 base units of USDC \(\$1\.000001\), above the \$1\.00 a payment .* Nothing was signed\./,
+            );
           }
         } finally {
           await target.close();
@@ -359,12 +363,13 @@ describe("on Ethereum Sepolia", () => {
   });
 });
 
-describe("a target the SDK client's spend controls refuse", () => {
-  // Not the target's fault, and nothing is sent: no verdict, saying why.
+describe("a target the guard refuses before the SDK client's spend controls", () => {
+  // Not the target's fault, and nothing is sent: no verdict, saying why. L2
+  // refuses first; the SDK's own controls (L3) stay behind it.
   it("is a setup error on a price above $1, or on an asset the client does not pay in", async () => {
     for (const [label, options, reason] of [
-      ["above $1", { amount: "1000001" }, /more than the \$1 a payment the official x402 client pays by default/],
-      ["other asset", { asset: "0x0000000000000000000000000000000000000Bad" }, /not an asset the official x402 client pays in by default/],
+      ["above $1", { amount: "1000001" }, /above the \$1\.00 a payment that is fixed in Wasit/],
+      ["other asset", { asset: "0x0000000000000000000000000000000000000Bad" }, /an asset Wasit does not value in US dollars/],
     ] as const) {
       const target = await standIn({ mode: "accept", ...options });
       try {

@@ -306,7 +306,10 @@ export const evmChain: PaymentChain = {
     client.register("eip155:*", new ExactEvmScheme(signer, { rpcUrl }));
     const allowed = NETWORKS[network]?.allowedAssets;
     if (allowed !== undefined) {
+      // Replaces the controls Wasit set before this call, so the $1 cap on the
+      // default assets is stated again rather than left to the SDK's default.
       client.setSpendControls({
+        maxAmountPerPayment: "$1",
         allowedAssets: allowed.map((entry) => ({ network: network as `${string}:${string}`, ...entry })),
       });
     }

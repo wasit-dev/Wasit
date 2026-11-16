@@ -132,6 +132,18 @@ export {
 } from "./guard/networks.js";
 export type { NetworkClass, PaymentProtocol } from "./guard/networks.js";
 
+// L1 and L2: the plan, and the caps every signature is charged against.
+export {
+  PER_PAYMENT_CAP_USD,
+  PER_RUN_CAP_USD,
+  PaymentGuardRefusedError,
+  RunBudget,
+  formatUsd,
+} from "./guard/budget.js";
+export type { GuardRefusal, PinTerms, PlannedSignature } from "./guard/budget.js";
+export { describePlan, planX402Run } from "./x402/plan.js";
+export type { EndpointPlan, EndpointPlanStatus, PlannedOption, RunPlan, X402PlanOptions } from "./x402/plan.js";
+
 export * from "./x402/simulator.js";
 export * from "./mpp/channel.js";
 export * from "./mpp/charge.js";

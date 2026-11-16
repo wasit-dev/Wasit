@@ -13,12 +13,25 @@ export type { PaymentChain } from "./types.js";
 // Stellar first: it is the default network, and the only chain with MPP.
 const CHAINS: readonly PaymentChain[] = [stellarChain, evmChain, svmChain];
 
+let chains: readonly PaymentChain[] = CHAINS;
+
+/**
+ * Tests only: replaces the adapters, so a recording chain can stand in for a
+ * real one (spec B11, the worst-case property test). `undefined` restores the
+ * real ones. Not exported from the package index, and reachable from no flag,
+ * setting or tool argument. The network guard still applies: a replacement
+ * pays only on a test network.
+ */
+export function setPaymentChainsForTesting(replacement: readonly PaymentChain[] | undefined): void {
+  chains = replacement ?? CHAINS;
+}
+
 /** The adapter that pays on `network`, if Wasit has one. */
 export function paymentChainFor(network: string): PaymentChain | undefined {
-  return CHAINS.find((chain) => chain.networks.includes(network));
+  return chains.find((chain) => chain.networks.includes(network));
 }
 
 /** Every network the payment checks can pay on, in adapter order. */
 export function paymentNetworks(): readonly string[] {
-  return CHAINS.flatMap((chain) => chain.networks);
+  return chains.flatMap((chain) => chain.networks);
 }
