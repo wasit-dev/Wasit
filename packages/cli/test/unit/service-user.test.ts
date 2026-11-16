@@ -21,10 +21,13 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, before, describe, it } from "node:test";
 
+import { Keypair } from "@stellar/stellar-sdk";
+
 import { SERVICE_USER, ServiceError, serviceUserFor, startService, type StartedService } from "../../src/service.js";
 
 const POSIX = process.platform !== "win32";
-const CANARY = "SCANARYKEYTHATHOLDSNOTHINGATALLXXXXXXXXXXXXXXXXXXXXXXXXXX";
+// A fresh random key, which holds nothing (review R8: no key-shaped literal in the repo).
+const CANARY = Keypair.random().secret();
 
 async function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {

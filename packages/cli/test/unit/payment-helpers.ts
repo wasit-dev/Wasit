@@ -74,6 +74,7 @@ function recordingChain(recorder: Recorder, options: RecordingChainOptions = {})
           authorizations: {
             unit: "ledger",
             unitMs: 1,
+            unitSeconds: 5,
             decode: () => {
               throw new Error("the stub watch reads nothing");
             },

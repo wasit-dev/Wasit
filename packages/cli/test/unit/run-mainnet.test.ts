@@ -91,7 +91,7 @@ describe("wasit run --mainnet (B12: a switch that always refuses)", () => {
     assert.equal(result.code, 2);
     assert.ok(result.stderr.startsWith(SENTENCE), result.stderr);
     assert.match(result.stderr, /Wasit pays on test networks only \(stellar:testnet, /);
-    assert.match(result.stderr, /Nothing was read, started, sent or signed\.$/);
+    assert.match(result.stderr, /The config was not read, and nothing was started, sent or signed\.$/);
     assert.equal(result.stdout, "");
     assert.equal(paywall.requests, 0);
     assert.equal(recorder.signed.length, 0);

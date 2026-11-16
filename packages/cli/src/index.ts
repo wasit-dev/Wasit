@@ -334,10 +334,13 @@ The payment tier pays on test networks only: at most $1.00 a payment and $5.00 a
 (lower with maxRunUsd), only the pinned payTo and asset when the config pins them.
 In GitHub Actions it pays only on push to the default branch, schedule and
 workflow_dispatch; a pull request runs the read-only checks, and a payer key set on
-a run that may not pay is refused before the service starts.
+a run that may not pay is refused before the service starts. In another CI (CI set,
+not GitHub Actions) the payment tier is refused with exit 2: use --read-only there,
+with no payer key in the job.
 X402-11 runs for an endpoint with a reject case, on Stellar: it sends a valid payment
 with the request the service must refuse, then reads the chain until that payment's
-authorization has expired, up to six minutes; a lifetime above 300 s is not signed.
+authorization has expired, up to six minutes; a lifetime above 300 s is not signed, and
+an authorization signed to outlive it is not sent.
 In CI (CI or GITHUB_ACTIONS set) a .env file in the working directory is not read.`,
   )
   .exitOverride(exitTwoOnUsageError)

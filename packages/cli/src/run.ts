@@ -74,7 +74,9 @@ import {
   type RunVerdict,
   type SkipKind,
   MainnetOptInRefusedError,
+  RpcIdentityError,
   UnsupportedPaymentNetworkError,
+  assertRpcServesNetwork,
 } from "@wasit-dev/core";
 
 import { formatRun } from "./run-format.js";
@@ -218,6 +220,20 @@ function keyOnRefusedEvent(keys: readonly string[], reason: string): string {
   );
 }
 
+/** Why `wasit run` stops in a CI that is not GitHub Actions. */
+function otherCiRefusal(keys: readonly string[]): string {
+  const key =
+    keys.length === 0
+      ? ""
+      : ` ${keys.join(", ")} ${keys.length === 1 ? "is" : "are"} set: remove ${keys.length === 1 ? "it" : "them"} from ` +
+        `this job, since the service of this run would run in the same job as the key.`;
+  return (
+    `wasit run: CI is set, and this is not GitHub Actions. In this version the payment tier runs outside CI, or in ` +
+    `GitHub Actions, where it pays only on a push to the default branch, a schedule and workflow_dispatch. ` +
+    `In this CI, run wasit run --read-only, with no payer key in the job.${key} Nothing was started, sent or signed.`
+  );
+}
+
 /** The payer's address for the first line of a paying run; the checks report a key that is not valid. */
 function payerAddress(chain: PaymentChain, key: string): string {
   try {
@@ -330,7 +346,12 @@ export async function executeRun(options: RunCommandOptions, context: RunContext
   // refused here, before the service of this run (code that may not be reviewed
   // yet) starts in the same job as the key. Every tier, the read-only one too.
   const gate = paymentEventGate(context.env, readGithubEvent(context.env));
-  if (!gate.allowed) {
+  if (gate.ciOutsideGithub === true) {
+    // In a CI that is not GitHub Actions the payment tier does not run at all, and
+    // no tier runs beside a payer key (Najmi, 2026-11-17, review R9 a).
+    const keys = payerKeyVariables(context.env);
+    if (keys.length > 0 || (!options.readOnly && options.dryRun !== true)) return fail(otherCiRefusal(keys));
+  } else if (!gate.allowed) {
     const keys = payerKeyVariables(context.env);
     if (keys.length > 0) return fail(keyOnRefusedEvent(keys, gate.reason ?? "this event"));
   }
@@ -361,6 +382,18 @@ export async function executeRun(options: RunCommandOptions, context: RunContext
       : chain !== undefined && key === undefined
         ? `no payer key: set ${keyEnv} on the Wasit step`
         : undefined;
+
+  // D-023a+b: a run that will pay checks its RPC before the service starts or
+  // anything is sent to it: the payments are built and their settlements read
+  // through it, so it must serve the run's own network.
+  if (paying && notPaid === undefined && chain !== undefined && key !== undefined && hasX402) {
+    try {
+      await assertRpcServesNetwork(resolved.network, chain.resolveRpcUrl(resolved.network, resolved.rpcUrl));
+    } catch (error) {
+      if (error instanceof RpcIdentityError) return fail(`wasit run: ${error.message} The service was not started.`);
+      throw error;
+    }
+  }
 
   // The decision is the CLI's, in one place: --start always starts, --start-if-local starts only
   // when service.start is set and the environment is on this machine, and says which it did.

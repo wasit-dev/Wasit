@@ -20,6 +20,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, afterEach, before, beforeEach, describe, it } from "node:test";
 
+import { setRpcIdentityTransportForTesting } from "@wasit-dev/core/dist/guard/rpc-identity.js";
+
 import { executeRun, type RunCommandOptions } from "../../src/run.js";
 import {
   KEY_ENV,
@@ -267,6 +269,56 @@ describe("wasit run, payment tier", () => {
     assert.match(run.stderr, /mainnet opt-in is not part of this version/);
     assert.equal(paywall.requests, 0, "a request was sent on a network the payment tier refuses");
     assert.equal(recorder.signed.length, 0);
+  });
+
+  it("refuses an RPC of another network before the service starts or any request is sent (review R4)", async () => {
+    paywall = await multiPaywall({ "/weather": [option("10000")] });
+    const config = await writePaymentConfig(dir, paywall.base);
+    // The RPC answers Ethereum mainnet's chain id; the run is on Base Sepolia.
+    setRpcIdentityTransportForTesting(async (_url, method) => (method === "eth_chainId" ? "0x1" : undefined));
+    const run = await pay({ config }, KEY);
+    assert.equal(run.code, 2, run.stderr);
+    assert.match(run.stderr, /serves eip155:1,/);
+    assert.match(run.stderr, /no payment was sent and nothing was signed/i);
+    assert.match(run.stderr, /The service was not started\./);
+    assert.equal(paywall.requests, 0, "a request reached the service before the RPC was checked");
+    assert.equal(recorder.signed.length, 0);
+  });
+
+  describe("in a CI that is not GitHub Actions (review R9 a, Najmi 2026-11-17)", () => {
+    const otherCi = { CI: "true" };
+
+    for (const [label, env] of [["with a payer key", KEY], ["without a payer key", {}]] as const) {
+      it(`refuses the payment tier ${label}: exit 2 before any request, and says to use --read-only`, async () => {
+        paywall = await multiPaywall({ "/weather": [option("10000")] });
+        const config = await writePaymentConfig(dir, paywall.base);
+        const run = await pay({ config }, { ...otherCi, ...env });
+        assert.equal(run.code, 2, run.stderr);
+        assert.match(run.stderr, /CI is set, and this is not GitHub Actions/);
+        assert.match(run.stderr, /--read-only/);
+        assert.match(run.stderr, /Nothing was started, sent or signed\./);
+        assert.equal(paywall.requests, 0);
+        assert.equal(recorder.signed.length, 0);
+      });
+    }
+
+    it("runs --read-only without a payer key", async () => {
+      paywall = await multiPaywall({ "/weather": [option("10000")] });
+      const config = await writePaymentConfig(dir, paywall.base);
+      const run = await pay({ config, readOnly: true }, otherCi);
+      assert.ok(run.report, run.stderr);
+      assert.ok(paywall.requests > 0);
+      assert.equal(recorder.signed.length, 0);
+    });
+
+    it("refuses --read-only with a payer key in the job: the service would run beside it", async () => {
+      paywall = await multiPaywall({ "/weather": [option("10000")] });
+      const config = await writePaymentConfig(dir, paywall.base);
+      const run = await pay({ config, readOnly: true }, { ...otherCi, STELLAR_PRIVATE_KEY: "SXXX" });
+      assert.equal(run.code, 2, run.stderr);
+      assert.match(run.stderr, /STELLAR_PRIVATE_KEY is set: remove it from this job/);
+      assert.equal(paywall.requests, 0);
+    });
   });
 
   it("skips the MPP endpoints with the reason: wasit run does not pay MPP in this version", async () => {

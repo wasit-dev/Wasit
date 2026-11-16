@@ -9,7 +9,8 @@
  * key. Every line printed and every file written is then searched for the key,
  * its raw seed in hex and in base64, and the RPC key. Any hit fails.
  *
- * Not covered here (later slices): the MCP tools and the mainnet ledger.
+ * The MCP tools have their own canary (packages/server/test/unit/canary-output.test.ts).
+ * Not covered here: the mainnet ledger (a later version).
  */
 
 import assert from "node:assert/strict";
@@ -176,6 +177,21 @@ http.createServer((q, s) => { s.writeHead(404); s.end(); }).listen(${port}, "127
     await run({ config: file, readOnly: true, start: true });
     const childEnv = JSON.parse(await readFile(envFile, "utf-8")) as Record<string, string>;
     for (const name of [...DENIED_ENV_NAMES, "WASIT_RPC_URL"]) assert.ok(!(name in childEnv), name);
+  });
+
+  it("X402-11 on an endpoint with a reject case, as text and as --json (review R7)", async () => {
+    // A chain with an X402-11 watch that reads nothing: the check is planned, starts, and stops with no verdict.
+    undo();
+    undo = installRecordingChain(recorder, { keyEnv: "STELLAR_PRIVATE_KEY", anyKey: true, stubWatch: true });
+    const file = await config("reject", {}, {
+      endpoints: [{ name: "weather", protocol: "x402", path: "/weather", method: "GET", reject: { headers: { "x-lang": "xx" } } }],
+    });
+    await run({ config: file });
+    await run({ config: file, json: true, out: path.join(dir, "reject.report.json") });
+    const report = JSON.parse(await readFile(path.join(dir, "reject.report.json"), "utf-8")) as {
+      endpoints: Array<{ results: Array<{ id: string }> }>;
+    };
+    assert.ok(report.endpoints[0]!.results.some((result) => result.id === "X402-11"), "X402-11 did not run");
   });
 
   it("left no key and no RPC key in anything printed or written", async () => {
