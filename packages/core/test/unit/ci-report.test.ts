@@ -449,3 +449,36 @@ describe("a hostile service", () => {
     assert.match(big, /more failures? not shown/);
   });
 });
+
+// D-022b option 2 (Najmi, 2026-11-16): "Changed since main" compares with the last
+// green run on main, the history comes from every completed run on main, and the
+// comment names the run it compares with, so a red main does not read as the
+// pull request's fault. Written before the code.
+describe("the run compared with, and the history of every run (D-022b)", () => {
+  const green = report([endpoint("weather", conformant())]);
+  const failing = report([endpoint("weather", [...CHALLENGE.slice(0, 3).map((id) => pass(id)), fail("X402-04", "missing field"), pass("X402-05")])]);
+
+  it("names the green run of main it compares with, by run id and its start time", () => {
+    const comment = renderComment({ report: green, baseline: baselineOf([green]), baselineRun: 43724229283 });
+    assert.match(
+      comment,
+      /Compared with the last green run on main: run 43724229283, started 2026-11-15 10:00 UTC\. Runs on main that failed after it are counted under Recent failures on main, not here\./,
+    );
+  });
+
+  it("names the start time alone when the run id is not known, and nothing when there is no baseline", () => {
+    assert.match(renderComment({ report: green, baseline: baselineOf([green]) }), /Compared with the last green run on main, started 2026-11-15 10:00 UTC\./);
+    assert.doesNotMatch(renderComment({ report: green }), /Compared with the last green run/);
+  });
+
+  it("counts recent failures from the history of every run when one is given, not only the green ones", () => {
+    const everyRun = baselineOf([green, failing, failing]).history;
+    const comment = renderComment({ report: green, baseline: baselineOf([green]), history: everyRun });
+    assert.match(comment, /weather X402-04: failed in 2 of the last 3 runs on main/);
+  });
+
+  it("keeps the baseline's own history when no other is given", () => {
+    const comment = renderComment({ report: green, baseline: baselineOf([failing, green]) });
+    assert.match(comment, /weather X402-04: failed in 1 of the last 2 runs on main/);
+  });
+});

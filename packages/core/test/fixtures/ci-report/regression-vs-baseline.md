@@ -10,6 +10,7 @@
 - **summarize**: unsupported. The service sent an x402 v1 challenge in its response body. To have it graded, move to x402 v2: send the challenge base64-encoded in a PAYMENT-REQUIRED response header.
 
 ### Changed since main
+Compared with the last green run on main, started 2026-11-15 10:00 UTC. Runs on main that failed after it are counted under Recent failures on main, not here.
 - Regression: summarize was conformant on main and is now unsupported.
 - summarize X402-02: PASS on main, now SKIP.
 - summarize X402-03: PASS on main, now SKIP.

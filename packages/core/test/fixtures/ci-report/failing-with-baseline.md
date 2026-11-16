@@ -8,6 +8,7 @@
 | fresh | x402 | conformant | challenge 5/5; payment not run: read-only tier |
 
 ### Changed since main
+Compared with the last green run on main, started 2026-11-15 10:00 UTC. Runs on main that failed after it are counted under Recent failures on main, not here.
 - New FAIL: weather X402-04 (was PASS on main).
 - New endpoint: fresh.
 

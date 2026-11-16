@@ -17,6 +17,7 @@ import {
   type Baseline,
   type Change,
   type ChangeKind,
+  type History,
 } from "./baseline.js";
 import type { SkipKind } from "./check.js";
 import { checkGroup, describeTotals, type CheckGroup, type EndpointReport, type RunReport } from "./report.js";
@@ -39,6 +40,13 @@ export interface CiReportInput {
   readonly baseline?: Baseline;
   /** Why no baseline could be used, when one was looked for: shown in place of "no baseline yet". */
   readonly baselineNote?: string;
+  /** The id of the run on main the baseline came from: the last green one (D-022b). */
+  readonly baselineRun?: number;
+  /**
+   * The history of every completed run on main, failed ones included (D-022b),
+   * for the recent-failures line. Absent: the baseline's own history.
+   */
+  readonly history?: History;
   /** Values no output may carry (a header value, a key, an RPC url). */
   readonly secrets?: readonly string[];
 }
@@ -168,6 +176,7 @@ function renderBody(input: CiReportInput): string {
     const changes = diffReports(report, baseline.report).sort(
       (a: Change, b: Change) => CHANGE_ORDER.indexOf(a.kind) - CHANGE_ORDER.indexOf(b.kind),
     );
+    out.push(comparedWith(baseline.report.startedAt, input.baselineRun));
     if (changes.length === 0) out.push("No change since main.");
     for (const change of changes.slice(0, MAX_CHANGES_SHOWN)) out.push(`- ${describeChange(change, md)}`);
     if (changes.length > MAX_CHANGES_SHOWN) out.push(`- ${changes.length - MAX_CHANGES_SHOWN} more changes not shown.`);
@@ -192,7 +201,7 @@ function renderBody(input: CiReportInput): string {
     }
   }
 
-  const recent = baseline === undefined ? [] : recentFailures(baseline.history);
+  const recent = baseline === undefined ? [] : recentFailures(input.history ?? baseline.history);
   if (recent.length > 0) {
     out.push("", "### Recent failures on main");
     for (const item of recent.slice(0, MAX_RECENT_SHOWN)) {
@@ -206,6 +215,25 @@ function renderBody(input: CiReportInput): string {
   }
 
   return out.join("\n");
+}
+
+/** "2026-11-15 10:00 UTC", from the report's own start time; nothing that is not a time. */
+function utcMinute(iso: string): string | undefined {
+  const time = Date.parse(iso);
+  if (!Number.isFinite(time)) return undefined;
+  return `${new Date(time).toISOString().slice(0, 16).replace("T", " ")} UTC`;
+}
+
+/**
+ * The line that says what "Changed since main" compares with (D-022b): the last
+ * green run on main, so a FAIL that main has now is not read as this run's.
+ */
+function comparedWith(startedAt: string, run: number | undefined): string {
+  const when = utcMinute(startedAt);
+  const id = run !== undefined && Number.isSafeInteger(run) && run > 0 ? run : undefined;
+  const started = when === undefined ? "" : `started ${when}`;
+  const which = id !== undefined ? `: run ${id}${started === "" ? "" : `, ${started}`}` : started === "" ? "" : `, ${started}`;
+  return `Compared with the last green run on main${which}. Runs on main that failed after it are counted under Recent failures on main, not here.`;
 }
 
 function describeChange(change: Change, md: (value: string) => string): string {
