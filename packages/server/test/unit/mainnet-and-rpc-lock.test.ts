@@ -202,19 +202,25 @@ describe("the MCP server's RPC lock and the RPC in results (D-023c)", () => {
     await rm(cwd, { recursive: true, force: true });
   });
 
-  const tools: Array<[string, Record<string, string>]> = [
+  const tools: Array<[string, Record<string, string>, Record<string, unknown>?]> = [
     ["wasit_x402_test", { STELLAR_PRIVATE_KEY: Keypair.random().secret() }],
     ["wasit_mpp_charge_test", { MPP_PAYER_SECRET: Keypair.random().secret() }],
     ["wasit_mpp_channel_test", { COMMITMENT_SECRET_HEX: randomBytes(32).toString("hex") }],
+    // The close tool exists only with WASIT_ALLOW_DESTRUCTIVE=1 (review R6, S1).
+    [
+      "wasit_mpp_channel_test_with_close",
+      { COMMITMENT_SECRET_HEX: randomBytes(32).toString("hex"), WASIT_ALLOW_DESTRUCTIVE: "1" },
+      { destructiveChannel: "CDESTROYCHANNEL" },
+    ],
   ];
 
-  for (const [tool, keys] of tools) {
+  for (const [tool, keys, extra = {}] of tools) {
     it(`${tool}: with WASIT_RPC_URL set, the rpcUrl argument is refused before anything is sent`, async () => {
       const paywall = await target();
       const locked = await countingRpc();
       const other = await countingRpc();
       try {
-        const result = await call(cwd, { ...keys, WASIT_RPC_URL: locked.url }, tool, { target: paywall.url, rpcUrl: other.url });
+        const result = await call(cwd, { ...keys, WASIT_RPC_URL: locked.url }, tool, { target: paywall.url, rpcUrl: other.url, ...extra });
         assert.equal(result.isError, true, result.text);
         assert.match(result.text, /^rpcUrl is not taken by this server: its RPC was fixed when it started \(WASIT_RPC_URL, http:\/\/127\.0\.0\.1:\d+\)\./);
         assert.match(result.text, /Nothing was sent\.$/);
