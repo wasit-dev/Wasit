@@ -269,7 +269,7 @@ authorization). See docs/CHECKS.md for what each check ID verifies.`,
 
 program
   .command("run")
-  .description("Run the endpoints of a wasit.config.json and write one report (read-only or a dry run in this version)")
+  .description("Run the endpoints of a wasit.config.json and write one report: the payment tier on a test network, --read-only, or --dry-run")
   .option("--config <path>", "The config file", "wasit.config.json")
   .option("--env <name>", "The environment to run (default: defaultEnvironment, else the only one)")
   .option(
@@ -280,7 +280,7 @@ program
   )
   .option(
     "--read-only",
-    "Run the unpaid challenge checks (X402-01..05). They send no payment and sign nothing. The only tier in this version: it, or --dry-run, is required.",
+    "Run the unpaid challenge checks (X402-01..05) only. They send no payment and sign nothing. Without it (and without --dry-run) the run is the payment tier.",
     false,
   )
   .option(
@@ -317,10 +317,17 @@ Examples:
   $ wasit run --read-only --start
   $ wasit run --read-only --start-if-local --env mainnet
   $ wasit run --dry-run --start
+  $ wasit run --start                     (payment tier: STELLAR_PRIVATE_KEY on stellar:testnet)
 
 Exit codes: 0 every graded endpoint conforms; 1 an endpoint does not conform, or one
 graded on the baseline is not graded now; 2 no verdict (nothing could be graded, a
-check could not run, the config or the service could not be used).
+check could not run, the config or the service could not be used, or the payment
+tier was asked for and did not pay: no payer key, or operatedByMe not true).
+The payment tier pays on test networks only: at most $1.00 a payment and $5.00 a run
+(lower with maxRunUsd), only the pinned payTo and asset when the config pins them.
+In GitHub Actions it pays only on push to the default branch, schedule and
+workflow_dispatch; a pull request runs the read-only checks, and a payer key set on
+a run that may not pay is refused before the service starts.
 In CI (CI or GITHUB_ACTIONS set) a .env file in the working directory is not read.`,
   )
   .exitOverride(exitTwoOnUsageError)

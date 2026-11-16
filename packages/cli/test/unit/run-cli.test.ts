@@ -88,13 +88,31 @@ describe("the wasit binary", () => {
       assert.equal((await wasit(["ci-report"], cwd)).code, 2);
     });
 
-    it("the payment tier is refused with a message, exit 2, nothing sent", async () => {
+    it("the payment tier with no payer key sends no payment and exits 2, with the variable to set", async () => {
       const paywall = await startPaywall();
       try {
         const config = await writeConfig(cwd, { baseUrl: paywall.base });
         const result = await wasit(["run", "--config", config], cwd);
         assert.equal(result.code, 2);
-        assert.match(result.stderr, /not available in this version/);
+        assert.match(result.stdout, /no payer key: set STELLAR_PRIVATE_KEY/);
+        for (const request of paywall.received) assert.equal(request.headers["payment-signature"], undefined);
+      } finally {
+        await paywall.close();
+      }
+    });
+
+    it("a pull request run with a payer key is refused before anything is sent, exit 2", async () => {
+      const paywall = await startPaywall();
+      try {
+        const config = await writeConfig(cwd, { baseUrl: paywall.base });
+        const result = await wasit(["run", "--config", config], cwd, {
+          GITHUB_ACTIONS: "true",
+          GITHUB_EVENT_NAME: "pull_request",
+          GITHUB_REF: "refs/pull/1/merge",
+          STELLAR_PRIVATE_KEY: "SNOTAKEY",
+        });
+        assert.equal(result.code, 2);
+        assert.match(result.stderr, /STELLAR_PRIVATE_KEY is set, and this run may not pay \(pull request\)/);
         assert.equal(paywall.received.length, 0);
       } finally {
         await paywall.close();

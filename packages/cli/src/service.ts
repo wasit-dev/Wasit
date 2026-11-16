@@ -22,9 +22,40 @@
  */
 
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { existsSync, realpathSync } from "node:fs";
 import { constants as osConstants } from "node:os";
+import path from "node:path";
 
-import { deniedEnvValues, isLoopbackUrl, sanitizeText, scrubEnv, urlOrigin } from "@wasit-dev/core";
+import { deniedEnvValues, isLoopbackUrl, payerKeyVariables, sanitizeText, scrubEnv, urlOrigin } from "@wasit-dev/core";
+
+/**
+ * The OS user a service runs as when it must not share a user with the payer
+ * key (D-022a option 2). Fixed in code: a config or a variable never chooses it.
+ */
+export const SERVICE_USER = "wasit-service";
+
+/**
+ * The user to run the service as, or undefined for the runner's own user.
+ *
+ * Najmi, 2026-11-16: a separate user only when a payer key variable is set AND
+ * the runner is GitHub-hosted (`RUNNER_ENVIRONMENT`, which GitHub documents as
+ * `github-hosted` or `self-hosted`; not re-read on the day). A hosted runner's
+ * user has passwordless sudo, which makes the user; a self-hosted runner or a
+ * laptop may not, and there the service runs as today. What this separates is
+ * the service's own processes from the Wasit process that holds the key: on
+ * Linux the environment of a process (`/proc/<pid>/environ`) is readable by its
+ * own user and root only. It does NOT separate code that ran earlier in the job
+ * as the runner's user (install scripts), which the guide says.
+ */
+export function serviceUserFor(env: Readonly<Record<string, string | undefined>>): string | undefined {
+  return payerKeyVariables(env).length > 0 && env["RUNNER_ENVIRONMENT"] === "github-hosted" ? SERVICE_USER : undefined;
+}
+
+/** The service runs as `name`, through `sudo -n`. `sudo` is the program to run: a test passes a stand-in. */
+export interface SeparateUser {
+  readonly name: string;
+  readonly sudo?: string;
+}
 
 /** The service did not start, did not answer, or exited. Nothing was learned about the target: exit 2. */
 export class ServiceError extends Error {
@@ -50,6 +81,91 @@ export interface ServiceOptions {
   readonly maxLogBytes?: number;
   /** Default 250. */
   readonly pollIntervalMs?: number;
+  /** Run the service as this user (see {@link serviceUserFor}). POSIX only; no fallback when it cannot be had. */
+  readonly separateUser?: SeparateUser;
+}
+
+const SUDO_TIMEOUT_MS = 120_000;
+
+/** Runs `sudo -n <args>`, collects its stderr, and never throws: a sudo that cannot be run is code 127. */
+function runSudo(sudo: string, args: readonly string[]): Promise<{ code: number; stderr: string }> {
+  return new Promise((resolve) => {
+    let stderr = "";
+    const child = spawn(sudo, ["-n", ...args], { stdio: ["ignore", "ignore", "pipe"], windowsHide: true });
+    const timer = setTimeout(() => child.kill("SIGKILL"), SUDO_TIMEOUT_MS);
+    child.stderr?.setEncoding("utf-8");
+    child.stderr?.on("data", (chunk: string) => {
+      if (stderr.length < 2000) stderr += chunk;
+    });
+    child.once("error", () => {
+      clearTimeout(timer);
+      resolve({ code: 127, stderr: "sudo could not be run" });
+    });
+    child.once("close", (code) => {
+      clearTimeout(timer);
+      resolve({ code: code ?? 1, stderr });
+    });
+  });
+}
+
+/**
+ * Makes the user when it does not exist, and lets it reach the working
+ * directory, by ACL for that one user: traverse (`x`) on each directory above
+ * it, read and write inside it, nothing on its `.git` (where actions/checkout
+ * keeps the job's token unless persist-credentials is false). Write access is
+ * given to the working directory only; beyond it the user can read what the
+ * directories already let any user read.
+ */
+async function prepareUser(user: SeparateUser, cwd: string, secrets: readonly string[]): Promise<string> {
+  const sudo = user.sudo ?? "sudo";
+  const home = `/home/${user.name}`;
+  const refuse = (what: string, result: { code: number; stderr: string }): never => {
+    const said = sanitizeText(result.stderr.trim().replace(/\s+/g, " "), { redact: secrets }).slice(0, 300);
+    throw new ServiceError(
+      `the service must run as a separate user (${user.name}) on a GitHub-hosted runner when a payer key is set, ` +
+        `and ${what} failed (sudo -n, exit ${result.code}${said === "" ? "" : `: ${said}`}). It was not started as ` +
+        `the runner's own user instead. This needs passwordless sudo, useradd and setfacl, as GitHub-hosted Linux runners have.`,
+    );
+  };
+
+  const exists = await runSudo(sudo, ["id", "-u", user.name]);
+  if (exists.code === 127) refuse("running sudo", exists);
+  if (exists.code !== 0) {
+    const made = await runSudo(sudo, [
+      "useradd",
+      "--system",
+      "--create-home",
+      "--home-dir",
+      home,
+      "--shell",
+      "/usr/sbin/nologin",
+      user.name,
+    ]);
+    if (made.code !== 0) refuse(`making the user (useradd)`, made);
+  }
+
+  let directory: string;
+  try {
+    directory = realpathSync(cwd);
+  } catch {
+    throw new ServiceError(`the working directory of the service cannot be read, so the separate user ${user.name} cannot be given it`);
+  }
+  const above: string[] = [];
+  for (let parent = path.dirname(directory); parent !== path.dirname(parent); parent = path.dirname(parent)) {
+    above.push(parent);
+  }
+  if (above.length > 0) {
+    const traverse = await runSudo(sudo, ["setfacl", "-m", `u:${user.name}:x`, ...above]);
+    if (traverse.code !== 0) refuse("letting the user reach the working directory (setfacl)", traverse);
+  }
+  const grant = await runSudo(sudo, ["setfacl", "-R", "-m", `u:${user.name}:rwX,d:u:${user.name}:rwX`, directory]);
+  if (grant.code !== 0) refuse("giving the user the working directory (setfacl)", grant);
+  const git = path.join(directory, ".git");
+  if (existsSync(git)) {
+    const deny = await runSudo(sudo, ["setfacl", "-R", "-m", `u:${user.name}:---`, git]);
+    if (deny.code !== 0) refuse("keeping the user out of .git (setfacl)", deny);
+  }
+  return home;
 }
 
 export interface StartedService {
@@ -103,15 +219,53 @@ export async function startService(options: ServiceOptions): Promise<StartedServ
   const posix = process.platform !== "win32";
   const maxLogBytes = options.maxLogBytes ?? 256 * 1024;
 
-  const child: ChildProcess = spawn(command, {
-    shell: true,
-    ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
-    env: scrubEnv(options.env),
-    stdio: ["ignore", "pipe", "pipe"],
-    // Its own process group, so the whole tree can be signalled at once.
-    detached: posix,
-    windowsHide: true,
-  });
+  const separate = options.separateUser;
+  const sudo = separate?.sudo ?? "sudo";
+  const childEnv = scrubEnv(options.env);
+  let child: ChildProcess;
+  if (separate === undefined) {
+    child = spawn(command, {
+      shell: true,
+      ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+      env: childEnv,
+      stdio: ["ignore", "pipe", "pipe"],
+      // Its own process group, so the whole tree can be signalled at once.
+      detached: posix,
+      windowsHide: true,
+    });
+  } else {
+    if (!posix) throw new ServiceError("a separate user for the service is built for Linux runners only");
+    const home = await prepareUser(separate, options.cwd ?? process.cwd(), secrets);
+    log(`[wasit] the service runs as the user ${separate.name}, not as the user that holds the payer key`);
+    // sudo -E keeps the scrubbed environment in the service's environment, where only
+    // its own user and root can read it; nothing secret is put on a command line, which
+    // any user can read. PATH and HOME are set again because sudo's own policy may reset them.
+    child = spawn(
+      sudo,
+      [
+        "-n",
+        "-E",
+        "-u",
+        separate.name,
+        "--",
+        "env",
+        `PATH=${childEnv["PATH"] ?? "/usr/local/bin:/usr/bin:/bin"}`,
+        `HOME=${home}`,
+        `USER=${separate.name}`,
+        `LOGNAME=${separate.name}`,
+        "sh",
+        "-c",
+        command,
+      ],
+      {
+        ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+        env: childEnv,
+        stdio: ["ignore", "pipe", "pipe"],
+        detached: true,
+        windowsHide: true,
+      },
+    );
+  }
 
   let spawnError: Error | undefined;
   let exitInfo: { code: number | null; signal: NodeJS.Signals | null } | undefined;
@@ -169,7 +323,16 @@ export async function startService(options: ServiceOptions): Promise<StartedServ
     );
   }
 
+  // A service of another user is signalled through sudo, by user: the user is the
+  // service's alone, so this reaches everything it started, a process that left
+  // the group included.
+  const userAlive = (name: string): boolean =>
+    spawnSync(sudo, ["-n", "pgrep", "-u", name], { stdio: "ignore", timeout: 10_000 }).status === 0;
+  const signalUser = (name: string, signal: NodeJS.Signals): void => {
+    spawnSync(sudo, ["-n", "pkill", `-${signal.replace(/^SIG/, "")}`, "-u", name], { stdio: "ignore", timeout: 10_000 });
+  };
   const groupAlive = (): boolean => {
+    if (separate !== undefined) return userAlive(separate.name);
     try {
       process.kill(-pid, 0);
       return true;
@@ -178,6 +341,10 @@ export async function startService(options: ServiceOptions): Promise<StartedServ
     }
   };
   const signalGroup = (signal: NodeJS.Signals): void => {
+    if (separate !== undefined) {
+      signalUser(separate.name, signal);
+      return;
+    }
     try {
       process.kill(-pid, signal);
     } catch {

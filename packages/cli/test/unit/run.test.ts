@@ -72,15 +72,14 @@ describe("wasit run", () => {
     paywall = undefined;
   });
 
-  it("refuses the payment tier before it reads a config or sends anything", async () => {
+  it("runs the payment tier without --read-only; with no payer key it signs nothing and exits 2", async () => {
     paywall = await startPaywall();
     const config = await writeConfig(dir, { baseUrl: paywall.base });
     const result = await run({ config, readOnly: false });
     assert.equal(result.code, 2);
-    assert.match(result.stderr, /not available in this version/);
-    assert.match(result.stderr, /--read-only/);
-    assert.equal(paywall.received.length, 0);
-    assert.equal((await run({ config: path.join(dir, "missing.json"), readOnly: false })).code, 2, "even for a missing config");
+    assert.match(result.stdout, /no payer key: set STELLAR_PRIVATE_KEY/);
+    for (const request of paywall.received) assert.equal(request.headers["payment-signature"], undefined, "a payment was sent");
+    assert.equal((await run({ config: path.join(dir, "missing.json"), readOnly: false })).code, 2, "a missing config");
   });
 
   describe("a conformant paywall", () => {
