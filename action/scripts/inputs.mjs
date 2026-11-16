@@ -21,13 +21,45 @@ export class InputError extends Error {
   }
 }
 
+/**
+ * The input asked for mainnet (spec B5). This version has no mainnet opt-in, so
+ * the input exists only to be refused, before Wasit is installed (spec B12). The
+ * step that checks the inputs writes this message to the job summary too.
+ */
+export class MainnetRefusedError extends InputError {
+  constructor(message) {
+    super(message);
+    this.name = "MainnetRefusedError";
+  }
+}
+
+/** An event name as GitHub writes them; anything else is never echoed. */
+const EVENT_NAME = /^[a-z_]{1,64}$/;
+
 function trimmed(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+/** Refuses `mainnet: true`, always; refuses a value that is not true or false. */
+function checkMainnet(env) {
+  const value = trimmed(env["INPUT_MAINNET"]).toLowerCase();
+  if (value === "" || value === "false") return;
+  if (value !== "true") throw new InputError("mainnet must be true or false.");
+  const event = typeof env["GITHUB_EVENT_NAME"] === "string" ? env["GITHUB_EVENT_NAME"] : "";
+  const eventRule =
+    event === "workflow_dispatch"
+      ? ""
+      : ` The input is also refused on every event but workflow_dispatch, and this run's event is ${EVENT_NAME.test(event) ? event : "another event"}.`;
+  throw new MainnetRefusedError(
+    "mainnet: true is refused: the mainnet opt-in is not part of this version. Wasit pays on test networks only." +
+      `${eventRule} Nothing was installed, started, sent or signed.`,
+  );
+}
+
 /**
  * Reads and checks the inputs from the step's environment (`INPUT_CONFIG`,
- * `INPUT_ENVIRONMENT`, `INPUT_TIER`, `INPUT_ENDPOINTS`, and the event name).
+ * `INPUT_ENVIRONMENT`, `INPUT_TIER`, `INPUT_ENDPOINTS`, `INPUT_MAINNET`, and the
+ * event name). `mainnet: true` is refused here, so it never reaches the CLI.
  *
  * @param {Record<string, string | undefined>} env
  * @returns {{ config: string, environment: string | undefined, tier: "read-only" | "payment", endpoints: string[] }}
@@ -39,6 +71,9 @@ export function parseInputs(env) {
       "this action does not run on pull_request_target: it would give the code of a pull request the token and the secrets of the base repository. Use pull_request.",
     );
   }
+
+  // B12: no mainnet opt-in in this version. Refused before anything else is read.
+  checkMainnet(env);
 
   // Whether this event may pay is the CLI's to say (D-022a): on a pull request it runs the
   // read-only checks and says so, and it refuses a payer key given to a run that may not pay.

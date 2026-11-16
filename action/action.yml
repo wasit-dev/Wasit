@@ -31,6 +31,14 @@ inputs:
     description: Names of the endpoints to run, separated by commas or line breaks. Default is every endpoint of the config.
     required: false
     default: ""
+  mainnet:
+    description: >-
+      Refused in this version: the mainnet opt-in is not part of it. true stops
+      the job with exit 2 before Wasit is installed or your service starts, and
+      the job summary says so; nothing is sent or signed. The payment tier pays
+      on test networks only.
+    required: false
+    default: "false"
 
 runs:
   using: composite
@@ -65,6 +73,7 @@ runs:
         INPUT_ENVIRONMENT: ${{ inputs.environment }}
         INPUT_TIER: ${{ inputs.tier }}
         INPUT_ENDPOINTS: ${{ inputs.endpoints }}
+        INPUT_MAINNET: ${{ inputs.mainnet }}
       run: node "$ACTION_PATH/scripts/wasit.mjs" check
 
     # Wasit is built from the ref this action was fetched at, with the lockfile
@@ -99,6 +108,7 @@ runs:
         INPUT_ENVIRONMENT: ${{ inputs.environment }}
         INPUT_TIER: ${{ inputs.tier }}
         INPUT_ENDPOINTS: ${{ inputs.endpoints }}
+        INPUT_MAINNET: ${{ inputs.mainnet }}
         BASELINE_PATH: ${{ steps.baseline.outputs.path }}
         WASIT_BUILD_COMMIT: ${{ github.action_ref }}
       run: node "$ACTION_PATH/scripts/wasit.mjs" run

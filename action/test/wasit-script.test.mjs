@@ -457,6 +457,25 @@ http.createServer((req, res) => {
     assert.equal(existsSync(path.join(temp, "wasit", "baseline-next.json")), false, "a run that graded nothing is never a baseline");
   });
 
+  it("refuses mainnet: true in the check step, exit 2, and writes the refusal to the job summary (B5: the report says so)", async () => {
+    await writeFile(summary, "");
+    const check = await runScript("check", stepEnv({ INPUT_CONFIG: "x.json", INPUT_MAINNET: "true", GITHUB_EVENT_NAME: "push" }), workspace);
+    assert.equal(check.code, 2, check.stderr);
+    assert.match(check.stderr, /^Wasit: mainnet: true is refused: the mainnet opt-in is not part of this version\./);
+    assert.match(check.stderr, /this run's event is push\./);
+    const written = await readFile(summary, "utf-8");
+    assert.match(written, /^## Wasit: refused\n\nmainnet: true is refused: the mainnet opt-in is not part of this version\./);
+    assert.match(written, /Nothing was installed, started, sent or signed\./);
+  });
+
+  it("refuses mainnet: true in the run step as well, before the CLI runs: no report is written", async () => {
+    await rm(path.join(temp, "wasit", "report.json"), { force: true });
+    const run = await runScript("run", stepEnv({ INPUT_CONFIG: "x.json", INPUT_MAINNET: "true", GITHUB_EVENT_NAME: "workflow_dispatch" }), workspace);
+    assert.equal(run.code, 2, run.stderr);
+    assert.match(run.stderr, /mainnet: true is refused/);
+    assert.equal(existsSync(path.join(temp, "wasit", "report.json")), false, "the CLI ran");
+  });
+
   it("accepts the payment tier and refuses pull_request_target as a process", async () => {
     assert.equal((await runScript("check", stepEnv({ INPUT_CONFIG: "x.json", INPUT_TIER: "payment" }), workspace)).code, 0);
     assert.equal((await runScript("check", stepEnv({ INPUT_CONFIG: "x.json", GITHUB_EVENT_NAME: "pull_request_target" }), workspace)).code, 2);

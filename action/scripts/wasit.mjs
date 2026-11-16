@@ -12,12 +12,12 @@
  */
 
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, statSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { InputError, buildReportArgs, buildRunArgs, parseInputs, scrubTokens } from "./inputs.mjs";
+import { InputError, MainnetRefusedError, buildReportArgs, buildRunArgs, parseInputs, scrubTokens } from "./inputs.mjs";
 
 const SIGNALS = ["SIGINT", "SIGTERM", "SIGHUP"];
 
@@ -45,6 +45,17 @@ function baselineFile(env, work, name = "BASELINE_PATH") {
     return statSync(resolved).isFile() ? resolved : undefined;
   } catch {
     return undefined;
+  }
+}
+
+/** Appends `text` to the job summary, when the runner gives one. A summary that cannot be written is not an error. */
+function writeSummary(env, text) {
+  const file = env["GITHUB_STEP_SUMMARY"];
+  if (typeof file !== "string" || !path.isAbsolute(file)) return;
+  try {
+    appendFileSync(file, text);
+  } catch {
+    // The refusal is in the log already.
   }
 }
 
@@ -100,6 +111,8 @@ export async function main(command, env = process.env, io = {}) {
   } catch (error) {
     if (error instanceof InputError) {
       stderr(`Wasit: ${error.message}`);
+      // Spec B5: a run that asked for mainnet says in its summary that it was refused.
+      if (error instanceof MainnetRefusedError) writeSummary(env, `## Wasit: refused\n\n${error.message}\n`);
       return 2;
     }
     throw error;

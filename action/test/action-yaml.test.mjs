@@ -30,11 +30,11 @@ const stepByName = (name) => {
 const index = (name) => steps.indexOf(stepByName(name));
 
 describe("action.yml", () => {
-  it("is a composite action with a name, a description and the four inputs", () => {
+  it("is a composite action with a name, a description and the five inputs", () => {
     assert.equal(action.runs.using, "composite");
     assert.ok(typeof action.name === "string" && action.name.length > 0);
     assert.ok(typeof action.description === "string" && action.description.length > 0);
-    assert.deepEqual(Object.keys(action.inputs).sort(), ["config", "endpoints", "environment", "tier"]);
+    assert.deepEqual(Object.keys(action.inputs).sort(), ["config", "endpoints", "environment", "mainnet", "tier"]);
     assert.equal(action.inputs.config.default, "wasit.config.json");
     assert.equal(action.inputs.tier.default, "read-only");
     for (const [name, input] of Object.entries(action.inputs)) assert.ok(typeof input.description === "string" && input.description.length > 0, name);
@@ -43,8 +43,21 @@ describe("action.yml", () => {
     assert.match(action.inputs.tier.description, /env: of this step/);
   });
 
-  it("offers no input that pays, signs or opts into mainnet", () => {
-    assert.ok(!Object.keys(action.inputs).some((name) => /key|secret|mainnet|dry|destructive|payer/i.test(name)));
+  it("offers no input that carries a key or enables a destructive check", () => {
+    assert.ok(!Object.keys(action.inputs).some((name) => /key|secret|dry|destructive|payer/i.test(name)));
+  });
+
+  it("has one input about mainnet, mainnet, off by default and refused in this version (B12)", () => {
+    assert.deepEqual(Object.keys(action.inputs).filter((name) => /mainnet|pubnet|optin/i.test(name)), ["mainnet"]);
+    assert.equal(action.inputs.mainnet.default, "false");
+    assert.match(action.inputs.mainnet.description, /^Refused in this version: the mainnet opt-in is not part of it\./);
+    assert.match(action.inputs.mainnet.description, /exit 2/);
+  });
+
+  it("hands the mainnet input to the step that checks the inputs and to the run step, and to no other", () => {
+    const withIt = steps.filter((step) => step.env?.INPUT_MAINNET !== undefined).map((step) => step.name);
+    assert.deepEqual(withIt, ["Check the inputs", "Run Wasit"]);
+    for (const name of withIt) assert.equal(stepByName(name).env.INPUT_MAINNET, "${{ inputs.mainnet }}");
   });
 
   it("gives every step a name, and a shell to every step that runs a command", () => {
