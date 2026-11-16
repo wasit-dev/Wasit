@@ -76,7 +76,7 @@ describe("the wasit binary", () => {
   });
 
   describe("flags that are not offered", () => {
-    for (const flag of [["--dry-run"], ["--mainnet"], ["--payer-key", "x"], ["--commitment-key", "x"], ["--allow-destructive"]]) {
+    for (const flag of [["--mainnet"], ["--payer-key", "x"], ["--commitment-key", "x"], ["--allow-destructive"]]) {
       it(`wasit run ${flag[0]} is an unknown option, exit 2`, async () => {
         const result = await wasit(["run", "--read-only", ...flag], cwd);
         assert.equal(result.code, 2, result.stderr);
@@ -101,11 +101,18 @@ describe("the wasit binary", () => {
       }
     });
 
-    it("--help works and exits 0", async () => {
+    it("--help works and exits 0, and offers --dry-run but no mainnet or key flag", async () => {
       const result = await wasit(["run", "--help"], cwd);
       assert.equal(result.code, 0);
       assert.match(result.stdout, /--start/);
-      assert.ok(!/--mainnet|--dry-run|--payer-key/.test(result.stdout));
+      assert.match(result.stdout, /--dry-run/);
+      assert.ok(!/--mainnet|--payer-key/.test(result.stdout));
+    });
+
+    it("wasit run --dry-run with --read-only is refused, exit 2", async () => {
+      const result = await wasit(["run", "--read-only", "--dry-run"], cwd);
+      assert.equal(result.code, 2, result.stderr);
+      assert.match(result.stderr, /choose --dry-run or --read-only/);
     });
   });
 

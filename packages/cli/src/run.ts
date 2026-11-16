@@ -2,12 +2,16 @@
  * `wasit run`: the endpoints of a `wasit.config.json`, one after another, with
  * one report (spec A2, A8).
  *
- * In this version every run is read-only. The payment tier is refused before a
- * config is read or anything is sent; the flags that would open it (`--dry-run`,
- * `--mainnet`, a key) are not registered. An x402 endpoint gets its unpaid
- * challenge checks (X402-01..05) and nothing else; its payment checks, and every
- * MPP check, are reported as skipped for the tier, so the report says which
- * checks need a payer instead of leaving them out.
+ * In this version a run is read-only, or a dry run. The payment tier is refused
+ * before a config is read or anything is sent; `--mainnet` and a key flag are
+ * not registered. An x402 endpoint gets its unpaid challenge checks
+ * (X402-01..05) and nothing else; its payment checks, and every MPP check, are
+ * reported as skipped for the tier, so the report says which checks need a
+ * payer instead of leaving them out.
+ *
+ * `--dry-run` (spec B5) runs L0 and L1 only: it reads each x402 endpoint's
+ * unpaid challenge, prints what the payment checks would sign and the caps,
+ * and exits. It uses no key, sends no payment and signs nothing.
  *
  * `executeRun` does not call `process.exit` and does not read the process: the
  * environment and the output are passed in, so it can be tested in-process.
@@ -17,12 +21,16 @@ import { readFileSync, statSync, writeFileSync } from "node:fs";
 
 import {
   ConfigError,
+  ConfigurationError,
   MAX_BASELINE_BYTES,
   buildEndpointReport,
   buildRunReport,
   deniedEnvValues,
+  describePlan,
+  describeRun,
   errored,
   isLoopbackUrl,
+  planX402Run,
   readBaseline,
   readConfigFile,
   readBuildCommit,
@@ -50,6 +58,8 @@ export interface RunCommandOptions {
   readonly env?: string;
   readonly endpoint?: readonly string[];
   readonly readOnly: boolean;
+  /** L0 and L1 only: print the plan of the payment checks and exit. No key, no payment, no signature. */
+  readonly dryRun?: boolean;
   readonly json: boolean;
   readonly out?: string;
   readonly start: boolean;
@@ -108,6 +118,54 @@ function readBaselineFile(path: string): BaselineResult | undefined {
   }
 }
 
+/**
+ * The dry run: the plan of the x402 payment checks (L0, L1), printed. Exit 0
+ * when a paying run could start as planned, 2 when it would be refused.
+ */
+async function printPlan(
+  resolved: ResolvedRun,
+  stdout: (line: string) => void,
+  clean: (text: string) => string,
+  fail: (message: string) => number,
+): Promise<number> {
+  const x402 = resolved.endpoints.filter((endpoint) => endpoint.protocol === "x402");
+  let plan;
+  try {
+    plan = await planX402Run({
+      network: resolved.network,
+      ...(resolved.pinned === undefined ? {} : { pin: resolved.pinned }),
+      ...(resolved.maxRunUsd === undefined ? {} : { maxRunUsd: resolved.maxRunUsd }),
+      endpoints: x402.map((endpoint) => ({
+        name: endpoint.name,
+        target: endpoint.url,
+        method: endpoint.method,
+        ...(endpoint.body === undefined ? {} : { body: endpoint.body }),
+        ...(Object.keys(endpoint.headers).length === 0 ? {} : { headers: endpoint.headers }),
+      })),
+    });
+  } catch (error) {
+    // L0: a network that is not a test network, refused before any request.
+    if (error instanceof ConfigurationError) return fail(`wasit run --dry-run: ${error.message}`);
+    throw error;
+  }
+
+  const lines = [...describeRun(resolved).split("\n"), ...describePlan(plan)];
+  for (const endpoint of resolved.endpoints) {
+    if (endpoint.protocol !== "x402") {
+      lines.push(`  ${endpoint.name}: not planned: the dry run plans the x402 payment checks; ${endpoint.protocol} is not planned in this version.`);
+    }
+  }
+  const refused = plan.refusal !== undefined || plan.endpoints.some((endpoint) => endpoint.status === "refused");
+  if (!resolved.operatedByMe) {
+    lines.push(
+      `Refused: operatedByMe is not true for environment ${resolved.environment}, so a paying run would be ` +
+        `refused: Wasit pays only a service its operator runs. Nothing was signed.`,
+    );
+  }
+  for (const line of lines) stdout(clean(line));
+  return refused || !resolved.operatedByMe ? 2 : 0;
+}
+
 export async function executeRun(options: RunCommandOptions, context: RunContext): Promise<number> {
   const secrets = deniedEnvValues(context.env);
   const clean = (text: string): string => sanitizeText(text, { redact: secrets });
@@ -117,10 +175,18 @@ export async function executeRun(options: RunCommandOptions, context: RunContext
     return 2;
   };
 
-  if (!options.readOnly) {
+  const dryRun = options.dryRun === true;
+  if (dryRun && options.readOnly) {
+    return fail("wasit run: choose --dry-run or --read-only, not both.");
+  }
+  if (dryRun && (options.json || options.out !== undefined || options.baseline !== undefined)) {
+    return fail("wasit run --dry-run prints a plan and writes no report: it takes no --json, --out or --baseline.");
+  }
+  if (!options.readOnly && !dryRun) {
     return fail(
       "wasit run: the payment tier is not available in this version. Pass --read-only to run the " +
-        "unpaid challenge checks, which send no payment and sign nothing.",
+        "unpaid challenge checks, which send no payment and sign nothing, or --dry-run to see what " +
+        "the payment checks would sign.",
     );
   }
 
@@ -183,6 +249,14 @@ export async function executeRun(options: RunCommandOptions, context: RunContext
     } catch (error) {
       if (error instanceof ServiceError) return fail(error.message);
       throw error;
+    }
+  }
+
+  if (dryRun) {
+    try {
+      return await printPlan(resolved, context.stdout, clean, fail);
+    } finally {
+      await service?.stop();
     }
   }
 

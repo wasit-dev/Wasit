@@ -269,7 +269,7 @@ authorization). See docs/CHECKS.md for what each check ID verifies.`,
 
 program
   .command("run")
-  .description("Run the endpoints of a wasit.config.json and write one report (read-only in this version)")
+  .description("Run the endpoints of a wasit.config.json and write one report (read-only or a dry run in this version)")
   .option("--config <path>", "The config file", "wasit.config.json")
   .option("--env <name>", "The environment to run (default: defaultEnvironment, else the only one)")
   .option(
@@ -280,7 +280,14 @@ program
   )
   .option(
     "--read-only",
-    "Run the unpaid challenge checks (X402-01..05). They send no payment and sign nothing. The only tier in this version, so it is required.",
+    "Run the unpaid challenge checks (X402-01..05). They send no payment and sign nothing. The only tier in this version: it, or --dry-run, is required.",
+    false,
+  )
+  .option(
+    "--dry-run",
+    "Print what the payment checks would sign: per endpoint the payee, the asset, the amount of each signature and the worst case, " +
+      "against the caps ($1 a payment, $5 a run, lower with maxRunUsd). Reads each x402 endpoint's unpaid challenge; " +
+      "uses no key, sends no payment, signs nothing. Exit 2 when a paying run would be refused. Not with --read-only.",
     false,
   )
   .option("--json", "Print the report as JSON instead of text", false)
@@ -309,6 +316,7 @@ Examples:
   $ wasit run --read-only --env staging --endpoint weather --json --out wasit-report.json
   $ wasit run --read-only --start
   $ wasit run --read-only --start-if-local --env mainnet
+  $ wasit run --dry-run --start
 
 Exit codes: 0 every graded endpoint conforms; 1 an endpoint does not conform, or one
 graded on the baseline is not graded now; 2 no verdict (nothing could be graded, a
@@ -325,6 +333,7 @@ In CI (CI or GITHUB_ACTIONS set) a .env file in the working directory is not rea
           ...(opts.env === undefined ? {} : { env: opts.env as string }),
           endpoint: opts.endpoint as string[],
           readOnly: opts.readOnly === true,
+          dryRun: opts.dryRun === true,
           json: opts.json === true,
           ...(opts.out === undefined ? {} : { out: opts.out as string }),
           start: opts.start === true,
