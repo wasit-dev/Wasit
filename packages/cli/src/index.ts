@@ -367,8 +367,13 @@ program
   .option("--summary <file>", "The job summary file, appended to (default: $GITHUB_STEP_SUMMARY)")
   .option(
     "--baseline-out <file>",
-    "Write the next baseline here: this report with its history. For a push to the default branch.",
+    "Write the next baseline here: this report with its history. For a run on the default branch.",
   )
+  .option(
+    "--history <file>",
+    "The baseline file of the newest completed run on the default branch, failed or not: the recent failures are counted from its history",
+  )
+  .option("--baseline-run <id>", "The id of the run the baseline came from, named in the comment")
   .exitOverride(exitTwoOnUsageError)
   .action(async (opts) => {
     let code: number;
@@ -380,6 +385,8 @@ program
           comment: opts.comment as string,
           ...(opts.summary === undefined ? {} : { summary: opts.summary as string }),
           ...(opts.baselineOut === undefined ? {} : { baselineOut: opts.baselineOut as string }),
+          ...(opts.history === undefined ? {} : { history: opts.history as string }),
+          ...(opts.baselineRun === undefined ? {} : { baselineRun: opts.baselineRun as string }),
         },
         { env: process.env, stdout: (line) => console.log(line), stderr: (line) => console.error(line) },
       );

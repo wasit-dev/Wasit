@@ -30,11 +30,18 @@ export interface Recorder {
   readonly signed: PaymentRequirements[];
 }
 
-function recordingChain(recorder: Recorder): PaymentChain {
+export interface RecordingChainOptions {
+  /** The variable the chain reads its key from. Default {@link KEY_ENV}. */
+  readonly keyEnv?: string;
+  /** Take any non-empty key, as a real chain takes any valid one. Default: only "test-payer-key". */
+  readonly anyKey?: boolean;
+}
+
+function recordingChain(recorder: Recorder, options: RecordingChainOptions = {}): PaymentChain {
   return {
     name: "Recording",
     networks: [NETWORK],
-    payerKeyEnv: KEY_ENV,
+    payerKeyEnv: options.keyEnv ?? KEY_ENV,
     referenceKind: "a test reference",
     resolveRpcUrl: (_network, override) => override || "http://127.0.0.1:9/rpc",
     registerPayer(client) {
@@ -52,7 +59,7 @@ function recordingChain(recorder: Recorder): PaymentChain {
     },
     expiredSigning: async () => ({ terms: { maxTimeoutSeconds: 1 }, holdMs: 0 }),
     payerAddress: (key) => {
-      if (key !== "test-payer-key") throw new Error("not a test key");
+      if (options.anyKey === true ? key === "" : key !== "test-payer-key") throw new Error("not a test key");
       return PAYER;
     },
     generatePayerKey: () => "test-payer-key",
@@ -64,8 +71,8 @@ function recordingChain(recorder: Recorder): PaymentChain {
 }
 
 /** Installs the recording chain and an RPC that serves Base Sepolia. Returns the undo. */
-export function installRecordingChain(recorder: Recorder): () => void {
-  setPaymentChainsForTesting([recordingChain(recorder)]);
+export function installRecordingChain(recorder: Recorder, options: RecordingChainOptions = {}): () => void {
+  setPaymentChainsForTesting([recordingChain(recorder, options)]);
   setRpcIdentityTransportForTesting(async (_url, method) => (method === "eth_chainId" ? "0x14a34" : undefined));
   return () => {
     setPaymentChainsForTesting(undefined);

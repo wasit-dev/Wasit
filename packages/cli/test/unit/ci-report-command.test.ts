@@ -15,6 +15,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, before, describe, it } from "node:test";
 
+import { parseRunReport, serializeBaseline, updateHistory } from "@wasit-dev/core";
+
 import { executeCiReport, type CiReportOptions } from "../../src/ci-report-command.js";
 import { executeRun } from "../../src/run.js";
 import { startPaywall, v1Handler, writeConfig, type Handler } from "./run-helpers.js";
@@ -118,7 +120,7 @@ describe("wasit ci-report", () => {
     const text = await readFile(comment, "utf-8");
     assert.match(text, /Wasit: non-conformant/);
     assert.match(text, /New FAIL: weather X402-01 \(was PASS on main\)/);
-    assert.ok(!/Recent failures/.test(text), "main never failed, so there is no recent-failures line");
+    assert.ok(!/### Recent failures/.test(text), "main never failed, so there is no recent-failures section");
   });
 
   it("says the baseline could not be used, and still writes the comment, when the file is not a report", async () => {
@@ -243,6 +245,102 @@ describe("wasit ci-report", () => {
           assert.ok(!/^\s*(::|##\[)/m.test(detail), "a workflow command in the report");
         }
       });
+    }
+  });
+});
+
+
+// D-022b option 2 (Najmi, 2026-11-16): the comparison from the last green run on
+// main (--baseline), the history from the newest completed run on main, failed
+// or not (--history), and the comment names the run compared with
+// (--baseline-run). Written before the code.
+describe("wasit ci-report --history --baseline-run", () => {
+  let dir: string;
+  before(async () => {
+    dir = await mkdtemp(path.join(tmpdir(), "wasit-ci-history-"));
+  });
+  after(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  async function runReport(handler: Handler, name: string, environment = "local") {
+    const paywall = await startPaywall(handler);
+    try {
+      const config = await writeConfig(dir, { baseUrl: paywall.base, environment }, `${name}.config.json`);
+      const file = path.join(dir, `${name}.report.json`);
+      await executeRun(
+        { config, readOnly: true, json: true, start: false, out: file },
+        { env: { PATH: process.env["PATH"] ?? "" }, stdout: () => {}, stderr: () => {} },
+      );
+      return { file, report: parseRunReport(JSON.parse(await readFile(file, "utf-8"))) };
+    } finally {
+      await paywall.close();
+    }
+  }
+  const conformantHandler: Handler = async (_request, response) => {
+    const { challengeHeader } = await import("./run-helpers.js");
+    response.writeHead(402, { "payment-required": challengeHeader() });
+    response.end("{}");
+  };
+  // X402-01 fails: the paid route answers 200 without a payment.
+  const openHandler: Handler = (_request, response) => {
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end("{}");
+  };
+
+  async function run(options: Partial<CiReportOptions> & { report: string }) {
+    const err: string[] = [];
+    const comment = path.join(dir, `comment-${Math.random().toString(36).slice(2)}.md`);
+    const code = await executeCiReport(
+      { comment, ...options },
+      { env: { PATH: process.env["PATH"] ?? "" }, stdout: () => {}, stderr: (line) => err.push(line) },
+    );
+    return { code, comment: await readFile(comment, "utf-8"), stderr: err.join("\n") };
+  }
+
+  it("compares with --baseline, counts recent failures from --history, and names the run", async () => {
+    const green = await runReport(conformantHandler, "green");
+    const red = await runReport(openHandler, "red");
+    const baseline = path.join(dir, "baseline.json");
+    await writeFile(baseline, serializeBaseline(green.report, updateHistory(undefined, green.report)));
+    const history = path.join(dir, "history.json");
+    await writeFile(history, serializeBaseline(red.report, updateHistory(updateHistory(updateHistory(undefined, green.report), red.report), red.report)));
+    const next = path.join(dir, "next.json");
+
+    const result = await run({ report: green.file, baseline, history, baselineRun: "43724229283", baselineOut: next });
+    assert.equal(result.code, 0, result.stderr);
+    assert.match(result.comment, /Compared with the last green run on main: run 43724229283, started /);
+    assert.match(result.comment, /No change since main\./);
+    assert.match(result.comment, /weather X402-01: failed in 2 of the last 3 runs on main/);
+    // The next baseline carries the history of every run on, with this run added.
+    const written = JSON.parse(await readFile(next, "utf-8"));
+    assert.equal(written.history.weather["X402-01"], "PFFP");
+  });
+
+  it("ignores a history from another environment, or one it cannot read, and keeps the baseline's own", async () => {
+    const green = await runReport(conformantHandler, "green2");
+    const other = await runReport(openHandler, "other", "staging");
+    const baseline = path.join(dir, "baseline2.json");
+    await writeFile(baseline, serializeBaseline(green.report, updateHistory(undefined, green.report)));
+    const foreign = path.join(dir, "foreign-history.json");
+    await writeFile(foreign, serializeBaseline(other.report, updateHistory(undefined, other.report)));
+    for (const history of [foreign, path.join(dir, "missing.json")]) {
+      const next = path.join(dir, "next2.json");
+      const result = await run({ report: green.file, baseline, history, baselineOut: next });
+      assert.equal(result.code, 0, result.stderr);
+      assert.doesNotMatch(result.comment, /### Recent failures on main/);
+      assert.match(result.stderr, /history .*not used/);
+      assert.equal(JSON.parse(await readFile(next, "utf-8")).history.weather["X402-01"], "PP");
+    }
+  });
+
+  it("does not print a run id that is not a whole number", async () => {
+    const green = await runReport(conformantHandler, "green3");
+    const baseline = path.join(dir, "baseline3.json");
+    await writeFile(baseline, serializeBaseline(green.report, updateHistory(undefined, green.report)));
+    for (const baselineRun of ["12; rm", "-1", "0x10", ""]) {
+      const result = await run({ report: green.file, baseline, baselineRun });
+      assert.match(result.comment, /Compared with the last green run on main, started /, baselineRun);
     }
   });
 });
