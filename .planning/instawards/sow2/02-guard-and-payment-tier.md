@@ -1,6 +1,6 @@
 # Job 02 — Network guard, payment tier, new check, opt-in, pre-release
 
-Status: 🟡 **IN PROGRESS** (payment tier shown on `main` of the example project, 2026-11-16) · Deliverable: **D2** · Week: **2** · Depends on: #0
+Status: 🟡 **IN PROGRESS** (payment tier and the new check shown on `main` of the example project, 2026-11-16) · Deliverable: **D2** · Week: **2** · Depends on: #0
 
 ## Goal
 
@@ -22,7 +22,7 @@ command line, without the opt-in, goes to beta testers at the end of the week.
 - [x] The plan, the per-payment cap and the per-run cap are enforced before anything is signed.
 - [x] The payment tier in the Action, on `main`, with the payer key in the repository's secrets.
 - [x] The payment tier never runs on a pull request from a fork.
-- [ ] The new check "rejected request does not settle" sends a valid payment with a request the service must refuse, then reads the chain to confirm that no transfer happened.
+- [x] The new check "rejected request does not settle" sends a valid payment with a request the service must refuse, then reads the chain to confirm that no transfer happened.
 - [ ] The opt-in switch: a flag on the run in the command line, an input on a run started by hand in the Action, and a start-up setting (never a tool argument) in the MCP server.
 - [ ] Independent review of the payment code, in writing.
 - [ ] The pre-release tag, without the opt-in: it refuses every payment on mainnet.
@@ -42,6 +42,14 @@ command line, without the opt-in, goes to beta testers at the end of the week.
 - **"Changed since main"** compares with the last green run on `main` and names it; the recent-failures line counts every finished run on `main`.
 - Code: [draft pull request 30](https://github.com/wasit-dev/Wasit/pull/30), stacked on pull request 23.
 
+## What shipped (the new check, 2026-11-16)
+
+- **`X402-11`, "Rejected Request Not Settled".** For an endpoint whose entry in `wasit.config.json` names a request the service must refuse (`reject`), Wasit signs a payment for the advertised terms, through the same plan, pin and caps as the other payment checks, and sends it with that request.
+- **It reads the chain, not the service's word.** Once a ledger it asks the Stellar RPC whether the nonce of that payment's authorization was used, in the same call as the nonce of `X402-06`'s payment, which was used and must be found. The payer's balance and the token's transfer events are second readings; when they disagree, there is no verdict.
+- **Verdicts.** Refused, and still unused after its expiration ledger: pass. Refused, and used: fail, with the transaction that took it. Served: fail.
+- **The wait.** A payment that stays valid for at most 300 seconds is waited out, with a hard stop 360 seconds after it was sent; a longer one is not signed, and the check is skipped.
+- Code: [draft pull request 30](https://github.com/wasit-dev/Wasit/pull/30); the check's entry in [`docs/CHECKS.md`](https://github.com/wasit-dev/Wasit/blob/sow2/s2-payment/docs/CHECKS.md) on that branch.
+
 ## Proof
 
 | What | Status | Proof |
@@ -51,6 +59,8 @@ command line, without the opt-in, goes to beta testers at the end of the week.
 | The read-only checks pass on a challenge that names `stellar:pubnet` | ✅ | [Pull request 6](https://github.com/dzakwannajmi/x402-example-paywall/pull/6) · [run](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43724229283) · [copy of the comment](week-2/copies/pr-6-comment.md) · [copy of the log](week-2/copies/run-pr6-pubnet.log.txt): the seller on `127.0.0.1` names `stellar:pubnet`, X402-01 to X402-05 pass, the payment checks are skipped by the read-only tier, no payment is made and nothing is signed. It is a local seller, not a deployed mainnet service |
 | The payment tier in the Action on `main`: X402-01 to X402-10, one real payment on the Stellar test network | ✅ | [Run on `main`](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43816426654) · [the payment on Stellar Expert](https://stellar.expert/explorer/testnet/tx/beb0a5f94e2c5cb41cad8f5fe1110020dd004c30022b53b853b30ae5ef905a86) · [copy of the log](week-2/copies/run-main-payment-tier.log.txt): the job pays from the secret `WASIT_TESTNET_PAYER`, the seller runs as the user `wasit-service`, the plan and the caps are printed before anything is signed, all ten checks pass, X402-06 settles the advertised amount and Wasit reads it from the transfer event, and the run charged at most what it planned |
 | A pull request from a fork with `tier: payment`: the payment checks are not run | ✅ | [Pull request 5](https://github.com/dzakwannajmi/x402-example-paywall/pull/5) · [run](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43819805398) · [copy of the log](week-2/copies/run-pr5-fork-payment-tier.log.txt): the same workflow as on `main`, on a pull request from a fork; the job had no secrets and a read-only token, X402-01 to X402-05 passed, X402-06 to X402-10 were skipped with "payment checks not run: pull request", the run notes that nothing was signed, and no comment was posted |
+| The new check `X402-11` in the Action on `main`: a valid payment sent with a request the seller must refuse, and the chain read with no transfer | ✅ | [Run on `main`](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43851987068) · [copy of the log](week-2/copies/run-main-x402-11.log.txt): the example's `reject` case asks for a quote language the seller does not have; the seller answered 400; Wasit read the chain once a ledger until the payment's authorization had expired, about five minutes at the default lifetime, found it never used and no transfer of it, and all eleven checks passed. The only payment of the run that settled is `X402-06`'s ([Stellar Expert](https://stellar.expert/explorer/testnet/tx/8dbe4e036ab12e8de436ac0fe7dc72004d584740c9e9cb0e14b1d29f004c1e78)) |
+| `X402-11` fails a seller that takes the payment of a refused request, and one that serves it, and names the transaction | 🟡 (on the maintainer's machine; the transactions are public) | [Copy of the output](week-2/copies/live-check-x402-11-three-modes.txt): Wasit's test fixture with three routes on the Stellar test network. The one that refuses passed; the one that settles and then refuses failed, naming [7463f7c0…](https://stellar.expert/explorer/testnet/tx/7463f7c0a490a7b05b6d12d063a8aa850d54a6e2e2652911921672f6dee9d93f); the one that serves failed, naming [4c34078c…](https://stellar.expert/explorer/testnet/tx/4c34078cf88319df2fb6c0797c0f3d73b2bd7d1ab6a725de52cd5bab443d5106) |
 | The pieces below | ⬜ | Not started |
 
 ## Result
@@ -75,4 +85,14 @@ account of ours that can receive USDC).
 Update 2026-11-16 (later): pull request 5 of the example project, which comes
 from a fork, ran on the new workflow with `tier: payment`. Wasit ran the
 read-only checks only and said why: payment checks are not run on a pull
-request. Nothing was signed. Next: the new check.
+request. Nothing was signed.
+
+Update 2026-11-16 (evening): the new check `X402-11` is built and shown. On the
+maintainer's machine it was run against a test fixture with three routes: the
+one that refuses passed, the two that take the payment failed and named the
+transaction. A first run there found a defect in Wasit's second reading (the
+test network's RPC no longer marks which events come from a successful call),
+fixed before the runs above. In the Action on `main` of the example project the
+seller refuses a quote language it does not have; the check waited out the
+payment's lifetime and passed. Next: the opt-in switch, the independent review
+and the pre-release.
