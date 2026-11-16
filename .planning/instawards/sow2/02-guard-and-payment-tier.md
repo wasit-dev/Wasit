@@ -1,6 +1,6 @@
 # Job 02 — Network guard, payment tier, new check, opt-in, pre-release
 
-Status: 🟡 **IN PROGRESS** (payment tier and the new check shown on `main` of the example project, 2026-11-16) · Deliverable: **D2** · Week: **2** · Depends on: #0
+Status: 🟡 **IN PROGRESS** (payment tier and the new check shown on `main` of the example project; mainnet refused, 2026-11-16) · Deliverable: **D2** · Week: **2** · Depends on: #0
 
 ## Goal
 
@@ -24,6 +24,7 @@ command line, without the opt-in, goes to beta testers at the end of the week.
 - [x] The payment tier never runs on a pull request from a fork.
 - [x] The new check "rejected request does not settle" sends a valid payment with a request the service must refuse, then reads the chain to confirm that no transfer happened.
 - [ ] The opt-in switch: a flag on the run in the command line, an input on a run started by hand in the Action, and a start-up setting (never a tool argument) in the MCP server.
+  In the pre-release the three switches exist and always refuse; the switch that allows waits for the validation (job 03).
 - [ ] Independent review of the payment code, in writing.
 - [ ] The pre-release tag, without the opt-in: it refuses every payment on mainnet.
 
@@ -50,12 +51,20 @@ command line, without the opt-in, goes to beta testers at the end of the week.
 - **The wait.** A payment that stays valid for at most 300 seconds is waited out, with a hard stop 360 seconds after it was sent; a longer one is not signed, and the check is skipped.
 - Code: [draft pull request 30](https://github.com/wasit-dev/Wasit/pull/30); the check's entry in [`docs/CHECKS.md`](https://github.com/wasit-dev/Wasit/blob/sow2/s2-payment/docs/CHECKS.md) on that branch.
 
+## What shipped (mainnet refused, 2026-11-16)
+
+- **The three switches of the opt-in, refusing.** `wasit run --mainnet` stops before the config is read; the Action's `mainnet` input stops the job in the step that checks the inputs, before Wasit is installed, and the job summary says so; the MCP server does not start with `WASIT_MAINNET_OPT_IN`, `WASIT_MAINNET_CONFIG` or `--mainnet`. Each says "the mainnet opt-in is not part of this version" and exits 2. On any GitHub event but a run started by hand, the message also says that the switch is refused on that event.
+- **No allow path.** A property test drives random combinations of flags, key variables, start-up variables, GitHub events and config values for a payment on `stellar:pubnet`, against a stand-in chain that opens every gate but Wasit's own: no paid request and no signature, ever. A control run on the test network shows the stand-in does record a signature when one is made.
+- **The MCP server's RPC.** `WASIT_RPC_URL`, set when the server starts, fixes the RPC of every tool call, and a call that names another RPC is refused before anything is sent. A result that reads the chain names its RPC by origin, and says when it is not Wasit's default.
+- Code: [draft pull request 30](https://github.com/wasit-dev/Wasit/pull/30).
+
 ## Proof
 
 | What | Status | Proof |
 | --- | --- | --- |
 | The first layer of the guard, with tests for the library, the command line, the dashboard and the MCP server | ✅ (code and tests) | [Draft pull request 23](https://github.com/wasit-dev/Wasit/pull/23) · [CI run](https://github.com/wasit-dev/Wasit/actions/runs/43706023137) |
-| A payment check on `stellar:pubnet` without the opt-in is refused before anything is signed | 🟡 | Offline tests: [`runners.test.ts`](https://github.com/wasit-dev/Wasit/blob/sow2/s1-action/packages/cli/test/unit/runners.test.ts). A recorded run and an Action run come next |
+| A payment check on `stellar:pubnet` without the opt-in is refused before anything is signed | ✅ | [Run on `main` of the example project](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43882304954) · [copy of the log](week-2/copies/run-pubnet-payment-refused.log.txt): the payment tier on a config that names `stellar:pubnet`, started by hand, no payer key; Wasit stopped with exit 2 before the service started and wrote no report, and the step after it confirmed the refusal |
+| The Action's `mainnet` input refused on a push | ✅ | [Run on a push](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43882283916) · [copy of the log](week-2/copies/run-mainnet-input-refused.log.txt): on a branch that is never merged, `mainnet: true` stopped the job with exit 2 in the step that checks the inputs; Wasit was not installed and nothing ran |
 | The read-only checks pass on a challenge that names `stellar:pubnet` | ✅ | [Pull request 6](https://github.com/dzakwannajmi/x402-example-paywall/pull/6) · [run](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43724229283) · [copy of the comment](week-2/copies/pr-6-comment.md) · [copy of the log](week-2/copies/run-pr6-pubnet.log.txt): the seller on `127.0.0.1` names `stellar:pubnet`, X402-01 to X402-05 pass, the payment checks are skipped by the read-only tier, no payment is made and nothing is signed. It is a local seller, not a deployed mainnet service |
 | The payment tier in the Action on `main`: X402-01 to X402-10, one real payment on the Stellar test network | ✅ | [Run on `main`](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43816426654) · [the payment on Stellar Expert](https://stellar.expert/explorer/testnet/tx/beb0a5f94e2c5cb41cad8f5fe1110020dd004c30022b53b853b30ae5ef905a86) · [copy of the log](week-2/copies/run-main-payment-tier.log.txt): the job pays from the secret `WASIT_TESTNET_PAYER`, the seller runs as the user `wasit-service`, the plan and the caps are printed before anything is signed, all ten checks pass, X402-06 settles the advertised amount and Wasit reads it from the transfer event, and the run charged at most what it planned |
 | A pull request from a fork with `tier: payment`: the payment checks are not run | ✅ | [Pull request 5](https://github.com/dzakwannajmi/x402-example-paywall/pull/5) · [run](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43819805398) · [copy of the log](week-2/copies/run-pr5-fork-payment-tier.log.txt): the same workflow as on `main`, on a pull request from a fork; the job had no secrets and a read-only token, X402-01 to X402-05 passed, X402-06 to X402-10 were skipped with "payment checks not run: pull request", the run notes that nothing was signed, and no comment was posted |
@@ -96,3 +105,9 @@ fixed before the runs above. In the Action on `main` of the example project the
 seller refuses a quote language it does not have; the check waited out the
 payment's lifetime and passed. Next: the opt-in switch, the independent review
 and the pre-release.
+
+Update 2026-11-16 (night): the switches of the mainnet opt-in were built, and in
+this version each one only refuses. Two runs in the example project show it: a
+push with the Action's `mainnet` input set stopped before Wasit was installed,
+and a payment-tier run on a config that names `stellar:pubnet` stopped before
+anything was signed. Next: the independent review and the pre-release.
