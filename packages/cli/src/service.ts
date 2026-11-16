@@ -87,6 +87,25 @@ export interface ServiceOptions {
 
 const SUDO_TIMEOUT_MS = 120_000;
 
+/**
+ * Runs as the service's user: reads `{ command, env }` as JSON from stdin, runs
+ * the command with `sh -c` and exactly that environment, passes signals on and
+ * exits with the command's code. CommonJS, for `node -e`.
+ */
+const SERVICE_LAUNCHER = [
+  'let input = "";',
+  'process.stdin.setEncoding("utf8");',
+  'process.stdin.on("data", (chunk) => { input += chunk; });',
+  'process.stdin.on("end", () => {',
+  '  let request;',
+  '  try { request = JSON.parse(input); } catch { process.exit(64); }',
+  '  const child = require("node:child_process").spawn("sh", ["-c", String(request.command)], { env: request.env, stdio: ["ignore", "inherit", "inherit"] });',
+  '  for (const signal of ["SIGTERM", "SIGINT", "SIGHUP"]) process.on(signal, () => { try { child.kill(signal); } catch {} });',
+  '  child.on("error", () => process.exit(127));',
+  '  child.on("exit", (code) => process.exit(code === null ? 1 : code));',
+  '});',
+].join("\n");
+
 /** Runs `sudo -n <args>`, collects its stderr, and never throws: a sudo that cannot be run is code 127. */
 function runSudo(sudo: string, args: readonly string[]): Promise<{ code: number; stderr: string }> {
   return new Promise((resolve) => {
@@ -237,33 +256,29 @@ export async function startService(options: ServiceOptions): Promise<StartedServ
     if (!posix) throw new ServiceError("a separate user for the service is built for Linux runners only");
     const home = await prepareUser(separate, options.cwd ?? process.cwd(), secrets);
     log(`[wasit] the service runs as the user ${separate.name}, not as the user that holds the payer key`);
-    // sudo -E keeps the scrubbed environment in the service's environment, where only
-    // its own user and root can read it; nothing secret is put on a command line, which
-    // any user can read. PATH and HOME are set again because sudo's own policy may reset them.
-    child = spawn(
-      sudo,
-      [
-        "-n",
-        "-E",
-        "-u",
-        separate.name,
-        "--",
-        "env",
-        `PATH=${childEnv["PATH"] ?? "/usr/local/bin:/usr/bin:/bin"}`,
-        `HOME=${home}`,
-        `USER=${separate.name}`,
-        `LOGNAME=${separate.name}`,
-        "sh",
-        "-c",
+    // The service's environment and its command go on stdin, as JSON, to a small launcher
+    // that runs as that user: sudo resets the environment, and the hosted runner's sudo
+    // ignores -E (run 43815743541, 2026-11-16). A command line can be read by any user;
+    // stdin cannot. The launcher's own code is the only thing on the command line.
+    child = spawn(sudo, ["-n", "-u", separate.name, "--", process.execPath, "-e", SERVICE_LAUNCHER], {
+      ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+      env: { PATH: childEnv["PATH"] ?? "/usr/local/bin:/usr/bin:/bin" },
+      stdio: ["pipe", "pipe", "pipe"],
+      detached: true,
+      windowsHide: true,
+    });
+    child.stdin?.on("error", () => undefined);
+    child.stdin?.end(
+      JSON.stringify({
         command,
-      ],
-      {
-        ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
-        env: childEnv,
-        stdio: ["ignore", "pipe", "pipe"],
-        detached: true,
-        windowsHide: true,
-      },
+        env: {
+          ...childEnv,
+          PATH: childEnv["PATH"] ?? "/usr/local/bin:/usr/bin:/bin",
+          HOME: home,
+          USER: separate.name,
+          LOGNAME: separate.name,
+        },
+      }),
     );
   }
 

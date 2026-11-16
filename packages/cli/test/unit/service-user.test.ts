@@ -4,8 +4,8 @@
  *
  * What these tests can show: when the run wants a separate user, Wasit makes
  * the user with passwordless sudo, gives it access to the working directory
- * only, starts the command through `sudo -n -E -u <user>` with the scrubbed
- * environment, refuses to start when sudo or the user cannot be had (no
+ * only, starts the command through `sudo -n -u <user>` with the scrubbed
+ * environment on stdin (the hosted runner's sudo ignores -E), refuses to start when sudo or the user cannot be had (no
  * fallback to the runner's own user), and stops the service through sudo.
  * The sudo here is a stand-in script that records each call and runs the
  * command as the same user: what these tests CANNOT show is the separation
@@ -113,7 +113,8 @@ case "$1" in
   useradd|setfacl) [ "$1" = '${options.failOn ?? "-"}' ] && { echo "$1: refused by the test" >&2; exit 1; }; exit 0 ;;
   pgrep) [ -f '${pidFile}' ] && kill -0 "-$(cat '${pidFile}')" 2>/dev/null && exit 0; exit 1 ;;
   pkill) sig="$2"; [ -f '${pidFile}' ] && kill "$sig" "-$(cat '${pidFile}')" 2>/dev/null; exit 0 ;;
-  -E) shift; [ "$1" = "-u" ] || exit 65; shift 2; [ "$1" = "--" ] || exit 66; shift
+  -E) echo "sudo stand-in: -E is not supported, as on the hosted runner's sudo" >&2; exit 68 ;;
+  -u) shift 2; [ "$1" = "--" ] || exit 66; shift
       echo $$ > '${pidFile}'
       exec "$@" ;;
   *) echo "sudo stand-in: unexpected $1" >&2; exit 67 ;;
@@ -155,15 +156,17 @@ http.createServer((q, s) => { s.writeHead(200); s.end("ok"); }).listen(${port}, 
     assert.ok(calls.some((call) => /^-n id -u wasit-service$/.test(call)), calls.join("\n"));
     assert.ok(calls.some((call) => /^-n useradd .*--system.*wasit-service$/.test(call)), calls.join("\n"));
     assert.ok(calls.some((call) => call.startsWith("-n setfacl -R -m u:wasit-service:rwX") && call.endsWith(work.split(path.sep).pop() ?? "")), calls.join("\n"));
-    const launch = calls.find((call) => call.startsWith("-n -E -u wasit-service -- env "));
+    // The hosted runner's sudo ignores -E (run 43815743541, 2026-11-16): the environment goes on stdin.
+    const launch = calls.find((call) => call.startsWith(`-n -u wasit-service -- ${process.execPath} -e `));
     assert.ok(launch, calls.join("\n"));
-    assert.match(launch, /HOME=\/home\/wasit-service/);
-    assert.match(launch, /USER=wasit-service/);
+    assert.ok(!calls.some((call) => call.includes(" -E ")), "sudo -E is not used");
     assert.ok(!launch.includes(CANARY) && !launch.includes("hdr-secret"), "a secret was put on the command line");
-    assert.ok(!launch.includes("KEEP_ME"), "the environment is passed by sudo -E, not on the command line");
+    assert.ok(!launch.includes("KEEP_ME") && !launch.includes(script), "the environment and the command are passed on stdin, not on the command line");
 
     const childEnv = JSON.parse(await readFile(path.join(dir, `env-${port}.json`), "utf-8"));
     assert.equal(childEnv["KEEP_ME"], "yes");
+    assert.equal(childEnv["HOME"], "/home/wasit-service");
+    assert.equal(childEnv["USER"], "wasit-service");
     assert.equal(childEnv["STELLAR_PRIVATE_KEY"], undefined);
     assert.equal(childEnv["WASIT_HEADER_X_KEY"], undefined);
     assert.ok(!JSON.stringify(childEnv).includes(CANARY));
@@ -207,7 +210,7 @@ http.createServer((q, s) => { s.writeHead(200); s.end("ok"); }).listen(${port}, 
         (error: unknown) =>
           error instanceof ServiceError && /separate user/.test(error.message) && !error.message.includes(CANARY),
       );
-      assert.ok(!(await sudo.calls()).some((call) => call.startsWith("-n -E")), "the service was started");
+      assert.ok(!(await sudo.calls()).some((call) => call.startsWith("-n -u")), "the service was started");
     });
   }
 
