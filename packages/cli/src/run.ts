@@ -19,6 +19,9 @@
  * run is the read-only tier and says so. A key variable that is set on a run that
  * may not pay is refused before the service starts (Najmi, 2026-11-16).
  *
+ * `--mainnet` asks for the mainnet opt-in, which this version does not have:
+ * the run is refused at once, exit 2, before the config is read (spec B12).
+ *
  * `executeRun` does not call `process.exit` and does not read the process: the
  * environment and the output are passed in, so it can be tested in-process.
  */
@@ -39,6 +42,7 @@ import {
   describeRun,
   errored,
   formatUsd,
+  inGithubActions,
   isLoopbackUrl,
   payerKeyVariables,
   paymentChainFor,
@@ -51,6 +55,7 @@ import {
   readGithubEvent,
   readToolVersions,
   redactReport,
+  refuseMainnetSwitch,
   resolveRun,
   runExitCode,
   runX402PaymentChecks,
@@ -68,6 +73,7 @@ import {
   type RunPlan,
   type RunVerdict,
   type SkipKind,
+  MainnetOptInRefusedError,
   UnsupportedPaymentNetworkError,
 } from "@wasit-dev/core";
 
@@ -92,6 +98,12 @@ export interface RunCommandOptions {
    */
   readonly startIfLocal?: boolean;
   readonly baseline?: string;
+  /**
+   * `--mainnet`: the switch of the mainnet opt-in (spec B5). This version has no
+   * opt-in, so it always refuses, exit 2, before anything else is done (B12).
+   * Never read from the config or the environment.
+   */
+  readonly mainnet?: boolean;
 }
 
 export interface RunContext {
@@ -277,6 +289,16 @@ export async function executeRun(options: RunCommandOptions, context: RunContext
     stderr(message);
     return 2;
   };
+
+  // B12: the switch exists only to refuse. First, so nothing is read, started, sent or signed.
+  if (options.mainnet === true) {
+    try {
+      refuseMainnetSwitch("--mainnet", inGithubActions(context.env) ? { event: context.env["GITHUB_EVENT_NAME"] ?? "" } : {});
+    } catch (error) {
+      if (error instanceof MainnetOptInRefusedError) return fail(`wasit run ${error.message}`);
+      throw error;
+    }
+  }
 
   const dryRun = options.dryRun === true;
   if (dryRun && options.readOnly) {

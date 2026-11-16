@@ -310,6 +310,11 @@ program
     "--baseline <file>",
     "The report of the default branch: an endpoint graded there that is unsupported or without a verdict now is a regression (exit 1)",
   )
+  .option(
+    "--mainnet",
+    "Refused in this version: the mainnet opt-in is not part of it. The run stops with exit 2 before the config is read; nothing is started, sent or signed.",
+    false,
+  )
   .addHelpText(
     "after",
     `
@@ -351,6 +356,7 @@ In CI (CI or GITHUB_ACTIONS set) a .env file in the working directory is not rea
           start: opts.start === true,
           startIfLocal: opts.startIfLocal === true,
           ...(opts.baseline === undefined ? {} : { baseline: opts.baseline as string }),
+          mainnet: opts.mainnet === true,
         },
         { env: process.env, stdout: (line) => console.log(line), stderr: (line) => console.error(line) },
       );

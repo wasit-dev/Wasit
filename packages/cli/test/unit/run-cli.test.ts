@@ -76,10 +76,33 @@ describe("the wasit binary", () => {
   });
 
   describe("flags that are not offered", () => {
-    for (const flag of [["--mainnet"], ["--payer-key", "x"], ["--commitment-key", "x"], ["--allow-destructive"]]) {
+    for (const flag of [["--payer-key", "x"], ["--commitment-key", "x"], ["--allow-destructive"]]) {
       it(`wasit run ${flag[0]} is an unknown option, exit 2`, async () => {
         const result = await wasit(["run", "--read-only", ...flag], cwd);
         assert.equal(result.code, 2, result.stderr);
+        assert.match(result.stderr, /unknown option/);
+      });
+    }
+
+    it("wasit run --mainnet is a switch that always refuses (B12): exit 2, the sentence, nothing read", async () => {
+      for (const args of [["run", "--mainnet"], ["run", "--read-only", "--mainnet"], ["run", "--dry-run", "--mainnet", "--config", "nope.json"]]) {
+        const result = await wasit(args, cwd);
+        assert.equal(result.code, 2, result.stderr);
+        assert.match(result.stderr, /^wasit run --mainnet is refused: the mainnet opt-in is not part of this version\./);
+        assert.doesNotMatch(result.stderr, /nope\.json|unknown option/);
+      }
+    });
+
+    it("wasit run --mainnet takes no value", async () => {
+      const result = await wasit(["run", "--mainnet=true"], cwd);
+      assert.equal(result.code, 2);
+    });
+
+    for (const command of [["test", "--target", "http://127.0.0.1:9/paid"], ["mpp-charge", "--target", "http://127.0.0.1:9/paid"]]) {
+      it(`wasit ${command[0]} --mainnet is an unknown option: the switch is on wasit run only`, async () => {
+        const result = await wasit([...command, "--mainnet"], cwd);
+        // These commands keep commander's own exit code for a usage error, as in 0.7.0.
+        assert.notEqual(result.code, 0, result.stderr);
         assert.match(result.stderr, /unknown option/);
       });
     }
@@ -119,12 +142,13 @@ describe("the wasit binary", () => {
       }
     });
 
-    it("--help works and exits 0, and offers --dry-run but no mainnet or key flag", async () => {
+    it("--help works and exits 0, offers --dry-run, shows --mainnet as refused in this version, and no key flag", async () => {
       const result = await wasit(["run", "--help"], cwd);
       assert.equal(result.code, 0);
       assert.match(result.stdout, /--start/);
       assert.match(result.stdout, /--dry-run/);
-      assert.ok(!/--mainnet|--payer-key/.test(result.stdout));
+      assert.match(result.stdout, /--mainnet\s+Refused in this version/);
+      assert.ok(!/--payer-key/.test(result.stdout));
     });
 
     it("wasit run --dry-run with --read-only is refused, exit 2", async () => {
