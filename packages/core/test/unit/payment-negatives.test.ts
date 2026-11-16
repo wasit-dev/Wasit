@@ -24,6 +24,7 @@ import {
   runX402PaymentChecks,
   underpaymentVerdict,
 } from "../../src/x402/simulator.js";
+import { planX402Run } from "../../src/x402/plan.js";
 
 const NETWORK = "eip155:84532";
 
@@ -352,7 +353,7 @@ describe("on Ethereum Sepolia", () => {
             assert.equal(r["X402-06"]?.error?.kind, "setup");
             assert.match(
               r["X402-06"]?.detail ?? "",
-              /X402-06 would sign 1000001 base units of USDC \(\$1\.000001\), above the \$1\.00 a payment .* Nothing was signed\./,
+              /X402-06 would sign 1000001 base units of USDC \(\$1\.000001\), above the \$1\.00 per payment fixed in Wasit\. .*Nothing was signed\./,
             );
           }
         } finally {
@@ -370,7 +371,7 @@ describe("a target the guard refuses before the SDK client's spend controls", ()
   // refuses first; the SDK's own controls (L3) stay behind it.
   it("is a setup error on a price above $1, or on an asset the client does not pay in", async () => {
     for (const [label, options, reason] of [
-      ["above $1", { amount: "1000001" }, /above the \$1\.00 a payment that is fixed in Wasit/],
+      ["above $1", { amount: "1000001" }, /above the \$1\.00 per payment fixed in Wasit/],
       ["other asset", { asset: "0x0000000000000000000000000000000000000Bad" }, /an asset Wasit does not value in US dollars/],
     ] as const) {
       const target = await standIn({ mode: "accept", ...options });
@@ -466,6 +467,34 @@ describe("when a negative check has nothing to test", () => {
       assert.equal(r["X402-10"]?.pass, false);
       // honest, corrupted, expired: no replay and no underpayment were sent.
       assert.equal(target.received.length, 3);
+    } finally {
+      await target.close();
+    }
+  });
+});
+
+describe("when a negative check has nothing to test, under the plan of wasit run", () => {
+  it("skips X402-09 at a 1-unit price, as without a plan, and fetches nothing for it (review R3)", async () => {
+    const target = await standIn({ mode: "accept", amount: "1" });
+    try {
+      const plan = await planX402Run({ network: NETWORK, endpoints: [{ name: "paid", target: target.url }] });
+      const entry = plan.endpoints[0]!;
+      assert.equal(entry.status, "planned", entry.reason ?? "");
+      assert.ok(!entry.signatures.some((signature) => signature.check === "X402-09"), "the plan has no X402-09 signature");
+      const r = byId(
+        await runX402PaymentChecks({
+          target: target.url,
+          network: NETWORK,
+          payerSecretKey: generatePrivateKey(),
+          rpcUrl: funded.url,
+          plan: entry,
+        }),
+      );
+      assert.equal(r["X402-09"]?.error, undefined, r["X402-09"]?.detail);
+      assert.equal(r["X402-09"]?.skipped, true, r["X402-09"]?.detail);
+      assert.match(r["X402-09"]?.skipReason ?? "", /1 base unit/);
+      // honest, replay, corrupted, expired: no underpayment was sent.
+      assert.equal(target.received.length, 4);
     } finally {
       await target.close();
     }

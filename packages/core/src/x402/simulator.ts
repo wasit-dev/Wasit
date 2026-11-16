@@ -746,7 +746,8 @@ async function preparePayment(
     throw new PaymentGuardRefusedError(
       "accepted",
       `The payment the x402 client built for ${check} names other terms in its accepted field than the ` +
-        `option Wasit checked, so it was discarded and not sent.`,
+        `option Wasit checked.`,
+      { signed: true },
     );
   }
   const paymentPayload = alter === undefined ? signed : { ...signed, accepted: selected };
@@ -1126,6 +1127,23 @@ export function replayVerdict(status: number, reason?: string): CheckResult {
  * accepts, the lower amount may settle.
  */
 async function checkUnderpaymentRejected(options: X402PaymentCheckOptions): Promise<CheckResult> {
+  // The plan of `wasit run` leaves X402-09 out at a price below 2 base units;
+  // the check is then skipped as it is without a plan, and nothing is fetched.
+  const plan = options.plan;
+  if (
+    plan?.status === "planned" &&
+    plan.option !== undefined &&
+    plan.option.amount < 2n &&
+    !plan.signatures.some((signature) => signature.check === "X402-09")
+  ) {
+    const price = plan.option.amount;
+    return skipped(
+      "X402-09",
+      "Underpayment Rejected",
+      `the advertised price is ${price} base unit${price === 1n ? "" : "s"} (as the plan read it before the run), so ` +
+        `there is no smaller payment to offer.`,
+    );
+  }
   let advertised = 0n;
   let offered = 0n;
   let prepared;
@@ -1261,6 +1279,19 @@ function authorizationOf(
   return decoded;
 }
 
+/** A lifetime X402-11 waits out: above 0 and at most 300 s. */
+function withinRejectLifetime(value: unknown): boolean {
+  const lifetime = Number(value);
+  return lifetime > 0 && lifetime <= REJECTED_REQUEST_MAX_LIFETIME_SECONDS;
+}
+
+/** Thrown before signing when the challenge X402-11 is paid from advertises a longer lifetime. */
+class RejectLifetimeTooLong extends Error {
+  public constructor(public readonly lifetime: unknown) {
+    super("the advertised lifetime is longer than X402-11 waits");
+  }
+}
+
 /**
  * X402-11 (negative, spec B7 as D-032 changed it): a valid payment sent with a
  * request the service must refuse must not settle. See `rejected-request.ts`
@@ -1334,16 +1365,16 @@ async function checkRejectedRequestNotSettled(
     );
   }
   const { selected: advertised } = await paymentTerms(unpaid, options.network);
-  const lifetime = Number(advertised.maxTimeoutSeconds);
-  if (!(lifetime > 0 && lifetime <= REJECTED_REQUEST_MAX_LIFETIME_SECONDS)) {
-    return skipped(
+  const tooLong = (value: unknown, again: boolean): CheckResult =>
+    skipped(
       id,
       name,
-      `the service's payments stay valid for ${sanitizeText(String(advertised.maxTimeoutSeconds))} seconds ` +
-        `(maxTimeoutSeconds), longer than the ${REJECTED_REQUEST_MAX_LIFETIME_SECONDS} seconds Wasit waits for one ` +
-        `to expire on a test network, so this check could not show that the payment never settled. Nothing was signed.`,
+      `the service's payments stay valid for ${sanitizeText(String(value))} seconds (maxTimeoutSeconds)` +
+        (again ? ", as it said when asked for payment again" : "") +
+        `, longer than the ${REJECTED_REQUEST_MAX_LIFETIME_SECONDS} seconds Wasit waits for one to expire on a ` +
+        `test network, so this check could not show that the payment never settled. Nothing was signed.`,
     );
-  }
+  if (!withinRejectLifetime(advertised.maxTimeoutSeconds)) return tooLong(advertised.maxTimeoutSeconds, false);
 
   const network = options.network;
   const rpcUrl = chain.resolveRpcUrl(network, options.rpcUrl);
@@ -1354,32 +1385,41 @@ async function checkRejectedRequestNotSettled(
   // payer's balance must be readable. Otherwise no verdict could be reached, and
   // nothing is signed.
   let balanceBefore = 0n;
-  const prepared = await preparePayment(rejectOptions, id, undefined, async () => {
-    let read;
-    try {
-      read = await watch.read(network, rpcUrl, [control]);
-    } catch (error) {
-      throw new CheckSetupError(`The chain could not be read before signing (${(error as Error).message}). Nothing was signed.`);
-    }
-    if (read.used[0] === undefined) {
-      throw new CheckSetupError(
-        "The chain's answer leaves out X402-06's authorization, which was used, so a later read could not show " +
-          "that this payment's was not. Nothing was signed.",
-      );
-    }
-    let balance: bigint | undefined;
-    try {
-      balance = await chain.payerBalance(network, rpcUrl, payer, advertised.asset);
-    } catch {
-      balance = undefined;
-    }
-    if (balance === undefined) {
-      throw new CheckSetupError(
-        "The payer's balance could not be read, and this check needs it as a second reading. Nothing was signed.",
-      );
-    }
-    balanceBefore = balance;
-  });
+  let prepared;
+  try {
+    prepared = await preparePayment(rejectOptions, id, undefined, async (selected) => {
+      // The challenge is read again for the signature, and the service may
+      // answer it with another lifetime: the one signed is held to 300 s too.
+      if (!withinRejectLifetime(selected.maxTimeoutSeconds)) throw new RejectLifetimeTooLong(selected.maxTimeoutSeconds);
+      let read;
+      try {
+        read = await watch.read(network, rpcUrl, [control]);
+      } catch (error) {
+        throw new CheckSetupError(`The chain could not be read before signing (${(error as Error).message}). Nothing was signed.`);
+      }
+      if (read.used[0] === undefined) {
+        throw new CheckSetupError(
+          "The chain's answer leaves out X402-06's authorization, which was used, so a later read could not show " +
+            "that this payment's was not. Nothing was signed.",
+        );
+      }
+      let balance: bigint | undefined;
+      try {
+        balance = await chain.payerBalance(network, rpcUrl, payer, advertised.asset);
+      } catch {
+        balance = undefined;
+      }
+      if (balance === undefined) {
+        throw new CheckSetupError(
+          "The payer's balance could not be read, and this check needs it as a second reading. Nothing was signed.",
+        );
+      }
+      balanceBefore = balance;
+    });
+  } catch (error) {
+    if (error instanceof RejectLifetimeTooLong) return tooLong(error.lifetime, true);
+    throw error;
+  }
   const { httpClient, paymentPayload, selected, payUrl } = prepared;
   const amount = BigInt(selected.amount);
   const ours = authorizationOf(chain, paymentPayload.payload, payer, "this payment");
@@ -1395,6 +1435,17 @@ async function checkRejectedRequestNotSettled(
   }
   if (before.used[0] !== undefined) {
     throw new CheckSetupError("The chain records this payment's authorization as used before it was sent, so it was not sent.");
+  }
+  // What the client signed, not what it was asked: an authorization that stays
+  // valid longer than the 300 s this check waits is not sent (2 units of slack
+  // for the ledgers that close while it is built).
+  const longest = Math.ceil(REJECTED_REQUEST_MAX_LIFETIME_SECONDS / watch.unitSeconds) + 2;
+  if (ours.expiresAt - before.latest > longest) {
+    throw new CheckSetupError(
+      `This payment's authorization stays valid until ${watch.unit} ${ours.expiresAt}, ` +
+        `${ours.expiresAt - before.latest} ${watch.unit}s after the latest (${before.latest}), longer than the ` +
+        `${REJECTED_REQUEST_MAX_LIFETIME_SECONDS} seconds this check waits. It was signed and discarded; it was not sent.`,
+    );
   }
 
   const sentAt = Date.now();

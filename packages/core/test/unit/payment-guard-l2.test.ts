@@ -247,6 +247,16 @@ describe("L2: the SDK signs only the option Wasit checked", () => {
     );
   });
 
+  it("refuses X402-10 before signing when the chain's expired terms change the payee (review R6, K2)", async () => {
+    undo?.();
+    undo = installRecordingChain(recorder, { expiredTerms: { maxTimeoutSeconds: 1, payTo: OTHER_PAY_TO } });
+    const target = await wall({ amount: "10000" });
+    const expired = byId(await run(target.url), "X402-10");
+    assert.equal(expired.error?.kind, "setup", expired.detail);
+    assert.match(expired.detail, /would sign different payTo terms than the target's/);
+    assert.ok(recorder.signed.every((requirement) => requirement.payTo !== OTHER_PAY_TO), "signed for another payee");
+  });
+
   it("discards, unsent, a payload whose accepted option is not the one checked", async () => {
     undo?.();
     undo = installRecordingChain(recorder, { swapPayTo: OTHER_PAY_TO });
@@ -256,6 +266,9 @@ describe("L2: the SDK signs only the option Wasit checked", () => {
     const honest = byId(results, "X402-06");
     assert.equal(honest.error?.kind, "setup", honest.detail);
     assert.match(honest.detail, /accepted/);
+    // It was signed: the message must not say otherwise (review R2).
+    assert.doesNotMatch(honest.detail, /Nothing was signed/);
+    assert.match(honest.detail, /It was signed and discarded; it was not sent\./);
     assert.equal(target.paid, 0, "the payload signed for another payee was sent");
     // It was signed, so it stays charged.
     assert.equal(formatUsd(budget.spentUsd), "$0.01");

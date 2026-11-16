@@ -144,6 +144,7 @@ export type { MainnetSwitch } from "./guard/mainnet-optin.js";
 
 // Which RPC a result read the chain through, and the MCP server's start-up RPC lock (D-023c).
 export { RPC_LOCK_VARIABLE, describeRpcInUse, readRpcLock, rpcInUse } from "./guard/rpc-in-use.js";
+export { RpcIdentityError, assertRpcServesNetwork } from "./guard/rpc-identity.js";
 export type { RpcInUse, RpcSource } from "./guard/rpc-in-use.js";
 
 // Which GitHub events may run the payment tier (D-022a), and which key variables are set.

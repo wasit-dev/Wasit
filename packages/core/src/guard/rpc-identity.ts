@@ -153,7 +153,7 @@ export async function assertRpcServesNetwork(network: string, rpcUrl: string): P
     const reason = sanitizeText(error instanceof Error ? error.message : String(error)).slice(0, 160);
     throw new RpcIdentityError(
       `The RPC at ${at} did not say which network it serves (${rule.method}: ${reason}), so Wasit ` +
-        `could not confirm it is ${label}. Nothing was sent to the target and nothing was signed.`,
+        `could not confirm it is ${label}. No payment was sent and nothing was signed.`,
     );
   }
 
@@ -161,14 +161,14 @@ export async function assertRpcServesNetwork(network: string, rpcUrl: string): P
   if (served === undefined) {
     throw new RpcIdentityError(
       `The RPC at ${at} answered ${rule.method} with something that does not name a network, so ` +
-        `Wasit could not confirm it is ${label}. Nothing was sent to the target and nothing was signed.`,
+        `Wasit could not confirm it is ${label}. No payment was sent and nothing was signed.`,
     );
   }
   if (served !== network) {
     throw new RpcIdentityError(
       `The RPC at ${at} serves ${served}, and this run is on ${label}. Wasit pays and reads ` +
-        `settlements only through an RPC of the run's own network, so nothing was sent to the ` +
-        `target and nothing was signed. Point the run at an RPC for ${label}.`,
+        `settlements only through an RPC of the run's own network, so no payment was sent and ` +
+        `nothing was signed. Point the run at an RPC for ${label}.`,
     );
   }
 }

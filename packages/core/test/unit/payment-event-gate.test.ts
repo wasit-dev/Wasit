@@ -24,9 +24,21 @@ function gha(event: string, ref = "refs/heads/main"): Record<string, string> {
 }
 
 describe("paymentEventGate", () => {
-  it("is open outside GitHub Actions", () => {
+  it("is open outside CI", () => {
     assert.deepEqual(paymentEventGate({}, undefined), { allowed: true });
-    assert.deepEqual(paymentEventGate({ CI: "true" }, undefined), { allowed: true });
+    assert.deepEqual(paymentEventGate({ CI: "" }, undefined), { allowed: true });
+  });
+
+  it("is closed in a CI that is not GitHub Actions, and says so (review R9 a, Najmi 2026-11-17)", () => {
+    for (const value of ["true", "1", "yes"]) {
+      const gate = paymentEventGate({ CI: value }, undefined);
+      assert.equal(gate.allowed, false, value);
+      assert.equal(gate.ciOutsideGithub, true, value);
+      assert.equal(gate.reason, "payment checks not run: CI is set, and this is not GitHub Actions");
+    }
+    // GitHub Actions sets CI too: its own rules apply, not this one.
+    assert.equal(paymentEventGate({ CI: "true", ...gha("push") }, main).allowed, true);
+    assert.equal(paymentEventGate({ CI: "true", ...gha("push") }, main).ciOutsideGithub, undefined);
   });
 
   it("allows a push to the default branch", () => {
@@ -37,6 +49,23 @@ describe("paymentEventGate", () => {
     assert.equal(paymentEventGate(gha("schedule"), { schedule: "0 6 * * *" }).allowed, true);
     assert.equal(paymentEventGate(gha("schedule"), main).allowed, true);
     assert.equal(paymentEventGate(gha("schedule"), undefined).allowed, true);
+  });
+
+  it("counts any non-empty GITHUB_ACTIONS as GitHub Actions, as the CLI's CI test does (review R9 b)", () => {
+    for (const value of ["1", "TRUE", "yes"]) {
+      const gate = paymentEventGate({ GITHUB_ACTIONS: value }, undefined);
+      assert.equal(gate.allowed, false, value);
+    }
+    assert.equal(paymentEventGate({ GITHUB_ACTIONS: "" }, undefined).allowed, true, "an empty value is not set");
+  });
+
+  it("refuses a schedule whose payload names no repository unless its ref is a branch (review R9 c)", () => {
+    for (const ref of ["refs/pull/1/merge", "refs/tags/v1", "", "main"]) {
+      const gate = paymentEventGate(gha("schedule", ref), { schedule: "0 6 * * *" });
+      assert.equal(gate.allowed, false, ref);
+      assert.match(gate.reason ?? "", /payment checks not run/);
+    }
+    assert.equal(paymentEventGate(gha("schedule", "refs/heads/main"), undefined).allowed, true);
   });
 
   it("allows workflow_dispatch on the default branch", () => {

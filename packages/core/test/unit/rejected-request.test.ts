@@ -187,6 +187,31 @@ describe("X402-11 signs nothing when it cannot reach a verdict", () => {
     assert.equal(target.invalid.length, 0);
   });
 
+  it("SKIP before signing when the service raises the lifetime above 300 s on the read it is paid from (review R1)", async () => {
+    // The first unpaid read of the reject request says 60 s; the read the
+    // payment is signed from says 100000 s.
+    const target = await wall("refuse", { invalidUnpaidLifetimes: [60, 100_000] });
+    const result = byId(await run(target.url), "X402-11");
+    assert.equal(result.skipped, true, result.detail);
+    assert.match(result.skipReason ?? "", /100000 seconds/);
+    assert.match(result.skipReason ?? "", /Nothing was signed/);
+    assert.equal(recorder.signed.length, BEFORE_X402_11, "nothing signed for X402-11");
+    assert.ok(recorder.signed.every((signed) => signed.maxTimeoutSeconds <= REJECTED_REQUEST_MAX_LIFETIME_SECONDS));
+    assert.equal(target.invalid.length, 0, "nothing sent with the invalid request");
+  });
+
+  it("not sent when the signed authorization outlives 300 s, whatever the client was asked (review R1)", async () => {
+    install({ extraExpiryLedgers: 100 });
+    const target = await wall("refuse");
+    const result = byId(await run(target.url), "X402-11");
+    assert.notEqual(result.pass, true);
+    assert.ok(result.error !== undefined, `no verdict expected: ${result.detail}`);
+    assert.match(result.error.message, /it was not sent/);
+    assert.doesNotMatch(result.error.message, /Nothing was signed/);
+    assert.equal(recorder.signed.length, BEFORE_X402_11 + 1, "signed once, then discarded");
+    assert.equal(target.invalid.length, 0, "nothing sent with the invalid request");
+  });
+
   it("a lifetime of exactly 300 s is waited out", async () => {
     const target = await wall("refuse", {}, 300);
     const result = byId(await run(target.url), "X402-11");
@@ -243,6 +268,46 @@ describe("X402-11 signs nothing when it cannot reach a verdict", () => {
     assert.equal(result.error?.kind, "setup", result.detail);
     assert.match(result.detail, /plan/);
     assert.equal(recorder.signed.length, BEFORE_X402_11);
+  });
+});
+
+describe("X402-11 does not send a payment it cannot tell apart (review R6)", () => {
+  const X402_11 = BEFORE_X402_11 + 1;
+
+  it("not sent when its authorization carries X402-06's nonce (K3)", async () => {
+    install({ alterPayload: (count) => (count === X402_11 ? { nonce: "nonce-1" } : undefined) });
+    const target = await wall("refuse");
+    const result = byId(await run(target.url), "X402-11");
+    assert.match(result.error?.message ?? "", /carries X402-06's nonce/, result.detail);
+    assert.equal(target.invalid.length, 0);
+  });
+
+  it("not sent when the chain records its authorization as used before it was sent (K4)", async () => {
+    install({ alterPayload: (count) => (count === X402_11 ? { nonce: "nonce-early" } : undefined) });
+    ledger.used.set("nonce-early", 999);
+    const target = await wall("refuse");
+    const result = byId(await run(target.url), "X402-11");
+    assert.match(result.error?.message ?? "", /used before it was sent/, result.detail);
+    assert.equal(target.invalid.length, 0);
+  });
+
+  it("not sent when the read right before sending leaves out X402-06's authorization (K5)", async () => {
+    // Read 1 is before signing and finds the control; read 2, right before sending, does not.
+    ledger.onRead = (reads) => {
+      if (reads === 2) ledger.hidden.add("nonce-1");
+    };
+    const target = await wall("refuse");
+    const result = byId(await run(target.url), "X402-11");
+    assert.match(result.error?.message ?? "", /leaves out X402-06's authorization, so this payment was not sent/, result.detail);
+    assert.equal(target.invalid.length, 0);
+  });
+
+  it("not sent when its authorization is signed by another address than the run's payer (K15)", async () => {
+    install({ alterPayload: (count) => (count === X402_11 ? { payer: "GANOTHERPAYER" } : undefined) });
+    const target = await wall("refuse");
+    const result = byId(await run(target.url), "X402-11");
+    assert.match(result.error?.message ?? "", /signed by another address than this run's payer/, result.detail);
+    assert.equal(target.invalid.length, 0);
   });
 });
 
@@ -375,6 +440,7 @@ describe("watchAuthorization", () => {
       watch: {
         unit: "ledger",
         unitMs: 1,
+        unitSeconds: 5,
         decode: () => ours,
         async read() {
           const latest = latests[Math.min(index, latests.length - 1)]!;
@@ -394,6 +460,25 @@ describe("watchAuthorization", () => {
     const outcome = await watchAuthorization({ watch, network: NETWORK, rpcUrl: "x", ours, control, sentAt: Date.now() });
     assert.deepEqual(outcome, { kind: "unused", latest: 1011 });
     assert.deepEqual(reads, [1009, 1010, 1011]);
+  });
+
+  it("ends as unread at the hard stop when a read never answers (review R5)", { timeout: 5000 }, async () => {
+    setRejectedRequestHardStopForTesting(200);
+    const watch = {
+      unit: "ledger",
+      unitMs: 1,
+      unitSeconds: 5,
+      decode: () => ours,
+      read: () => new Promise<never>(() => undefined),
+      async transfers() {
+        return { latest: 0, transfers: [] };
+      },
+    };
+    const started = Date.now();
+    const outcome = await watchAuthorization({ watch, network: NETWORK, rpcUrl: "x", ours, control, sentAt: started });
+    assert.equal(outcome.kind, "unread");
+    assert.match(outcome.kind === "unread" ? outcome.why : "", /did not answer/);
+    assert.ok(Date.now() - started < 2000, "the watch waited past its hard stop for a read");
   });
 
   it("stops at once when the authorization is found used", async () => {

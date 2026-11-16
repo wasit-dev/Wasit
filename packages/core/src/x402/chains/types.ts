@@ -74,6 +74,12 @@ export interface AuthorizationWatch {
   /** About how long one unit lasts, in milliseconds: the watch reads once per unit. */
   readonly unitMs: number;
   /**
+   * The seconds one unit counts for when a client turns an advertised lifetime
+   * into an expiration (the lifetime divided by this, rounded up). X402-11 does
+   * not send an authorization that outlives its 300 s by more than that count.
+   */
+  readonly unitSeconds: number;
+  /**
    * The authorization a payment payload's inner `payload` carries. Throws
    * `CheckSetupError` when it carries none that can be read, or more than one.
    */

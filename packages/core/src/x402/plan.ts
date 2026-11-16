@@ -147,7 +147,7 @@ async function planEndpoint(
         endpoint.name,
         "refused",
         `it is priced at ${amount} base units of ${asset.symbol} (${formatUsd(price)}), above the ` +
-          `${formatUsd(perPayment)} a payment that is fixed in Wasit. Nothing was signed. Test a route ` +
+          `${formatUsd(perPayment)} per payment fixed in Wasit. Nothing was signed. Test a route ` +
           `priced at ${formatUsd(perPayment)} or less.`,
         option,
       );

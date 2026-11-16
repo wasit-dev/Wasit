@@ -47,7 +47,7 @@ describe("the mainnet opt-in switches of this version (B12)", () => {
     assert.equal(error.switchName, "--mainnet");
     assert.match(error.message, /^--mainnet is refused: the mainnet opt-in is not part of this version\./);
     for (const network of TEST_NETWORKS) assert.ok(error.message.includes(network), network);
-    assert.match(error.message, /Nothing was read, started, sent or signed\.$/);
+    assert.match(error.message, /The config was not read, and nothing was started, sent or signed\.$/);
     assert.doesNotMatch(error.message, /workflow_dispatch/, "no event rule outside GitHub Actions");
   });
 
@@ -58,7 +58,7 @@ describe("the mainnet opt-in switches of this version (B12)", () => {
         error.message.includes(`--mainnet is also refused on every GitHub event but workflow_dispatch, and this run's event is ${event}.`),
         error.message,
       );
-      assert.match(error.message, /Nothing was read, started, sent or signed\.$/);
+      assert.match(error.message, /The config was not read, and nothing was started, sent or signed\.$/);
     }
   });
 

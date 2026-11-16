@@ -80,6 +80,7 @@ export function watchOf(ledger: FakeLedger): AuthorizationWatch {
   return {
     unit: "ledger",
     unitMs: 1,
+    unitSeconds: 5,
     decode(payload) {
       const nonce = payload["nonce"];
       const expiresAt = payload["expiresAt"];
@@ -116,6 +117,10 @@ export interface LedgerChainOptions {
   readonly withoutWatch?: boolean;
   /** X402-06's settlement does not hold up on chain: X402-06 fails. */
   readonly settlementFails?: boolean;
+  /** Ledgers added to every expiration the client signs: a client that signs longer than it was asked. */
+  readonly extraExpiryLedgers?: number;
+  /** Fields over the payload of the `count`th signature (1 = X402-06's). */
+  readonly alterPayload?: (count: number) => Partial<FakePayload> | undefined;
 }
 
 /** The recording chain, with payloads that carry a nonce and an expiration, and a watch on `ledger`. */
@@ -136,10 +141,11 @@ export function ledgerChain(recorder: Recorder, ledger: FakeLedger, options: Led
           const payload: FakePayload = {
             signature: `sig-${count}`,
             nonce: `nonce-${count}`,
-            expiresAt: ledger.latest + Math.ceil(requirements.maxTimeoutSeconds / 5),
+            expiresAt: ledger.latest + Math.ceil(requirements.maxTimeoutSeconds / 5) + (options.extraExpiryLedgers ?? 0),
             payer: PAYER,
             amount: requirements.amount,
             maxTimeoutSeconds: requirements.maxTimeoutSeconds,
+            ...(options.alterPayload?.(count) ?? {}),
           };
           return { x402Version: version, payload: { ...payload } };
         },
@@ -165,6 +171,11 @@ export interface RejectPaywallOptions {
   readonly refuseUnpaidInvalid?: boolean;
   /** Answer the paid invalid request with this status instead of 400 (refusing modes). */
   readonly refusalStatus?: number;
+  /**
+   * The `maxTimeoutSeconds` of each unpaid invalid request in turn (the last
+   * one repeats): a service that changes the lifetime between two reads.
+   */
+  readonly invalidUnpaidLifetimes?: readonly number[];
 }
 
 export interface RejectPaywall {
@@ -191,6 +202,7 @@ export async function rejectPaywall(
   const marker = options.marker ?? "x-invalid";
   const state = { accepts };
   const invalid: RejectPaywall["invalid"] = [];
+  let invalidUnpaidReads = 0;
 
   const challenge = (response: http.ServerResponse, error?: string): void => {
     const body = { x402Version: 2, resource: { url: "http://127.0.0.1/paid" }, accepts: state.accepts, ...(error === undefined ? {} : { error }) };
@@ -211,6 +223,16 @@ export async function rejectPaywall(
         if (isInvalid && options.refuseUnpaidInvalid === true) {
           response.writeHead(400, { "content-type": "application/json" });
           response.end(JSON.stringify({ error: "invalid request" }));
+          return;
+        }
+        const lifetimes = options.invalidUnpaidLifetimes;
+        if (isInvalid && lifetimes !== undefined && lifetimes.length > 0) {
+          const lifetime = lifetimes[Math.min(invalidUnpaidReads, lifetimes.length - 1)]!;
+          invalidUnpaidReads += 1;
+          const saved = state.accepts;
+          state.accepts = saved.map((requirement) => ({ ...requirement, maxTimeoutSeconds: lifetime }));
+          challenge(response);
+          state.accepts = saved;
           return;
         }
         challenge(response);

@@ -82,14 +82,15 @@ export function formatUsd(amount: bigint): string {
 export type GuardRefusal = "price" | "asset" | "amount" | "pin" | "plan" | "run-cap" | "accepted";
 
 /**
- * A payment the guard will not sign. A setup error: it says nothing about the
- * target, and the check that hit it has no verdict.
+ * A payment the guard will not sign, or, with `signed`, a signed payment it
+ * will not send. A setup error: it says nothing about the target, and the
+ * check that hit it has no verdict.
  */
 export class PaymentGuardRefusedError extends CheckSetupError {
   public readonly reason: GuardRefusal;
 
-  public constructor(reason: GuardRefusal, message: string) {
-    super(`${message} Nothing was signed.`);
+  public constructor(reason: GuardRefusal, message: string, options: { readonly signed?: boolean } = {}) {
+    super(options.signed === true ? `${message} It was signed and discarded; it was not sent.` : `${message} Nothing was signed.`);
     this.name = "PaymentGuardRefusedError";
     this.reason = reason;
   }
@@ -250,7 +251,7 @@ export class RunBudget {
       throw new PaymentGuardRefusedError(
         "price",
         `${charge.check} would sign ${amount} base units of ${asset.symbol} (${formatUsd(usd)}), above the ` +
-          `${formatUsd(perPayment)} a payment that is fixed in Wasit. A route priced at ` +
+          `${formatUsd(perPayment)} per payment fixed in Wasit. A route priced at ` +
           `${formatUsd(perPayment)} or less is checked as usual.`,
       );
     }

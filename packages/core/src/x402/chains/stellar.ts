@@ -238,6 +238,9 @@ const EVENTS_MAX_PAGES = 20;
 const stellarAuthorizations: AuthorizationWatch = {
   unit: "ledger",
   unitMs: 5_000,
+  // The x402 Stellar client's own default (DEFAULT_ESTIMATED_LEDGER_SECONDS in
+  // @x402/stellar 2.28.0); it estimates from recent ledgers when it can.
+  unitSeconds: 5,
   decode: decodeStellarAuthorization,
   async read(_network, rpcUrl, authorizations) {
     const keys = authorizations.map(nonceKey);

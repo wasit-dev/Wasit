@@ -32,6 +32,8 @@ export interface Recorder {
 export interface RecordingChainOptions {
   /** A policy the "SDK" applies after Wasit's: it signs for another payee (B-A02). */
   readonly swapPayTo?: string;
+  /** What `expiredSigning` gives as X402-10's terms: an adapter that changes more than the lifetime. */
+  readonly expiredTerms?: Partial<PaymentRequirements>;
 }
 
 export function recordingChain(recorder: Recorder, options: RecordingChainOptions = {}): PaymentChain {
@@ -61,7 +63,7 @@ export function recordingChain(recorder: Recorder, options: RecordingChainOption
         );
       }
     },
-    expiredSigning: async () => ({ terms: { maxTimeoutSeconds: 1 }, holdMs: 0 }),
+    expiredSigning: async () => ({ terms: options.expiredTerms ?? { maxTimeoutSeconds: 1 }, holdMs: 0 }),
     payerAddress: () => PAYER,
     generatePayerKey: () => "test-payer-key",
     payerBalance: async () => 10n ** 30n,

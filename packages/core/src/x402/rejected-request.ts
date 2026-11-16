@@ -12,7 +12,9 @@
  *
  * The wait (Najmi, 2026-11-16): a payment whose advertised lifetime
  * (`maxTimeoutSeconds`) is at most 300 s is waited out, with a hard stop 360 s
- * after it was sent; a longer one is not signed at all.
+ * after it was sent; a longer one is not signed at all (it is read again on the
+ * challenge the payment is signed from), and an authorization the client signs
+ * to outlive it is not sent.
  *
  * This file holds the parts that need no network: the rules, the reject
  * request's shape, the watch loop over a chain's reads, and the verdict. The
@@ -108,6 +110,27 @@ function message(error: unknown): string {
   return sanitizeText(error instanceof Error ? error.message : String(error)).replace(/\s+/g, " ").slice(0, 200);
 }
 
+class ReadTimedOut extends Error {}
+
+/** `promise`, or `ReadTimedOut` once `ms` have passed (at once when `ms` is 0 or less). */
+function withinMs<T>(promise: Promise<T>, ms: number): Promise<T> {
+  // A read that answers after the stop is ignored, and its failure too.
+  promise.catch(() => undefined);
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new ReadTimedOut()), Math.max(0, ms));
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
 export interface WatchInput {
   readonly watch: AuthorizationWatch;
   readonly network: string;
@@ -134,8 +157,16 @@ export async function watchAuthorization(input: WatchInput): Promise<WatchOutcom
   for (;;) {
     let read;
     try {
-      read = await input.watch.read(input.network, input.rpcUrl, [input.ours, input.control]);
+      // A read that has not answered by the hard stop ends the watch there: the
+      // stop holds while a read is in flight, not only between reads.
+      read = await withinMs(input.watch.read(input.network, input.rpcUrl, [input.ours, input.control]), stop - now());
     } catch (error) {
+      if (error instanceof ReadTimedOut) {
+        return {
+          kind: "unread",
+          why: `the chain did not answer a read before the watch's hard stop, ${Math.round(rejectedRequestHardStopMs() / 1000)} s after the payment was sent`,
+        };
+      }
       return { kind: "unread", why: `the chain read failed: ${message(error)}` };
     }
     if (read.used[1] === undefined) {

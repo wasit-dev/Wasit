@@ -77,7 +77,8 @@ export function refuseMainnetSwitch(switchName: MainnetSwitch, context: { readon
           `${EVENT_NAME.test(event) ? event : "another event"}.`;
     throw new MainnetOptInRefusedError(
       switchName,
-      `--mainnet is refused: ${MAINNET_OPT_IN_ABSENT}. ${networks}${eventRule} Nothing was read, started, sent or signed.`,
+      `--mainnet is refused: ${MAINNET_OPT_IN_ABSENT}. ${networks}${eventRule} ` +
+        `The config was not read, and nothing was started, sent or signed.`,
     );
   }
   throw new MainnetOptInRefusedError(

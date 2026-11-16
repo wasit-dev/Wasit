@@ -23,6 +23,12 @@ export interface PaymentEventGate {
   readonly allowed: boolean;
   /** Set when not allowed: the reason a skipped payment check gives, "payment checks not run: ...". */
   readonly reason?: string;
+  /**
+   * Not allowed because the run is in a CI that is not GitHub Actions (`CI`
+   * set): there the service of the run would share its job with the key, and
+   * nothing keeps them apart. `wasit run` refuses the payment tier there.
+   */
+  readonly ciOutsideGithub?: true;
 }
 
 const ALLOWED_EVENTS = "Wasit pays on push to the default branch, schedule and workflow_dispatch only";
@@ -53,9 +59,13 @@ function defaultBranch(event: unknown): string | undefined {
   return typeof branch === "string" && PRINTABLE_REF.test(branch) ? branch : undefined;
 }
 
-/** True when the process runs as a step of GitHub Actions, or says it does. Fail closed: either variable counts. */
+/**
+ * True when the process runs as a step of GitHub Actions, or says it does.
+ * Fail closed: either variable counts, with any value that is not empty, as
+ * the CLI's own CI test reads `GITHUB_ACTIONS`.
+ */
 export function inGithubActions(env: Readonly<Record<string, string | undefined>>): boolean {
-  return env["GITHUB_ACTIONS"] === "true" || nonEmpty(env["GITHUB_EVENT_NAME"]);
+  return nonEmpty(env["GITHUB_ACTIONS"]) || nonEmpty(env["GITHUB_EVENT_NAME"]);
 }
 
 /**
@@ -63,7 +73,13 @@ export function inGithubActions(env: Readonly<Record<string, string | undefined>
  * ({@link readGithubEvent}), or undefined when there is none.
  */
 export function paymentEventGate(env: Readonly<Record<string, string | undefined>>, event: unknown): PaymentEventGate {
-  if (!inGithubActions(env)) return { allowed: true };
+  if (!inGithubActions(env)) {
+    // Najmi, 2026-11-17 (review R9 a): outside GitHub Actions only a run outside CI pays.
+    if (nonEmpty(env["CI"])) {
+      return { allowed: false, reason: "payment checks not run: CI is set, and this is not GitHub Actions", ciOutsideGithub: true };
+    }
+    return { allowed: true };
+  }
 
   const name = env["GITHUB_EVENT_NAME"] ?? "";
   if (name.startsWith("pull_request")) return { allowed: false, reason: "payment checks not run: pull request" };
@@ -77,8 +93,9 @@ export function paymentEventGate(env: Readonly<Record<string, string | undefined
   const ref = env["GITHUB_REF"] ?? "";
   const branch = defaultBranch(event);
   if (branch === undefined) {
-    // GitHub runs a schedule on the default branch, and its payload may not name the repository.
-    if (name === "schedule") return { allowed: true };
+    // GitHub runs a schedule on the default branch, and its payload may not name
+    // the repository; its ref must still be a branch.
+    if (name === "schedule" && ref.startsWith("refs/heads/")) return { allowed: true };
     return {
       allowed: false,
       reason: `payment checks not run: the ${name} event does not name the default branch, so Wasit cannot tell that ${shownRef(ref)} is it`,

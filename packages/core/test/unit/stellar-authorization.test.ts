@@ -102,6 +102,7 @@ describe("decode: the authorization as signed", () => {
   it("is the unit Stellar counts in: a ledger, about 5 s", () => {
     assert.equal(watch.unit, "ledger");
     assert.equal(watch.unitMs, 5000);
+    assert.equal(watch.unitSeconds, 5, "the x402 Stellar client's default ledger estimate");
   });
 });
 
@@ -280,6 +281,24 @@ describe("transfers: the second reading", () => {
       assert.equal(read.transfers.length, 101);
       assert.equal(rpc.calls.length, 2);
       assert.equal(rpc.calls[1]!.params["pagination"] !== undefined || rpc.calls[1]!.params["cursor"] !== undefined, true);
+    } finally {
+      await rpc.close();
+    }
+  });
+
+  it("throws after 20 full pages rather than read a cut list as complete (review R6, K27)", async () => {
+    let page = 0;
+    const rpc = await rpcStandIn(() => {
+      page += 1;
+      const events = Array.from({ length: 100 }, () => transferEvent(PAYER, PAY_TO, 1n));
+      return { latestLedger: 5100, oldestLedger: 100, latestLedgerCloseTime: "0", oldestLedgerCloseTime: "0", cursor: `c${page}`, events };
+    });
+    try {
+      await assert.rejects(
+        watch.transfers(NETWORK, rpc.url, { asset: TOKEN, from: PAYER, to: PAY_TO, fromLedger: 5001 }),
+        /more transfer events than can be read in full/,
+      );
+      assert.equal(rpc.calls.length, 20);
     } finally {
       await rpc.close();
     }
