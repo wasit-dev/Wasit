@@ -30,7 +30,7 @@ function trimmed(value) {
  * `INPUT_ENVIRONMENT`, `INPUT_TIER`, `INPUT_ENDPOINTS`, and the event name).
  *
  * @param {Record<string, string | undefined>} env
- * @returns {{ config: string, environment: string | undefined, tier: "read-only", endpoints: string[] }}
+ * @returns {{ config: string, environment: string | undefined, tier: "read-only" | "payment", endpoints: string[] }}
  */
 export function parseInputs(env) {
   // pull_request_target hands the base repository's token and secrets to a workflow that runs a pull request's code.
@@ -40,9 +40,10 @@ export function parseInputs(env) {
     );
   }
 
+  // Whether this event may pay is the CLI's to say (D-022a): on a pull request it runs the
+  // read-only checks and says so, and it refuses a payer key given to a run that may not pay.
   const tier = trimmed(env["INPUT_TIER"]) || "read-only";
-  if (tier === "payment") throw new InputError("tier: payment is not available in this version. Use tier: read-only.");
-  if (tier !== "read-only") throw new InputError("tier must be read-only.");
+  if (tier !== "read-only" && tier !== "payment") throw new InputError("tier must be read-only or payment.");
 
   const config = trimmed(env["INPUT_CONFIG"]) || DEFAULT_CONFIG;
   if (/[\u0000-\u001f\u007f]/.test(config) || config.length > MAX_CONFIG_PATH || config.startsWith("-")) {
@@ -67,12 +68,12 @@ export function parseInputs(env) {
     throw new InputError("each entry of endpoints must be a name: letters, digits, dot, underscore and hyphen, at most 64 characters; separate them with commas or line breaks.");
   }
 
-  return { config, environment: environment === "" ? undefined : environment, tier: "read-only", endpoints };
+  return { config, environment: environment === "" ? undefined : environment, tier, endpoints };
 }
 
 /**
- * The one call that runs Wasit: `wasit run --read-only --start-if-local --json --out`: the CLI starts service.start only when it is set and the environment is on this machine.
- * No flag that pays, signs or opts into mainnet is offered by this version.
+ * The one call that runs Wasit: `wasit run [--read-only] --start-if-local --json --out`: the CLI starts service.start only when it is set and the environment is on this machine.
+ * The payment tier is the same call without --read-only. No flag that opts into mainnet or carries a key is offered.
  *
  * @param {ReturnType<typeof parseInputs>} inputs
  * @param {{ cli: string, report: string, baseline?: string }} paths
@@ -82,7 +83,7 @@ export function buildRunArgs(inputs, paths) {
   return [
     paths.cli,
     "run",
-    "--read-only",
+    ...(inputs.tier === "payment" ? [] : ["--read-only"]),
     "--start-if-local",
     "--json",
     "--out",

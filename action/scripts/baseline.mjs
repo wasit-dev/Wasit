@@ -1,8 +1,9 @@
 /**
  * Choosing the baseline for a run (spec A5, A8 #4, A-A05).
  *
- * The RUN is chosen first: the latest successful `push` run of this workflow on
- * the default branch, from this repository. Only then is that run's
+ * The RUN is chosen first: the latest successful run of this workflow on the
+ * default branch, from this repository, started by a push, a schedule or a
+ * workflow_dispatch. Only then is that run's
  * `wasit-baseline` artifact downloaded, by run id. Never "the newest artifact
  * with that name": a pull request run (a fork's too, which runs the fork's copy
  * of the workflow file) can upload an artifact with that name, and a fork can
@@ -30,6 +31,13 @@ export const BASELINE_ARTIFACT = "wasit-baseline";
  */
 export const ACCEPTED_CONCLUSIONS = Object.freeze(["success"]);
 
+/**
+ * The events whose runs may be a baseline: those that run merged code on the
+ * default branch, which are also the only ones where the payment tier pays
+ * (D-022a). A pull request run, a merge queue run and a workflow_run never are.
+ */
+export const BASELINE_EVENTS = Object.freeze(["push", "schedule", "workflow_dispatch"]);
+
 const sameName = (a, b) => typeof a === "string" && typeof b === "string" && a.toLowerCase() === b.toLowerCase();
 
 /**
@@ -45,7 +53,7 @@ export function selectBaselineRun(runs, context) {
       typeof run === "object" &&
       Number.isSafeInteger(run.id) &&
       run.id !== context.currentRunId &&
-      run.event === "push" &&
+      BASELINE_EVENTS.includes(run.event) &&
       run.head_branch === context.defaultBranch &&
       run.status === "completed" &&
       ACCEPTED_CONCLUSIONS.includes(run.conclusion) &&
@@ -82,13 +90,14 @@ export async function findBaseline({ gh, repository, runId, directory, defaultBr
     if (workflowId === undefined) return none("this run does not name its workflow");
 
     // `status=success` keeps the newest successful runs on the first page of a busy repository.
+    // The API takes one event at a time, so the events are filtered here.
     const conclusion = ACCEPTED_CONCLUSIONS.length === 1 ? `&status=${ACCEPTED_CONCLUSIONS[0]}` : "";
     const listing = await api(
       gh,
-      `repos/${repository}/actions/workflows/${workflowId}/runs?branch=${encodeURIComponent(branch)}&event=push${conclusion}&per_page=50`,
+      `repos/${repository}/actions/workflows/${workflowId}/runs?branch=${encodeURIComponent(branch)}${conclusion}&per_page=50`,
     );
     const chosen = selectBaselineRun(listing.workflow_runs, { repository, defaultBranch: branch, workflowId, currentRunId });
-    if (chosen === undefined) return none(`no successful push run of this workflow on ${oneLine(branch, 60)} yet`);
+    if (chosen === undefined) return none(`no successful push, schedule or workflow_dispatch run of this workflow on ${oneLine(branch, 60)} yet`);
 
     const artifacts = await api(gh, `repos/${repository}/actions/runs/${chosen.id}/artifacts?per_page=100&name=${BASELINE_ARTIFACT}`);
     const found = (Array.isArray(artifacts.artifacts) ? artifacts.artifacts : [])

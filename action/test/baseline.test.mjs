@@ -45,6 +45,13 @@ describe("selectBaselineRun", () => {
     assert.equal(chosen?.id, 3);
   });
 
+  it("takes a schedule or a workflow_dispatch run on the default branch as well: the payment tier runs there (D-022a)", () => {
+    for (const event of ["schedule", "workflow_dispatch"]) {
+      const chosen = selectBaselineRun([run({ id: 1, created_at: "2026-11-01T00:00:00Z" }), run({ id: 2, event, created_at: "2026-11-12T00:00:00Z" })], CONTEXT);
+      assert.equal(chosen?.id, 2, event);
+    }
+  });
+
   it("breaks a tie in time by the higher run id", () => {
     assert.equal(selectBaselineRun([run({ id: 5 }), run({ id: 6 })], CONTEXT)?.id, 6);
   });
@@ -62,14 +69,14 @@ describe("selectBaselineRun", () => {
       "a pull request run whose head repository is a fork": run({ ...newer, id: 3, event: "pull_request", head_repository: { full_name: "mallory/paywall" } }),
       "a push run whose head repository is another one": run({ ...newer, id: 4, head_repository: { full_name: "mallory/paywall" } }),
       "a run of another repository": run({ ...newer, id: 5, repository: { full_name: "mallory/paywall" } }),
-      "a workflow_dispatch run": run({ ...newer, id: 6, event: "workflow_dispatch" }),
-      "a schedule run": run({ ...newer, id: 7, event: "schedule" }),
       "a run on another branch": run({ ...newer, id: 8, head_branch: "feature" }),
       "a run on a branch whose name only starts with main": run({ ...newer, id: 9, head_branch: "main-evil" }),
       "a failed run": run({ ...newer, id: 10, conclusion: "failure" }),
       "a cancelled run": run({ ...newer, id: 11, conclusion: "cancelled" }),
       "a run that is not finished": run({ ...newer, id: 12, status: "in_progress", conclusion: null }),
       "a run of another workflow": run({ ...newer, id: 13, workflow_id: 7 }),
+      "a merge_group run": run({ ...newer, id: 16, event: "merge_group" }),
+      "a workflow_run run": run({ ...newer, id: 17, event: "workflow_run" }),
       "the run that is running now": run({ ...newer, id: 900 }),
       "a run with no head repository": run({ ...newer, id: 14, head_repository: null }),
       "a run whose id is not a whole number": run({ ...newer, id: "15; rm -rf /" }),
@@ -145,12 +152,12 @@ describe("findBaseline", () => {
     assert.equal(download[download.indexOf("--name") + 1], BASELINE_ARTIFACT);
   });
 
-  it("asks the API for push runs of this workflow on the default branch, that succeeded", async () => {
+  it("asks the API for runs of this workflow on the default branch that succeeded, of any event (it filters the events itself)", async () => {
     const { gh, calls } = fakeGh({ runs: [] });
     await findBaseline({ ...base(), gh, log: () => {} });
     const listing = calls.map((args) => args[1]).find((route) => route?.includes("/workflows/"));
     assert.match(listing, /\/workflows\/4242\/runs\?/);
-    assert.match(listing, /event=push/);
+    assert.doesNotMatch(listing, /event=/);
     assert.match(listing, /branch=main/);
     assert.match(listing, /status=success/);
   });

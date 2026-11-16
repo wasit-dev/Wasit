@@ -35,13 +35,20 @@ describe("parseInputs", () => {
   });
 
   describe("tier", () => {
-    it("refuses payment: not available in this version", () => {
-      assert.throws(() => parseInputs(env({ INPUT_TIER: "payment" })), (error) => error instanceof InputError && /not available in this version/.test(error.message));
+    it("takes payment, on any event: the CLI decides whether the event may pay (D-022a)", () => {
+      for (const name of ["push", "pull_request", "schedule", "workflow_dispatch"]) {
+        assert.equal(parseInputs(env({ INPUT_TIER: "payment", GITHUB_EVENT_NAME: name })).tier, "payment", name);
+      }
     });
 
-    it("refuses anything that is not read-only, naming the value as data", () => {
-      for (const tier of ["Payment", "full", "read-only; id", "mainnet"]) {
-        assert.throws(() => parseInputs(env({ INPUT_TIER: tier })), InputError, tier);
+    it("refuses anything that is not read-only or payment, without quoting the value", () => {
+      for (const tier of ["Payment", "full", "read-only; id", "mainnet", "payment\n"]) {
+        if (tier.trim() === "payment") continue;
+        assert.throws(
+          () => parseInputs(env({ INPUT_TIER: tier })),
+          (error) => error instanceof InputError && /tier must be read-only or payment/.test(error.message) && !error.message.includes(tier),
+          tier,
+        );
       }
     });
   });
@@ -95,9 +102,17 @@ describe("buildRunArgs", () => {
     ]);
   });
 
-  it("offers no flag that pays, signs or opts in", () => {
-    const joined = buildRunArgs(parseInputs(env()), paths).join(" ");
-    assert.ok(!/--dry-run|--mainnet|--payer-key|--commitment-key|--allow-destructive/.test(joined));
+  it("offers no flag that opts in or carries a key, on either tier", () => {
+    for (const tier of ["read-only", "payment"]) {
+      const joined = buildRunArgs(parseInputs(env({ INPUT_TIER: tier })), paths).join(" ");
+      assert.ok(!/--dry-run|--mainnet|--payer-key|--commitment-key|--allow-destructive/.test(joined), tier);
+    }
+  });
+
+  it("drops --read-only for the payment tier, and changes nothing else", () => {
+    const read = buildRunArgs(parseInputs(env()), paths);
+    const pay = buildRunArgs(parseInputs(env({ INPUT_TIER: "payment" })), paths);
+    assert.deepEqual(pay, read.filter((arg) => arg !== "--read-only"));
   });
 
   it("keeps a value that looks like a flag a single argument after its option", () => {

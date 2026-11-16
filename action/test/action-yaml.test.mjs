@@ -38,7 +38,9 @@ describe("action.yml", () => {
     assert.equal(action.inputs.config.default, "wasit.config.json");
     assert.equal(action.inputs.tier.default, "read-only");
     for (const [name, input] of Object.entries(action.inputs)) assert.ok(typeof input.description === "string" && input.description.length > 0, name);
-    assert.match(action.inputs.tier.description, /payment.*not available in this version/i);
+    assert.match(action.inputs.tier.description, /payment/);
+    assert.match(action.inputs.tier.description, /pull request/);
+    assert.match(action.inputs.tier.description, /env: of this step/);
   });
 
   it("offers no input that pays, signs or opts into mainnet", () => {
@@ -179,10 +181,13 @@ describe("action.yml", () => {
       assert.equal(stepByName("Write the report").env.BASELINE_PATH, "${{ steps.baseline.outputs.path }}");
     });
 
-    it("uploads the baseline only on a push to the default branch", () => {
+    it("uploads the baseline on a push or a dispatch on the default branch, and on a schedule, never on a pull request", () => {
       const upload = stepByName("Upload the baseline");
       assert.match(upload.if, /github\.event_name == 'push'/);
+      assert.match(upload.if, /github\.event_name == 'workflow_dispatch'/);
+      assert.match(upload.if, /github\.event_name == 'schedule'/);
       assert.match(upload.if, /github\.ref == format\('refs\/heads\/\{0\}', github\.event\.repository\.default_branch\)/);
+      assert.ok(!/pull_request/.test(upload.if));
       assert.equal(upload.with.name, "wasit-baseline");
     });
 

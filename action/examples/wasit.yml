@@ -45,6 +45,22 @@ jobs:
         with:
           node-version: 22
 
+      # The payment tier (test networks only, at most $1.00 a payment and $5.00 a
+      # run) also runs X402-06 to X402-10. It pays on push to main, schedule and
+      # workflow_dispatch; on a pull request it runs the read-only checks. To use
+      # it, store a dedicated testnet payer as a repository secret and change this
+      # step to:
+      #   with:
+      #     config: wasit.config.json
+      #     tier: payment
+      #   env:
+      #     STELLAR_PRIVATE_KEY: ${{ github.event_name != 'pull_request' && secrets.WASIT_TESTNET_PAYER || '' }}
+      # Give the key on this step only, never in a job-level env: the earlier
+      # steps of this job (an npm ci with install scripts) would get it too. A key
+      # given to a pull request run is refused before your service starts. On a
+      # GitHub-hosted runner your service then runs as a separate user, so it
+      # cannot read the key from Wasit's process; code that ran earlier in the job
+      # as the runner's user is not kept from it.
       - uses: wasit-dev/wasit/action@<tag-or-commit-sha>
         with:
           config: wasit.config.json

@@ -1,9 +1,10 @@
 name: Wasit
 description: >-
-  Runs Wasit's read-only x402 challenge checks against your service inside the
-  job, comments the result on the pull request, and compares it with main.
-  Linux runners. Needs Node 22 or later (add actions/setup-node before this
-  step). The payment tier is not available in this version.
+  Runs Wasit's x402 checks against your service inside the job, comments the
+  result on the pull request, and compares it with main. The payment tier pays
+  on test networks only, on push to the default branch, schedule and
+  workflow_dispatch. Linux runners. Needs Node 22 or later (add
+  actions/setup-node before this step).
 
 inputs:
   config:
@@ -17,8 +18,12 @@ inputs:
   tier:
     description: >-
       read-only runs the unpaid challenge checks (X402-01 to X402-05): they send
-      no payment and sign nothing. payment is not available in this version and
-      is refused.
+      no payment and sign nothing. payment also runs the payment checks (X402-06
+      to X402-10) on a test network, at most $1.00 a payment and $5.00 a run, on
+      push to the default branch, schedule and workflow_dispatch only; on a pull
+      request it runs the read-only checks and says so. Give the payer key in the
+      env: of this step only, and only to runs that may pay; a key given to a
+      pull request run is refused before your service starts.
     required: false
     default: read-only
   endpoints:
@@ -117,7 +122,7 @@ runs:
 
     # Pinned to the commit of v4.6.2 (read from the GitHub API on 2026-11-15).
     - name: Upload the baseline
-      if: ${{ always() && steps.run.conclusion != 'skipped' && github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+      if: ${{ always() && steps.run.conclusion != 'skipped' && (github.event_name == 'schedule' || ((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == format('refs/heads/{0}', github.event.repository.default_branch))) }}
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
       with:
         name: wasit-baseline

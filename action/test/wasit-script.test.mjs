@@ -49,10 +49,9 @@ describe("wasit.mjs check", () => {
     assert.ok(existsSync(path.join(temp, "wasit")));
   });
 
-  it("refuses the payment tier with the sentence the guide will quote, exit 2", async () => {
+  it("accepts the payment tier: whether the event may pay is the CLI's to say", async () => {
     const result = await runMain("check", { ...env(), INPUT_TIER: "payment" });
-    assert.equal(result.code, 2);
-    assert.match(result.stderr, /tier: payment is not available in this version/);
+    assert.equal(result.code, 0, result.stderr);
   });
 
   it("refuses pull_request_target, exit 2", async () => {
@@ -173,11 +172,13 @@ if (process.env.FAKE_WAIT) {
     }
   });
 
-  it("run: refuses the payment tier itself, before it starts the CLI", async () => {
+  it("run: the payment tier calls the CLI without --read-only, and with no key flag", async () => {
     await clearRecord();
-    const result = await runMain("run", env({ INPUT_TIER: "payment" }));
-    assert.equal(result.code, 2);
-    assert.equal((await readFile(record, "utf-8")).trim(), "");
+    await runMain("run", env({ INPUT_TIER: "payment" }));
+    const argv = (await lastCall()).argv;
+    assert.equal(argv[0], "run");
+    assert.ok(!argv.includes("--read-only"));
+    assert.ok(!argv.some((arg) => /key|secret|mainnet/i.test(arg)), argv.join(" "));
   });
 
   it("run: exits 2 when the CLI is not where the action's checkout says (the install did not happen)", async () => {
@@ -307,6 +308,13 @@ http.createServer((req, res) => {
     return { config: `${name}.config.json`, envFile };
   }
 
+  /** The event file of a push to main, as the runner writes it. */
+  async function pushEvent() {
+    const file = path.join(root, "push-event.json");
+    await writeFile(file, JSON.stringify({ ref: "refs/heads/main", repository: { default_branch: "main" } }));
+    return file;
+  }
+
   const stepEnv = (extra = {}) => ({
     PATH: process.env.PATH,
     HOME: root,
@@ -336,6 +344,9 @@ http.createServer((req, res) => {
     const env = stepEnv({
       INPUT_CONFIG: config,
       GITHUB_EVENT_NAME: "push",
+      // A push the payment gate reads as one to the default branch: a key on any other run is refused (D-022a).
+      GITHUB_REF: "refs/heads/main",
+      GITHUB_EVENT_PATH: await pushEvent(),
       GH_TOKEN: "canary-gh-token",
       GITHUB_TOKEN: "canary-github-token",
       WASIT_HEADER_X_API_KEY: "canary-header-value",
@@ -424,8 +435,9 @@ http.createServer((req, res) => {
     assert.equal(existsSync(path.join(temp, "wasit", "baseline-next.json")), false, "a run that graded nothing is never a baseline");
   });
 
-  it("refuses the payment tier and pull_request_target as a process, exit 2", async () => {
-    assert.equal((await runScript("check", stepEnv({ INPUT_CONFIG: "x.json", INPUT_TIER: "payment" }), workspace)).code, 2);
+  it("accepts the payment tier and refuses pull_request_target as a process", async () => {
+    assert.equal((await runScript("check", stepEnv({ INPUT_CONFIG: "x.json", INPUT_TIER: "payment" }), workspace)).code, 0);
     assert.equal((await runScript("check", stepEnv({ INPUT_CONFIG: "x.json", GITHUB_EVENT_NAME: "pull_request_target" }), workspace)).code, 2);
+    assert.equal((await runScript("check", stepEnv({ INPUT_CONFIG: "x.json", INPUT_TIER: "mainnet" }), workspace)).code, 2);
   });
 });
