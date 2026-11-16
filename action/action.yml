@@ -108,6 +108,8 @@ runs:
       env:
         ACTION_PATH: ${{ github.action_path }}
         BASELINE_PATH: ${{ steps.baseline.outputs.path }}
+        HISTORY_PATH: ${{ steps.baseline.outputs.history }}
+        BASELINE_RUN: ${{ steps.baseline.outputs.run }}
         WASIT_BUILD_COMMIT: ${{ github.action_ref }}
       run: node "$ACTION_PATH/scripts/wasit.mjs" report
 

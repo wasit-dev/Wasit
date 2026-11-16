@@ -191,6 +191,12 @@ describe("action.yml", () => {
       assert.equal(upload.with.name, "wasit-baseline");
     });
 
+    it("hands the report step the history and the run it compares with (D-022b)", () => {
+      const report = stepByName("Write the report").env;
+      assert.equal(report.HISTORY_PATH, "${{ steps.baseline.outputs.history }}");
+      assert.equal(report.BASELINE_RUN, "${{ steps.baseline.outputs.run }}");
+    });
+
     it("comments only on a pull request", () => {
       assert.match(stepByName("Comment on the pull request").if, /github\.event_name == 'pull_request'/);
     });

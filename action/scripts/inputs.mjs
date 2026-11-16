@@ -99,7 +99,10 @@ export function buildRunArgs(inputs, paths) {
 /**
  * The call that turns the report into the comment, the summary and the next baseline.
  *
- * @param {{ cli: string, report: string, comment: string, baselineOut: string, baseline?: string }} paths
+ * The history file and the run id (D-022b) come after the baseline; each is left
+ * out when it is empty.
+ *
+ * @param {{ cli: string, report: string, comment: string, baselineOut: string, baseline?: string, history?: string, baselineRun?: string }} paths
  * @returns {string[]}
  */
 export function buildReportArgs(paths) {
@@ -113,6 +116,8 @@ export function buildReportArgs(paths) {
     "--baseline-out",
     paths.baselineOut,
     ...(paths.baseline === undefined || paths.baseline === "" ? [] : ["--baseline", paths.baseline]),
+    ...(paths.history === undefined || paths.history === "" ? [] : ["--history", paths.history]),
+    ...(paths.baselineRun === undefined || paths.baselineRun === "" ? [] : ["--baseline-run", paths.baselineRun]),
   ];
 }
 

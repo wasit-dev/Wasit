@@ -128,6 +128,13 @@ describe("buildReportArgs", () => {
     assert.deepEqual(buildReportArgs(paths), [paths.cli, "ci-report", "--report", paths.report, "--comment", paths.comment, "--baseline-out", paths.baselineOut]);
   });
 
+  it("adds --history and --baseline-run when there are, after the baseline (D-022b)", () => {
+    const args = buildReportArgs({ ...paths, baseline: "/tmp/w/baseline/baseline.json", history: "/tmp/w/history/baseline.json", baselineRun: "200" });
+    assert.deepEqual(args.slice(-6), ["--baseline", "/tmp/w/baseline/baseline.json", "--history", "/tmp/w/history/baseline.json", "--baseline-run", "200"]);
+    const none = buildReportArgs({ ...paths, history: "", baselineRun: "" });
+    assert.ok(!none.includes("--history") && !none.includes("--baseline-run"));
+  });
+
   it("adds --baseline only when there is one", () => {
     assert.deepEqual(buildReportArgs({ ...paths, baseline: "/tmp/w/baseline/baseline.json" }).slice(-2), ["--baseline", "/tmp/w/baseline/baseline.json"]);
     assert.ok(!buildReportArgs({ ...paths, baseline: "" }).includes("--baseline"));

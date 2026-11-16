@@ -35,9 +35,9 @@ function cliPath(env) {
   return path.resolve(actionPath, "..", "packages", "cli", "dist", "index.js");
 }
 
-/** The baseline file the earlier step downloaded, if it is a file inside the work directory. Anything else is ignored. */
-function baselineFile(env, work) {
-  const given = env["BASELINE_PATH"];
+/** A file the baseline step downloaded (`BASELINE_PATH`, `HISTORY_PATH`), if it is a file inside the work directory. Anything else is ignored. */
+function baselineFile(env, work, name = "BASELINE_PATH") {
+  const given = env[name];
   if (typeof given !== "string" || given === "") return undefined;
   const resolved = path.resolve(given);
   if (!resolved.startsWith(`${work}${path.sep}`)) return undefined;
@@ -88,6 +88,9 @@ export async function main(command, env = process.env, io = {}) {
         comment: path.join(work, "comment.md"),
         baselineOut: path.join(work, "baseline-next.json"),
         baseline: baselineFile(env, work),
+        history: baselineFile(env, work, "HISTORY_PATH"),
+        // A run id is digits only; anything else is not passed on.
+        baselineRun: /^[1-9][0-9]{0,15}$/.test(env["BASELINE_RUN"] ?? "") ? env["BASELINE_RUN"] : undefined,
       };
       const args = command === "run" ? buildRunArgs(parseInputs(env), paths) : buildReportArgs(paths);
       return await runCli(args, env);

@@ -204,6 +204,28 @@ if (process.env.FAKE_WAIT) {
     assert.ok(!JSON.stringify(call.env).includes("canary"));
   });
 
+  it("report: adds the history and the compared run when they are a file under the temp directory and a run id (D-022b)", async () => {
+    await clearRecord();
+    const baseline = path.join(temp, "wasit", "baseline", "baseline.json");
+    await writeFile(baseline, "{}");
+    await mkdir(path.join(temp, "wasit", "history"), { recursive: true });
+    const history = path.join(temp, "wasit", "history", "baseline.json");
+    await writeFile(history, "{}");
+    await runMain("report", env({ BASELINE_PATH: baseline, HISTORY_PATH: history, BASELINE_RUN: "43724229283" }));
+    const argv = (await lastCall()).argv;
+    assert.equal(argv[argv.indexOf("--history") + 1], history);
+    assert.equal(argv[argv.indexOf("--baseline-run") + 1], "43724229283");
+  });
+
+  it("report: leaves out a history outside the temp directory, and a run id that is not one", async () => {
+    for (const [HISTORY_PATH, BASELINE_RUN] of [["/etc/passwd", "12; rm"], [path.join(root, "outside.json"), "-1"], ["", ""]]) {
+      await clearRecord();
+      await runMain("report", env({ HISTORY_PATH, BASELINE_RUN }));
+      const argv = (await lastCall()).argv;
+      assert.ok(!argv.includes("--history") && !argv.includes("--baseline-run"), `${HISTORY_PATH} ${BASELINE_RUN}`);
+    }
+  });
+
   it("report: returns the exit code of the CLI", async () => {
     await clearRecord();
     assert.equal((await runMain("report", env({ FAKE_EXIT: "2" }))).code, 2);
