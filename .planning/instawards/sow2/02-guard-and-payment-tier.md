@@ -21,7 +21,7 @@ command line, without the opt-in, goes to beta testers at the end of the week.
 - [x] A channel commitment is signed only when it names the run's channel, amount and network.
 - [x] The plan, the per-payment cap and the per-run cap are enforced before anything is signed.
 - [x] The payment tier in the Action, on `main`, with the payer key in the repository's secrets.
-- [ ] The payment tier never runs on a pull request from a fork (built and tested; the run on the fork's pull request comes next).
+- [x] The payment tier never runs on a pull request from a fork.
 - [ ] The new check "rejected request does not settle" sends a valid payment with a request the service must refuse, then reads the chain to confirm that no transfer happened.
 - [ ] The opt-in switch: a flag on the run in the command line, an input on a run started by hand in the Action, and a start-up setting (never a tool argument) in the MCP server.
 - [ ] Independent review of the payment code, in writing.
@@ -50,6 +50,7 @@ command line, without the opt-in, goes to beta testers at the end of the week.
 | A payment check on `stellar:pubnet` without the opt-in is refused before anything is signed | 🟡 | Offline tests: [`runners.test.ts`](https://github.com/wasit-dev/Wasit/blob/sow2/s1-action/packages/cli/test/unit/runners.test.ts). A recorded run and an Action run come next |
 | The read-only checks pass on a challenge that names `stellar:pubnet` | ✅ | [Pull request 6](https://github.com/dzakwannajmi/x402-example-paywall/pull/6) · [run](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43724229283) · [copy of the comment](week-2/copies/pr-6-comment.md) · [copy of the log](week-2/copies/run-pr6-pubnet.log.txt): the seller on `127.0.0.1` names `stellar:pubnet`, X402-01 to X402-05 pass, the payment checks are skipped by the read-only tier, no payment is made and nothing is signed. It is a local seller, not a deployed mainnet service |
 | The payment tier in the Action on `main`: X402-01 to X402-10, one real payment on the Stellar test network | ✅ | [Run on `main`](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43816426654) · [the payment on Stellar Expert](https://stellar.expert/explorer/testnet/tx/beb0a5f94e2c5cb41cad8f5fe1110020dd004c30022b53b853b30ae5ef905a86) · [copy of the log](week-2/copies/run-main-payment-tier.log.txt): the job pays from the secret `WASIT_TESTNET_PAYER`, the seller runs as the user `wasit-service`, the plan and the caps are printed before anything is signed, all ten checks pass, X402-06 settles the advertised amount and Wasit reads it from the transfer event, and the run charged at most what it planned |
+| A pull request from a fork with `tier: payment`: the payment checks are not run | ✅ | [Pull request 5](https://github.com/dzakwannajmi/x402-example-paywall/pull/5) · [run](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43819805398) · [copy of the log](week-2/copies/run-pr5-fork-payment-tier.log.txt): the same workflow as on `main`, on a pull request from a fork; the job had no secrets and a read-only token, X402-01 to X402-05 passed, X402-06 to X402-10 were skipped with "payment checks not run: pull request", the run notes that nothing was signed, and no comment was posted |
 | The pieces below | ⬜ | Not started |
 
 ## Result
@@ -69,5 +70,9 @@ example project. A first attempt failed for two reasons, both fixed before the
 run above: the runner's sudo ignored the option that passes the environment to
 the seller's user (Wasit now hands it over another way), and the example's payee
 was an account that did not exist on the test network (it now pays a testnet
-account of ours that can receive USDC). Next: the run on the fork's pull
-request, then the new check.
+account of ours that can receive USDC).
+
+Update 2026-11-16 (later): pull request 5 of the example project, which comes
+from a fork, ran on the new workflow with `tier: payment`. Wasit ran the
+read-only checks only and said why: payment checks are not run on a pull
+request. Nothing was signed. Next: the new check.

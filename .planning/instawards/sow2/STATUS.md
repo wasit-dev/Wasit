@@ -3,11 +3,11 @@
 > **READ THIS FIRST** for anything about SOW 2. Single source of truth for the
 > engagement. Updated at the end of every working session.
 
-Last updated: 2026-11-15: week 1 is done and shown in real runs (job 00 and
-job 01). The first layer of the network guard is built (job 02). The payment
-tier, the new check, the opt-in and the pre-release are the next work. The
-example project is now public, so every link in the review table opens without
-a login.
+Last updated: 2026-11-16: week 1 is done and shown in real runs (job 00 and
+job 01). In job 02 the payment tier runs on `main` of the example project and
+is not run on a pull request from a fork. The new check, the opt-in and the
+pre-release are the next work. The example project is public, so every link in
+the review table opens without a login.
 
 ---
 
@@ -40,7 +40,7 @@ This table is for screening a week without reading the rest.
 | Week | Dates (our calendar) | What the week plans | Status | Click to check |
 | --- | --- | --- | --- | --- |
 | 1 | 14 to 20 Nov | The read-only Action, `wasit.config.json`, "unsupported" results, the workflow in the example project | ✅ **DONE** | [Red check and comment, PR 1](https://github.com/dzakwannajmi/x402-example-paywall/pull/1) · [Red, then green, same comment, PR 2](https://github.com/dzakwannajmi/x402-example-paywall/pull/2) · [Green run on `main`](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43697947796) · [From a fork, no comment, PR 5](https://github.com/dzakwannajmi/x402-example-paywall/pull/5) · [Job 00](00-read-only-action.md) · [Evidence table](07-evidence-submission.md) |
-| 2 | 21 to 27 Nov | Payment checks in CI on test networks, the new check "rejected request does not settle", the network guard and its caps, a pre-release for beta testers | 🟡 **IN PROGRESS** — the payment tier runs on `main` | [Draft pull request with the code](https://github.com/wasit-dev/Wasit/pull/23) · [Payment tier code, PR 30](https://github.com/wasit-dev/Wasit/pull/30) · [Payment tier on `main`, 10 of 10](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43816426654) · [The payment on Stellar Expert](https://stellar.expert/explorer/testnet/tx/beb0a5f94e2c5cb41cad8f5fe1110020dd004c30022b53b853b30ae5ef905a86) · [Read-only checks pass on a challenge naming `stellar:pubnet`, PR 6](https://github.com/dzakwannajmi/x402-example-paywall/pull/6) · [Job 02](02-guard-and-payment-tier.md) |
+| 2 | 21 to 27 Nov | Payment checks in CI on test networks, the new check "rejected request does not settle", the network guard and its caps, a pre-release for beta testers | 🟡 **IN PROGRESS** — the payment tier runs on `main` | [Draft pull request with the code](https://github.com/wasit-dev/Wasit/pull/23) · [Payment tier code, PR 30](https://github.com/wasit-dev/Wasit/pull/30) · [Payment tier on `main`, 10 of 10](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43816426654) · [The payment on Stellar Expert](https://stellar.expert/explorer/testnet/tx/beb0a5f94e2c5cb41cad8f5fe1110020dd004c30022b53b853b30ae5ef905a86) · [From a fork, payment checks not run, PR 5](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43819805398) · [Read-only checks pass on a challenge naming `stellar:pubnet`, PR 6](https://github.com/dzakwannajmi/x402-example-paywall/pull/6) · [Job 02](02-guard-and-payment-tier.md) |
 | 3 | 28 Nov to 4 Dec | MPP in the Action, `wasit init` and the test-network key setup, recent-failures line, validation of the capped opt-in on our own service | ⬜ **NOT STARTED** | [Job 03](03-mpp-and-validation.md) · [Job 04](04-init.md) |
 | 4 | 5 to 11 Dec | Demo mode, guides, install-time guarantees, SBOM, release, final report | ⬜ **NOT STARTED** | [Job 05](05-guides-and-hygiene.md) · [Job 06](06-release-and-final-report.md) |
 
@@ -93,7 +93,6 @@ or shown only in part · ⬜ planned for a later week.
 
 ## Open items
 
-- **A pull request from a fork, payment tier.** Shown for the read-only tier: [pull request 5](https://github.com/dzakwannajmi/x402-example-paywall/pull/5) comes from a real fork, gets no comment (the token of a fork is read-only) and the check passes. The other half, payment checks not run on a fork, comes with the payment tier in week 2.
 - **Windows.** Not run. The Action supports Linux runners in this SOW.
 - **Version number.** The comment names the commit a build came from, but the packages still declare 0.7.0 until the pre-release changes it.
 - **The draft pull request 23** waits for the pre-release.
@@ -105,6 +104,7 @@ or shown only in part · ⬜ planned for a later week.
 
 | Date | Focus | Outcome |
 | --- | --- | --- |
+| 2026-11-16 | A pull request from a fork, payment tier | [Pull request 5](https://github.com/dzakwannajmi/x402-example-paywall/pull/5), from a fork, was brought up to date with `main`, so it runs the workflow that asks for `tier: payment`. In [its run](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43819805398) the job had no secrets and a read-only token; X402-01 to X402-05 passed, X402-06 to X402-10 were skipped with "payment checks not run: pull request", the run notes that nothing was signed, and no comment was posted ([copy of the log](week-2/copies/run-pr5-fork-payment-tier.log.txt)). |
 | 2026-11-16 | The payment tier on `main` | The example project's workflow now runs the payment tier on a push to `main` and on a run started by hand, with a dedicated testnet payer in the repository secret `WASIT_TESTNET_PAYER`, given to the Wasit step only and not on pull requests. In [the run on `main`](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43816426654) the seller ran as its own user, the plan and the caps were printed before anything was signed, X402-01 to X402-10 passed, and X402-06's payment settled on the Stellar test network ([Stellar Expert](https://stellar.expert/explorer/testnet/tx/beb0a5f94e2c5cb41cad8f5fe1110020dd004c30022b53b853b30ae5ef905a86); [copy of the log](week-2/copies/run-main-payment-tier.log.txt)). A first attempt failed: the runner's sudo ignored the option that passes the environment to the seller's user, and the example's payee did not exist on the test network. Both were fixed before this run. Code: [draft pull request 30](https://github.com/wasit-dev/Wasit/pull/30). |
 | 2026-11-15 | Read-only checks on a challenge that names `stellar:pubnet` | A week 2 proof that does not need the payment tier. [Pull request 6](https://github.com/dzakwannajmi/x402-example-paywall/pull/6) makes the local seller name `stellar:pubnet` (its facilitator is a local stand-in that cannot verify or settle). Before the push, the same run was made on the maintainer's machine. In [the Action's run](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43724229283) X402-01 to X402-05 passed, the payment checks were skipped by the read-only tier, and the comment says nothing was signed ([copy](week-2/copies/pr-6-comment.md)). It is a local seller, not a deployed mainnet service. The pull request stays open as proof. |
 | 2026-11-15 | A pull request from a fork | A fork of the example project, made from a second account of the maintainer, opened [pull request 5](https://github.com/dzakwannajmi/x402-example-paywall/pull/5) (one line in `.gitignore`). In [its run](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43722428182) the token had read access only, the Action printed that the pull request is from a fork so no comment is posted, no comment was posted, the check "Wasit" passed, and the job summary shows the verdict ([copy](week-1/copies/pr-5-job-summary.md)). The pull request stays open as proof. |
