@@ -4,7 +4,7 @@ MCP server exposing [Wasit](https://github.com/wasit-dev/wasit)'s **x402** / **M
 
 The suite logic isn't reimplemented here — this is a thin adapter over [`@wasit-dev/core`](https://www.npmjs.com/package/@wasit-dev/core), the same package [`@wasit-dev/cli`](https://www.npmjs.com/package/@wasit-dev/cli) runs. An agent's run and a CLI run against the same target can never disagree.
 
-**Testnet only.** Several tools settle real transactions.
+**Testnet only.** Several tools settle real transactions. In 0.8.0-beta.1 (npm tag `beta`; `latest` is 0.7.0) the tools pay on test networks only: any other network, `stellar:pubnet` included, is refused before a key is read. `WASIT_MAINNET_OPT_IN`, `WASIT_MAINNET_CONFIG` and `--mainnet` stop the server at start: the mainnet opt-in is not part of this version.
 
 ## Install
 
@@ -93,6 +93,10 @@ echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \
 ## Secrets never travel through tool arguments
 
 Signing keys are read from the server process's own environment, never accepted as a tool parameter — so an agent handles a result, never a key, and a key can't end up in a transcript. A missing key returns an error result naming which variable to set.
+
+## The RPC lock
+
+`WASIT_RPC_URL`, read when the server starts, fixes the RPC of every tool call, and a tool call that names another `rpcUrl` is then refused before anything is sent. A result that reads the chain names its RPC by origin, where it came from, and when it is not Wasit's default (in the text and in `structuredContent.rpc`). New in 0.8.0-beta.1.
 
 ## Results
 

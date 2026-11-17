@@ -6,7 +6,9 @@ Protocol-compliance testing for **x402** and **MPP** on Stellar, from your termi
 
 For both MPP charge payments and x402 payments it verifies the settlement independently — via Stellar RPC and the token contract's own on-chain transfer event, rather than the response the service returns.
 
-**Testnet only.** Several checks settle real transactions — do not point this at pubnet or use production keys.
+**Testnet only.** Several checks settle real transactions. The payment checks pay on test networks only: any other network, `stellar:pubnet` included, is refused before a key is read. Do not use production keys.
+
+**This README describes 0.8.0-beta.1**, a pre-release on npm under the `beta` tag (`npm install -g @wasit-dev/cli@beta`). `latest` is still 0.7.0. New in the beta: `wasit run` for a whole service from a `wasit.config.json`, `wasit ci-report`, the GitHub Action, a seventeenth check (`X402-11`), and a cap on every payment Wasit signs.
 
 ## Install
 
@@ -48,7 +50,7 @@ wasit test --target <url> [options]
 | Option | Default | Notes |
 |---|---|---|
 | `--target <url>` | required | Must include the scheme |
-| `--network <id>` | `stellar:testnet` | Network the payment checks pay on (`stellar:testnet`, `stellar:pubnet`, `eip155:84532` for Base Sepolia, `eip155:11155111` for Ethereum Sepolia, or `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` for Solana devnet); `X402-01`–`05` apply on any chain |
+| `--network <id>` | `stellar:testnet` | Network the payment checks pay on: `stellar:testnet`, `eip155:84532` (Base Sepolia), `eip155:11155111` (Ethereum Sepolia) or `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` (Solana devnet). Any other network is refused before a key is read. `X402-01`–`05` apply on any chain |
 | `--payer-key <key>` | `STELLAR_PRIVATE_KEY`, `EVM_PRIVATE_KEY` on Base or Ethereum Sepolia, or `SVM_PRIVATE_KEY` on Solana devnet | A Stellar secret (`S...`), an EVM private key (`0x` + 64 hex), or a Solana keypair (base58 of its 64 bytes) |
 | `--rpc-url <url>` | testnet default | Soroban RPC used to verify `X402-06`'s settlement |
 | `--method <verb>` | `GET` | HTTP method the paid endpoint uses |
@@ -56,7 +58,7 @@ wasit test --target <url> [options]
 | `--header <name:value>` | — | Extra request header, repeatable |
 | `--read-only` | off | Restricts the run to `X402-01`–`05` (no payment) |
 
-Without a payer key, the payment checks are skipped automatically. When they run: **`X402-06` settles a real payment, `X402-07` attempts one with a corrupted signature** — testnet funds move on every call.
+Without a payer key, the payment checks are skipped automatically. When they run: **`X402-06` settles a real payment, `X402-07` attempts one with a corrupted signature**, so testnet funds move on every call. A price above $1.00 is not paid: `X402-06` gets no verdict (`ERROR (setup)`) and nothing is signed. `X402-11` needs a request the service must refuse, which only `wasit run` reads from the config, so `wasit test` skips it.
 
 ### `wasit mpp-charge` — MPP, charge mode
 
@@ -68,8 +70,8 @@ wasit mpp-charge --target <url> [options]
 |---|---|---|
 | `--target <url>` | required | The paid resource |
 | `--payer-key <key>` | `MPP_PAYER_SECRET` | Secret key, `S...` |
-| `--network <id>` | `MPP_STELLAR_NETWORK` | CAIP-2. Only a challenge on this network is paid |
-| `--rpc-url <url>` | testnet default | Used for the payment and the settlement read; https only. Required for pubnet |
+| `--network <id>` | `MPP_STELLAR_NETWORK` | CAIP-2. Only a challenge on this network is paid; `stellar:testnet` only, any other network is refused |
+| `--rpc-url <url>` | testnet default | Used for the payment and the settlement read; https only |
 
 **Every run settles a real payment.** Charge mode has no dry run — a settlement that never happened cannot be verified on-chain.
 
@@ -96,6 +98,28 @@ wasit mpp-channel --target <url> [options]
 `MPP-10`–`12` and `MPP-14` cost nothing. `MPP-13` is skipped unless `--allow-destructive` and a named disposable channel are both given — it permanently ends a channel and cannot be undone.
 
 `--channel` **asserts**, it does not select: the channel under test is resolved from the target's own 402 challenge, so every check in a run reports on the same contract. When `--channel` differs from what the target advertises, `MPP-10` fails and inspects nothing.
+
+### `wasit run`: a whole service from `wasit.config.json` (new in 0.8.0-beta.1)
+
+```bash
+wasit run --read-only --start           # the free checks, X402-01 to 05, with the service started from the config
+wasit run --dry-run --start             # what the payment checks would sign; no key, nothing sent
+wasit run --start                       # the payment tier, on a test network
+```
+
+`wasit.config.json` (version 1) holds a service's endpoints, methods, request bodies and environments. The loader is strict: an unknown key is an error, and secrets, the mainnet opt-in and per-payment caps have no place in it. `wasit run` runs every endpoint (`--env`, `--endpoint`) and writes one report (`--json`, `--out`); it can start the service itself (`--start`, `--start-if-local`) and compare with the report of the default branch (`--baseline`).
+
+Without `--read-only` or `--dry-run` the run is the payment tier. It pays on test networks only, when the environment has `operatedByMe: true` and the chain's key variable is set: at most $1.00 a payment and $5.00 a run (`maxRunUsd` can only lower it), only to the `payTo` and asset the config pins. In GitHub Actions it pays only on a push to the default branch, a schedule and `workflow_dispatch`; a pull request runs the read-only checks. In another CI the payment tier is refused with exit 2: use `--read-only` there. `--mainnet` is refused in this version. `wasit run --help` lists every option.
+
+For an endpoint with a `reject` case in the config, on Stellar, the payment tier also runs `X402-11`: a valid payment is sent with the request the service must refuse, and the chain is read until that payment's authorization has expired, up to six minutes.
+
+### `wasit ci-report`: the pull request comment and the job summary (new in 0.8.0-beta.1)
+
+```bash
+wasit ci-report --report wasit-report.json --comment comment.md
+```
+
+Turns the report of `wasit run --json --out` into the pull request comment and the job summary, compared with the default branch's report (`--baseline`). `--check-run <file>` also writes the title, summary and conclusion of a GitHub check run. The GitHub Action in the repository's `action/` directory runs `wasit run` and `wasit ci-report` in a workflow and comments on the pull request; pin it by full commit SHA.
 
 ### `wasit checks` — the catalogue
 
@@ -154,6 +178,8 @@ SKIP  X402-02  Payment Header Present
 7 passed.
 ```
 
+At a terminal, `wasit test` shows the checks live and in colour, in two blocks (challenge and payment). A pipe, CI, `--json` and `NO_COLOR` get the plain text above.
+
 `PREFLIGHT` appears in place of the checks when the target URL or network identifier itself is invalid — both are wrong for every check in the suite, so it's reported once rather than repeated identically.
 
 ## Exit codes
@@ -184,7 +210,7 @@ All keys are **testnet only**. `wasit` also reads a `.env` file in the current w
 
 ## What's checked
 
-Sixteen checks across x402 and MPP, each traced to a written spec clause — the full catalogue, with pass criteria and spec references, is in [`docs/CHECKS.md`](https://github.com/wasit-dev/wasit/blob/main/docs/CHECKS.md).
+Seventeen checks across x402 and MPP (`X402-11` is new in 0.8.0-beta.1), each traced to a written spec clause — the full catalogue, with pass criteria and spec references, is in [`docs/CHECKS.md`](https://github.com/wasit-dev/wasit/blob/main/docs/CHECKS.md).
 
 ## Related
 
