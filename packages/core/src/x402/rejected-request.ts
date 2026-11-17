@@ -14,7 +14,8 @@
  * (`maxTimeoutSeconds`) is at most 300 s is waited out, with a hard stop 360 s
  * after it was sent; a longer one is not signed at all (it is read again on the
  * challenge the payment is signed from), and an authorization the client signs
- * to outlive it is not sent.
+ * to outlive it is not sent. A lifetime below 30 s is not signed either, and an
+ * authorization with fewer than 3 ledgers left is not sent (2026-11-17).
  *
  * This file holds the parts that need no network: the rules, the reject
  * request's shape, the watch loop over a chain's reads, and the verdict. The
@@ -31,6 +32,17 @@ export const REJECTED_REQUEST_NAME = "Rejected Request Not Settled";
 
 /** The longest advertised lifetime X402-11 waits out on a test network. */
 export const REJECTED_REQUEST_MAX_LIFETIME_SECONDS = 300;
+
+/**
+ * The shortest advertised lifetime X402-11 signs for (Najmi, 2026-11-17,
+ * screening S-1): a payment valid for a few seconds can expire before a service
+ * that settles it has it on chain, and its unused authorization would then show
+ * nothing about the service.
+ */
+export const REJECTED_REQUEST_MIN_LIFETIME_SECONDS = 30;
+
+/** The fewest units of validity a signed authorization must have left when X402-11 sends it. */
+export const REJECTED_REQUEST_MIN_UNITS_LEFT = 3;
 
 /**
  * How long after the payment is sent the watch stops, whatever the lifetime:

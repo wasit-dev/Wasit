@@ -21,6 +21,8 @@ import type { EndpointPlan } from "./plan.js";
 import {
   REJECTED_REQUEST_ID,
   REJECTED_REQUEST_MAX_LIFETIME_SECONDS,
+  REJECTED_REQUEST_MIN_LIFETIME_SECONDS,
+  REJECTED_REQUEST_MIN_UNITS_LEFT,
   REJECTED_REQUEST_NAME,
   rejectRequestShape,
   rejectedRequestHardStopMs,
@@ -1279,16 +1281,16 @@ function authorizationOf(
   return decoded;
 }
 
-/** A lifetime X402-11 waits out: above 0 and at most 300 s. */
+/** A lifetime X402-11 signs for: at least 30 s, and at most the 300 s it waits out. */
 function withinRejectLifetime(value: unknown): boolean {
   const lifetime = Number(value);
-  return lifetime > 0 && lifetime <= REJECTED_REQUEST_MAX_LIFETIME_SECONDS;
+  return lifetime >= REJECTED_REQUEST_MIN_LIFETIME_SECONDS && lifetime <= REJECTED_REQUEST_MAX_LIFETIME_SECONDS;
 }
 
-/** Thrown before signing when the challenge X402-11 is paid from advertises a longer lifetime. */
-class RejectLifetimeTooLong extends Error {
+/** Thrown before signing when the challenge X402-11 is paid from advertises a lifetime it does not sign for. */
+class RejectLifetimeOutside extends Error {
   public constructor(public readonly lifetime: unknown) {
-    super("the advertised lifetime is longer than X402-11 waits");
+    super("the advertised lifetime is outside what X402-11 signs for");
   }
 }
 
@@ -1365,16 +1367,20 @@ async function checkRejectedRequestNotSettled(
     );
   }
   const { selected: advertised } = await paymentTerms(unpaid, options.network);
-  const tooLong = (value: unknown, again: boolean): CheckResult =>
+  const outside = (value: unknown, again: boolean): CheckResult =>
     skipped(
       id,
       name,
       `the service's payments stay valid for ${sanitizeText(String(value))} seconds (maxTimeoutSeconds)` +
         (again ? ", as it said when asked for payment again" : "") +
-        `, longer than the ${REJECTED_REQUEST_MAX_LIFETIME_SECONDS} seconds Wasit waits for one to expire on a ` +
-        `test network, so this check could not show that the payment never settled. Nothing was signed.`,
+        (Number(value) > REJECTED_REQUEST_MAX_LIFETIME_SECONDS
+          ? `, longer than the ${REJECTED_REQUEST_MAX_LIFETIME_SECONDS} seconds Wasit waits for one to expire on a ` +
+            `test network, so this check could not show that the payment never settled.`
+          : `, shorter than the ${REJECTED_REQUEST_MIN_LIFETIME_SECONDS} seconds this check needs: such a payment can ` +
+            `expire before a service that settles it has it on chain, so its unused authorization would show nothing.`) +
+        ` Nothing was signed.`,
     );
-  if (!withinRejectLifetime(advertised.maxTimeoutSeconds)) return tooLong(advertised.maxTimeoutSeconds, false);
+  if (!withinRejectLifetime(advertised.maxTimeoutSeconds)) return outside(advertised.maxTimeoutSeconds, false);
 
   const network = options.network;
   const rpcUrl = chain.resolveRpcUrl(network, options.rpcUrl);
@@ -1390,7 +1396,7 @@ async function checkRejectedRequestNotSettled(
     prepared = await preparePayment(rejectOptions, id, undefined, async (selected) => {
       // The challenge is read again for the signature, and the service may
       // answer it with another lifetime: the one signed is held to 300 s too.
-      if (!withinRejectLifetime(selected.maxTimeoutSeconds)) throw new RejectLifetimeTooLong(selected.maxTimeoutSeconds);
+      if (!withinRejectLifetime(selected.maxTimeoutSeconds)) throw new RejectLifetimeOutside(selected.maxTimeoutSeconds);
       let read;
       try {
         read = await watch.read(network, rpcUrl, [control]);
@@ -1417,7 +1423,7 @@ async function checkRejectedRequestNotSettled(
       balanceBefore = balance;
     });
   } catch (error) {
-    if (error instanceof RejectLifetimeTooLong) return tooLong(error.lifetime, true);
+    if (error instanceof RejectLifetimeOutside) return outside(error.lifetime, true);
     throw error;
   }
   const { httpClient, paymentPayload, selected, payUrl } = prepared;
@@ -1445,6 +1451,14 @@ async function checkRejectedRequestNotSettled(
       `This payment's authorization stays valid until ${watch.unit} ${ours.expiresAt}, ` +
         `${ours.expiresAt - before.latest} ${watch.unit}s after the latest (${before.latest}), longer than the ` +
         `${REJECTED_REQUEST_MAX_LIFETIME_SECONDS} seconds this check waits. It was signed and discarded; it was not sent.`,
+    );
+  }
+  // And long enough that a service which settles it could still get it on chain.
+  if (ours.expiresAt - before.latest < REJECTED_REQUEST_MIN_UNITS_LEFT) {
+    throw new CheckSetupError(
+      `This payment's authorization expires at ${watch.unit} ${ours.expiresAt}, ` +
+        `${ours.expiresAt - before.latest} ${watch.unit}s after the latest (${before.latest}): too soon for an unused ` +
+        `authorization to show anything. It was signed and discarded; it was not sent.`,
     );
   }
 

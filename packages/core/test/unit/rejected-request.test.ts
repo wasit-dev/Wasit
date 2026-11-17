@@ -28,6 +28,7 @@ import { planX402Run } from "../../src/x402/plan.js";
 import {
   REJECTED_REQUEST_HARD_STOP_MS,
   REJECTED_REQUEST_MAX_LIFETIME_SECONDS,
+  REJECTED_REQUEST_MIN_LIFETIME_SECONDS,
   rejectRequestShape,
   rejectedRequestHardStopMs,
   rejectedRequestVerdict,
@@ -210,6 +211,47 @@ describe("X402-11 signs nothing when it cannot reach a verdict", () => {
     assert.doesNotMatch(result.error.message, /Nothing was signed/);
     assert.equal(recorder.signed.length, BEFORE_X402_11 + 1, "signed once, then discarded");
     assert.equal(target.invalid.length, 0, "nothing sent with the invalid request");
+  });
+
+  it(`SKIP before signing when the advertised lifetime is below ${REJECTED_REQUEST_MIN_LIFETIME_SECONDS} s (screening S-1)`, async () => {
+    assert.equal(REJECTED_REQUEST_MIN_LIFETIME_SECONDS, 30);
+    const target = await wall("refuse", {}, 29);
+    const result = byId(await run(target.url), "X402-11");
+    assert.equal(result.skipped, true, result.detail);
+    assert.match(result.skipReason ?? "", /29 seconds/);
+    assert.match(result.skipReason ?? "", /shorter than the 30 seconds/);
+    assert.match(result.skipReason ?? "", /Nothing was signed/);
+    assert.equal(recorder.signed.length, BEFORE_X402_11);
+    assert.equal(target.invalid.length, 0);
+  });
+
+  it("a lifetime of exactly 30 s is waited out", async () => {
+    const target = await wall("refuse", {}, 30);
+    const result = byId(await run(target.url), "X402-11");
+    assert.equal(result.pass, true, result.detail);
+    assert.equal(recorder.signed.at(-1)!.maxTimeoutSeconds, 30);
+  });
+
+  it("SKIP before signing when the service lowers the lifetime below 30 s on the read it is paid from (screening S-1)", async () => {
+    const target = await wall("refuse", { invalidUnpaidLifetimes: [60, 10] });
+    const result = byId(await run(target.url), "X402-11");
+    assert.equal(result.skipped, true, result.detail);
+    assert.match(result.skipReason ?? "", /10 seconds/);
+    assert.match(result.skipReason ?? "", /Nothing was signed/);
+    assert.equal(recorder.signed.length, BEFORE_X402_11);
+    assert.equal(target.invalid.length, 0);
+  });
+
+  it("not sent when fewer than 3 ledgers of validity are left right before sending (screening S-1)", async () => {
+    install({ extraExpiryLedgers: -10 });
+    const target = await wall("refuse");
+    const result = byId(await run(target.url), "X402-11");
+    assert.notEqual(result.pass, true);
+    assert.ok(result.error !== undefined, `no verdict expected: ${result.detail}`);
+    assert.match(result.error.message, /too soon/);
+    assert.match(result.error.message, /it was not sent/);
+    assert.equal(recorder.signed.length, BEFORE_X402_11 + 1, "signed once, then discarded");
+    assert.equal(target.invalid.length, 0);
   });
 
   it("a lifetime of exactly 300 s is waited out", async () => {
@@ -567,6 +609,10 @@ describe("the plan (L1) counts X402-11", () => {
     const long = await wall("refuse", {}, 301);
     const longPlan = await planX402Run({ network: NETWORK, endpoints: [{ name: "long", target: long.url, reject: REJECT }] });
     assert.ok(!longPlan.endpoints[0]!.signatures.some((signature) => signature.check === "X402-11"));
+
+    const short = await wall("refuse", {}, 29);
+    const shortPlan = await planX402Run({ network: NETWORK, endpoints: [{ name: "short", target: short.url, reject: REJECT }] });
+    assert.ok(!shortPlan.endpoints[0]!.signatures.some((signature) => signature.check === "X402-11"), "planned below 30 s");
 
     install({ withoutWatch: true });
     const target = await wall("refuse");

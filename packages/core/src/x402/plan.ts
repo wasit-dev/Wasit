@@ -29,7 +29,7 @@ import {
   type PlannedSignature,
 } from "../guard/budget.js";
 import { paymentChainFor } from "./chains/index.js";
-import { REJECTED_REQUEST_MAX_LIFETIME_SECONDS, type RejectCase } from "./rejected-request.js";
+import { REJECTED_REQUEST_MAX_LIFETIME_SECONDS, REJECTED_REQUEST_MIN_LIFETIME_SECONDS, type RejectCase } from "./rejected-request.js";
 import { readPaymentChallenge, type RequestShape } from "./simulator.js";
 
 export interface PlanEndpointInput extends RequestShape {
@@ -157,7 +157,7 @@ async function planEndpoint(
     const rejectedRequest =
       endpoint.reject !== undefined &&
       paymentChainFor(network)?.authorizations !== undefined &&
-      selected.maxTimeoutSeconds > 0 &&
+      selected.maxTimeoutSeconds >= REJECTED_REQUEST_MIN_LIFETIME_SECONDS &&
       selected.maxTimeoutSeconds <= REJECTED_REQUEST_MAX_LIFETIME_SECONDS;
     const signatures = plannedSignatures(amount, { rejectedRequest });
     const worstCase = signatures.reduce((sum, entry) => sum + entry.amount, 0n);

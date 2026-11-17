@@ -339,8 +339,8 @@ not GitHub Actions) the payment tier is refused with exit 2: use --read-only the
 with no payer key in the job.
 X402-11 runs for an endpoint with a reject case, on Stellar: it sends a valid payment
 with the request the service must refuse, then reads the chain until that payment's
-authorization has expired, up to six minutes; a lifetime above 300 s is not signed, and
-an authorization signed to outlive it is not sent.
+authorization has expired, up to six minutes; a lifetime above 300 s or below 30 s is
+not signed, and an authorization signed to outlive 300 s is not sent.
 In CI (CI or GITHUB_ACTIONS set) a .env file in the working directory is not read.`,
   )
   .exitOverride(exitTwoOnUsageError)
