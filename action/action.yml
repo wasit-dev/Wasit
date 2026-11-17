@@ -46,10 +46,19 @@ runs:
     # Each step gets only what it needs, as env. No input and no event value is
     # written into a run block: they reach the scripts as environment variables.
     # The token (GH_TOKEN) is given to the two steps that call gh and to no other,
-    # and never to the step that starts the service.
+    # and never to the step that starts the service. The env a workflow puts on
+    # this action reaches every one of its steps: the payer key variables are set
+    # empty in each step but Run Wasit, the only one that needs a key.
 
     - name: Check the runner
       shell: bash
+      env:
+        STELLAR_PRIVATE_KEY: ""
+        EVM_PRIVATE_KEY: ""
+        SVM_PRIVATE_KEY: ""
+        MPP_PAYER_SECRET: ""
+        COMMITMENT_SECRET_HEX: ""
+        WASIT_MAINNET_PAYER_SECRET: ""
       run: |
         if [ "$RUNNER_OS" != "Linux" ]; then
           echo "Wasit: this action runs on Linux runners in this version." >&2
@@ -69,6 +78,12 @@ runs:
       shell: bash
       env:
         ACTION_PATH: ${{ github.action_path }}
+        STELLAR_PRIVATE_KEY: ""
+        EVM_PRIVATE_KEY: ""
+        SVM_PRIVATE_KEY: ""
+        MPP_PAYER_SECRET: ""
+        COMMITMENT_SECRET_HEX: ""
+        WASIT_MAINNET_PAYER_SECRET: ""
         INPUT_CONFIG: ${{ inputs.config }}
         INPUT_ENVIRONMENT: ${{ inputs.environment }}
         INPUT_TIER: ${{ inputs.tier }}
@@ -82,6 +97,12 @@ runs:
       shell: bash
       env:
         ACTION_PATH: ${{ github.action_path }}
+        STELLAR_PRIVATE_KEY: ""
+        EVM_PRIVATE_KEY: ""
+        SVM_PRIVATE_KEY: ""
+        MPP_PAYER_SECRET: ""
+        COMMITMENT_SECRET_HEX: ""
+        WASIT_MAINNET_PAYER_SECRET: ""
       run: |
         cd "$ACTION_PATH/.."
         npm ci --ignore-scripts --no-audit --no-fund
@@ -94,6 +115,12 @@ runs:
       shell: bash
       env:
         ACTION_PATH: ${{ github.action_path }}
+        STELLAR_PRIVATE_KEY: ""
+        EVM_PRIVATE_KEY: ""
+        SVM_PRIVATE_KEY: ""
+        MPP_PAYER_SECRET: ""
+        COMMITMENT_SECRET_HEX: ""
+        WASIT_MAINNET_PAYER_SECRET: ""
         GH_TOKEN: ${{ github.token }}
       run: node "$ACTION_PATH/scripts/baseline.mjs"
 
@@ -118,6 +145,12 @@ runs:
       shell: bash
       env:
         ACTION_PATH: ${{ github.action_path }}
+        STELLAR_PRIVATE_KEY: ""
+        EVM_PRIVATE_KEY: ""
+        SVM_PRIVATE_KEY: ""
+        MPP_PAYER_SECRET: ""
+        COMMITMENT_SECRET_HEX: ""
+        WASIT_MAINNET_PAYER_SECRET: ""
         BASELINE_PATH: ${{ steps.baseline.outputs.path }}
         HISTORY_PATH: ${{ steps.baseline.outputs.history }}
         BASELINE_RUN: ${{ steps.baseline.outputs.run }}
@@ -129,6 +162,12 @@ runs:
       shell: bash
       env:
         ACTION_PATH: ${{ github.action_path }}
+        STELLAR_PRIVATE_KEY: ""
+        EVM_PRIVATE_KEY: ""
+        SVM_PRIVATE_KEY: ""
+        MPP_PAYER_SECRET: ""
+        COMMITMENT_SECRET_HEX: ""
+        WASIT_MAINNET_PAYER_SECRET: ""
         GH_TOKEN: ${{ github.token }}
         WASIT_COMMENT_FILE: ${{ runner.temp }}/wasit/comment.md
       run: node "$ACTION_PATH/scripts/comment.mjs"

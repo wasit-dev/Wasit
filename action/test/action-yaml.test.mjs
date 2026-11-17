@@ -22,6 +22,7 @@ const read = (file) => readFileSync(path.join(ACTION_DIR, file), "utf-8");
 
 const action = parse(read("action.yml"));
 const steps = action.runs.steps;
+const KEY_NAMES = ["STELLAR_PRIVATE_KEY", "EVM_PRIVATE_KEY", "SVM_PRIVATE_KEY", "MPP_PAYER_SECRET", "COMMITMENT_SECRET_HEX", "WASIT_MAINNET_PAYER_SECRET"];
 const stepByName = (name) => {
   const step = steps.find((candidate) => candidate.name === name);
   assert.ok(step !== undefined, `a step named ${name}`);
@@ -119,7 +120,9 @@ describe("action.yml", () => {
     it("never reaches the step that runs the service, nor the install, the report or the checks", () => {
       for (const name of ["Check the runner", "Check the inputs", "Install Wasit", "Run Wasit", "Write the report"]) {
         const step = stepByName(name);
-        assert.ok(!JSON.stringify(step).match(/token|secret|password/i), name);
+        // The payer key variables these steps blank (below) carry no value.
+        const env = Object.fromEntries(Object.entries(step.env ?? {}).filter(([key, value]) => !(KEY_NAMES.includes(key) && value === "")));
+        assert.ok(!JSON.stringify({ ...step, env }).match(/token|secret|password/i), name);
       }
     });
 
@@ -127,6 +130,27 @@ describe("action.yml", () => {
       assert.ok(!/secrets\./i.test(text));
       assert.ok(!/GITHUB_TOKEN/.test(text));
       assert.equal((text.match(/github\.token/g) ?? []).length, 2);
+    });
+  });
+
+  describe("the payer key (screening S-4)", () => {
+    it("is blanked in every step that runs a command, except the run step", () => {
+      const others = steps.filter((step) => step.run !== undefined && step.name !== "Run Wasit");
+      assert.ok(others.length >= 6, others.map((step) => step.name).join(", "));
+      for (const step of others) {
+        for (const name of KEY_NAMES) assert.equal(step.env?.[name], "", `${step.name}: ${name}`);
+      }
+    });
+
+    it("reaches the run step as the workflow gives it", () => {
+      const run = stepByName("Run Wasit");
+      for (const name of KEY_NAMES) assert.equal(run.env?.[name], undefined, name);
+    });
+
+    it("names exactly the key variables core keeps from the service", () => {
+      const source = readFileSync(path.join(ACTION_DIR, "..", "packages", "core", "src", "denied-env.ts"), "utf-8");
+      const list = source.slice(source.indexOf("DENIED_ENV_NAMES"), source.indexOf("];", source.indexOf("DENIED_ENV_NAMES")));
+      assert.deepEqual([...list.matchAll(/"([A-Z0-9_]+)"/g)].map((match) => match[1]), KEY_NAMES);
     });
   });
 
