@@ -134,9 +134,10 @@ describe("action.yml", () => {
   });
 
   describe("the payer key (screening S-4)", () => {
-    it("is blanked in every step that runs a command, except the run step", () => {
-      const others = steps.filter((step) => step.run !== undefined && step.name !== "Run Wasit");
-      assert.ok(others.length >= 6, others.map((step) => step.name).join(", "));
+    it("is blanked in every step but the run step, the steps that use another action too (week 2 check F-1)", () => {
+      const others = steps.filter((step) => step.name !== "Run Wasit");
+      assert.equal(others.length, steps.length - 1, "the run step is missing");
+      assert.ok(others.some((step) => step.uses !== undefined), "no step that uses another action was checked");
       for (const step of others) {
         for (const name of KEY_NAMES) assert.equal(step.env?.[name], "", `${step.name}: ${name}`);
       }
