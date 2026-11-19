@@ -31,6 +31,17 @@ permissions:
   contents: read
   pull-requests: write
   actions: read
+  # Optional: lets Wasit add its own check, "Wasit conformance", with the result
+  # of each check. Without it the action works the same and skips that check.
+  checks: write
+
+# One Wasit run per pull request: a newer push cancels the older run, so two runs
+# never write the pull request's comment over each other. Any other run (a push to
+# main, a schedule, a run started by hand) has a group of its own: nothing waits
+# for it and nothing cancels it, since a run there may be paying.
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('wasit-pr-{0}', github.event.pull_request.number) || format('wasit-run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   wasit:

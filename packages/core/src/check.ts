@@ -61,6 +61,13 @@ export interface CheckResult {
   expected?: string;
   actual?: string;
   /**
+   * The settlement a check read back from the chain and found to be this
+   * payment (X402-06's transaction: a Stellar or EVM transaction hash, a Solana
+   * signature). Set only on a PASS whose settlement was verified on chain; a
+   * report may link it to an explorer after checking its shape.
+   */
+  reference?: string;
+  /**
    * True when the check did not run. A skipped check is neither a pass nor a
    * failure: `pass` is false so it can never be counted as conformance, and
    * reporters must render it separately rather than as a defect.
@@ -257,6 +264,8 @@ export interface StructuredCheckResult {
   readonly expected?: string;
   /** Present only when `status` is "FAIL" and the check recorded it: what the service sent. */
   readonly actual?: string;
+  /** Present only when `status` is "PASS" and the check verified a settlement on chain: its reference. */
+  readonly reference?: string;
   /** Present only when `status` is "FAIL": what to change (see {@link fixFor}). */
   readonly fix?: string;
   /** Present only when `status` is "FAIL": the check's docs page. */
@@ -314,6 +323,7 @@ export function toStructuredRun(results: CheckResult[]): StructuredRun {
         ...(status === "SKIP" && result.skipKind !== undefined ? { skipKind: result.skipKind } : {}),
         ...(status === "FAIL" && result.expected !== undefined ? { expected: sanitizeText(result.expected) } : {}),
         ...(status === "FAIL" && result.actual !== undefined ? { actual: sanitizeText(result.actual) } : {}),
+        ...(status === "PASS" && result.reference !== undefined ? { reference: sanitizeText(result.reference) } : {}),
         ...(guidance === undefined
           ? {}
           : {

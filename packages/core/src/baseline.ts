@@ -100,6 +100,7 @@ function readResult(raw: unknown, path: string): StructuredCheckResult {
     ...(entry["skipKind"] === undefined ? {} : { skipKind: oneOf<SkipKind>(entry["skipKind"], SKIP_KINDS, at(path, "skipKind")) }),
     ...(entry["expected"] === undefined ? {} : { expected: text(entry["expected"], at(path, "expected"), 500) }),
     ...(entry["actual"] === undefined ? {} : { actual: text(entry["actual"], at(path, "actual"), 500) }),
+    ...(entry["reference"] === undefined ? {} : { reference: text(entry["reference"], at(path, "reference"), 120) }),
     ...(entry["fix"] === undefined ? {} : { fix: text(entry["fix"], at(path, "fix"), 2000) }),
     ...(entry["docs"] === undefined ? {} : { docs: text(entry["docs"], at(path, "docs"), 300) }),
   };

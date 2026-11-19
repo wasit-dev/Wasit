@@ -191,7 +191,17 @@ if (process.env.FAKE_WAIT) {
     await clearRecord();
     await runMain("report", env());
     const w = (name) => path.join(temp, "wasit", name);
-    assert.deepEqual((await lastCall()).argv, ["ci-report", "--report", w("report.json"), "--comment", w("comment.md"), "--baseline-out", w("baseline-next.json")]);
+    assert.deepEqual((await lastCall()).argv, [
+      "ci-report",
+      "--report",
+      w("report.json"),
+      "--comment",
+      w("comment.md"),
+      "--baseline-out",
+      w("baseline-next.json"),
+      "--check-run",
+      w("check-run.json"),
+    ]);
   });
 
   it("report: adds the baseline when there is one, and gives the CLI no token", async () => {
@@ -395,8 +405,8 @@ http.createServer((req, res) => {
     assert.equal(write.code, 0, write.stderr);
     const comment = await readFile(path.join(temp, "wasit", "comment.md"), "utf-8");
     assert.equal(comment.split("\n")[0], COMMENT_MARKER);
-    assert.match(comment, /Wasit: conformant/);
-    assert.match(await readFile(summary, "utf-8"), /Wasit: conformant/, "the job summary was written");
+    assert.match(comment, /Wasit: ✅ conformant/);
+    assert.match(await readFile(summary, "utf-8"), /Wasit: ✅ conformant/, "the job summary was written");
     const next = JSON.parse(await readFile(path.join(temp, "wasit", "baseline-next.json"), "utf-8"));
     assert.equal(next.history.weather["X402-01"], "P");
   });
@@ -417,7 +427,7 @@ http.createServer((req, res) => {
     const write = await runScript("report", env, workspace);
     assert.equal(write.code, 0, write.stderr);
     const comment = await readFile(path.join(temp, "wasit", "comment.md"), "utf-8");
-    assert.match(comment, /Wasit: regression/);
+    assert.match(comment, /Wasit: ❌ regression/);
     assert.match(comment, /Regression: weather was conformant on main and is now unsupported/);
   });
 
@@ -452,8 +462,8 @@ http.createServer((req, res) => {
     assert.equal(write.code, 0, write.stderr);
     const comment = await readFile(path.join(temp, "wasit", "comment.md"), "utf-8");
     assert.equal(comment.split("\n")[0], COMMENT_MARKER, "same marker, so the earlier comment is the one that is replaced");
-    assert.match(comment, /Wasit: no verdict\./);
-    assert.match(await readFile(summary, "utf-8"), /Wasit: no verdict\./, "the job summary says it too");
+    assert.match(comment, /Wasit: ⚠️ no verdict\./);
+    assert.match(await readFile(summary, "utf-8"), /Wasit: ⚠️ no verdict\./, "the job summary says it too");
     assert.equal(existsSync(path.join(temp, "wasit", "baseline-next.json")), false, "a run that graded nothing is never a baseline");
   });
 

@@ -113,6 +113,8 @@ const resultShape = {
   /** Present only on a FAIL whose check recorded them: what it expected, and what the service sent. */
   expected: z.string().optional(),
   actual: z.string().optional(),
+  /** Present only on a PASS that read its settlement back from the chain (X402-06): the transaction. */
+  reference: z.string().optional(),
   /** Present only on FAIL: what to change. */
   fix: z.string().optional(),
   /** Present only on FAIL: the check's docs page. */

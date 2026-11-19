@@ -98,6 +98,7 @@ export async function main(command, env = process.env, io = {}) {
         report: path.join(work, "report.json"),
         comment: path.join(work, "comment.md"),
         baselineOut: path.join(work, "baseline-next.json"),
+        checkRun: path.join(work, "check-run.json"),
         baseline: baselineFile(env, work),
         history: baselineFile(env, work, "HISTORY_PATH"),
         // A run id is digits only; anything else is not passed on.

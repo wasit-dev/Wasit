@@ -713,3 +713,17 @@ describe("rejectedRequestVerdict", () => {
     }
   });
 });
+
+describe("X402-06's reference, for the payment proof of the PR comment (2026-11-20)", () => {
+  it("carries the settlement it read back from the chain on a PASS, and none on a FAIL", async () => {
+    const target = await wall("refuse");
+    const honest = byId(await run(target.url), "X402-06");
+    assert.equal(honest.pass, true, honest.detail);
+    assert.equal(honest.reference, "tx-nonce-1");
+    install({ settlementFails: true });
+    const other = await wall("refuse");
+    const failed = byId(await run(other.url), "X402-06");
+    assert.equal(failed.pass, false, failed.detail);
+    assert.equal(failed.reference, undefined);
+  });
+});

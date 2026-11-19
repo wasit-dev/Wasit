@@ -113,6 +113,8 @@ describe("canary: no key and no RPC key in any output of wasit run and wasit ci-
         baselineOut: path.join(dir, "pay.baseline.json"),
         baseline: report,
         history: report,
+        // The check run's payload (2026-11-20) is scanned with every other file below.
+        checkRun: path.join(dir, "pay.check-run.json"),
       },
       { env: { PATH: process.env["PATH"] ?? "", ...KEYS, ...RPC }, stdout: (line) => printed.push(line), stderr: (line) => printed.push(line) },
     );

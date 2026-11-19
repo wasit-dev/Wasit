@@ -113,7 +113,17 @@ export { runExitCode } from "./verdict.js";
 export type { RunVerdict } from "./verdict.js";
 
 // The pull request comment and the job summary.
-export { COMMENT_MARKER, renderComment, renderNoReportComment, renderNoReportSummary, renderSummary } from "./ci-report.js";
+export {
+  COMMENT_MARKER,
+  renderCheckRun,
+  renderComment,
+  renderNoReportCheckRun,
+  renderNoReportComment,
+  renderNoReportSummary,
+  renderRunningComment,
+  renderSummary,
+} from "./ci-report.js";
+export type { CheckRunOutput, RunningCommentInput } from "./ci-report.js";
 export type { CiReportInput } from "./ci-report.js";
 
 // Variables kept away from a service Wasit starts, and values kept out of output.

@@ -110,7 +110,12 @@ describe("action.yml", () => {
 
     it("is passed as GH_TOKEN, as github.token, to the steps that call gh and to no other", () => {
       const withToken = steps.filter((step) => step.env !== undefined && Object.keys(step.env).some((key) => /token/i.test(key)));
-      assert.deepEqual(withToken.map((step) => step.name).sort(), ["Comment on the pull request", "Find the baseline"]);
+      assert.deepEqual(withToken.map((step) => step.name).sort(), [
+        "Announce the run",
+        "Comment on the pull request",
+        "Find the baseline",
+        "Finish the check run",
+      ]);
       for (const step of withToken) {
         assert.deepEqual(Object.keys(step.env).filter((key) => /token/i.test(key)), ["GH_TOKEN"], step.name);
         assert.equal(step.env.GH_TOKEN, "${{ github.token }}", step.name);
@@ -129,7 +134,23 @@ describe("action.yml", () => {
     it("refers to no secret and no token by any other name", () => {
       assert.ok(!/secrets\./i.test(text));
       assert.ok(!/GITHUB_TOKEN/.test(text));
-      assert.equal((text.match(/github\.token/g) ?? []).length, 2);
+      assert.equal((text.match(/github\.token/g) ?? []).length, 4);
+    });
+  });
+
+  describe("NODE_OPTIONS (2026-11-20 screening, class B-A10)", () => {
+    it("is set empty in every step, so a --require that an earlier step put in GITHUB_ENV does not run with the token or the key", () => {
+      for (const step of steps) assert.equal(step.env?.NODE_OPTIONS, "", step.name);
+    });
+  });
+
+  describe("the running comment is always replaced (2026-11-20 screening)", () => {
+    it("writes the report and the comment whenever the announcement ran, even if Run Wasit was skipped", () => {
+      for (const name of ["Write the report", "Comment on the pull request"]) {
+        const condition = stepByName(name).if ?? "";
+        assert.match(condition, /always\(\)/, name);
+        assert.match(condition, /steps\.announce\.outcome == 'success'/, `${name}: a skipped run would leave "Wasit is running" on the pull request`);
+      }
     });
   });
 
@@ -263,8 +284,17 @@ describe("the template workflow for builders", () => {
   const text = read("examples/wasit.yml");
   const workflow = parse(text);
 
-  it("asks for contents: read, pull-requests: write and actions: read, and nothing else", () => {
-    assert.deepEqual(workflow.permissions, { contents: "read", "pull-requests": "write", actions: "read" });
+  it("asks for contents: read, pull-requests: write, actions: read and the optional checks: write, and nothing else", () => {
+    assert.deepEqual(workflow.permissions, { contents: "read", "pull-requests": "write", actions: "read", checks: "write" });
+  });
+
+  it("runs one Wasit job per pull request, a newer push cancelling the older run, and never queues or cancels a run on main (2026-11-20)", () => {
+    assert.equal(
+      workflow.concurrency?.group,
+      "${{ github.event_name == 'pull_request' && format('wasit-pr-{0}', github.event.pull_request.number) || format('wasit-run-{0}', github.run_id) }}",
+      "a run that is not on a pull request has a group of its own, so nothing waits for it and nothing cancels it",
+    );
+    assert.equal(workflow.concurrency?.["cancel-in-progress"], "${{ github.event_name == 'pull_request' }}");
   });
 
   it("never uses pull_request_target, not even in a comment that could be copied", () => {

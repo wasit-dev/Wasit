@@ -404,6 +404,7 @@ program
     "The baseline file of the newest completed run on the default branch, failed or not: the recent failures are counted from its history",
   )
   .option("--baseline-run <id>", "The id of the run the baseline came from, named in the comment")
+  .option("--check-run <file>", "Write the check run's title, summary and conclusion here, as JSON")
   .exitOverride(exitTwoOnUsageError)
   .action(async (opts) => {
     let code: number;
@@ -417,6 +418,7 @@ program
           ...(opts.baselineOut === undefined ? {} : { baselineOut: opts.baselineOut as string }),
           ...(opts.history === undefined ? {} : { history: opts.history as string }),
           ...(opts.baselineRun === undefined ? {} : { baselineRun: opts.baselineRun as string }),
+          ...(opts.checkRun === undefined ? {} : { checkRun: opts.checkRun as string }),
         },
         { env: process.env, stdout: (line) => console.log(line), stderr: (line) => console.error(line) },
       );

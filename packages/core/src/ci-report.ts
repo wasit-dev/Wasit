@@ -19,8 +19,15 @@ import {
   type ChangeKind,
   type History,
 } from "./baseline.js";
-import type { SkipKind } from "./check.js";
-import { checkGroup, describeTotals, type CheckGroup, type EndpointReport, type RunReport } from "./report.js";
+import type { CheckStatus, SkipKind } from "./check.js";
+import {
+  checkGroup,
+  describeTotals,
+  type CheckGroup,
+  type EndpointOutcome,
+  type EndpointReport,
+  type RunReport,
+} from "./report.js";
 import { sanitizeForMarkdown } from "./sanitize.js";
 import { isShortCommit, type ToolVersions } from "./versions.js";
 import { runExitCode } from "./verdict.js";
@@ -53,6 +60,30 @@ export interface CiReportInput {
 
 /** Docs links go in only if they point at the site: the file they come from is data. */
 const DOCS_LINK = /^https:\/\/usewasit\.dev\/[A-Za-z0-9/_.-]*$/;
+
+/** A check's status at a glance (Najmi, 2026-11-20): emoji are safe in a comment, which is HTML. */
+const STATUS_MARK: Readonly<Record<CheckStatus, string>> = { PASS: "✅", FAIL: "❌", SKIP: "⚪", ERROR: "⚠️" };
+const OUTCOME_MARK: Readonly<Record<EndpointOutcome, string>> = {
+  conformant: "✅",
+  "non-conformant": "❌",
+  "no-verdict": "⚠️",
+  unsupported: "⚪",
+};
+/** The run's verdict words, as the headline says them. */
+type VerdictWord = "conformant" | "non-conformant" | "regression" | "nothing graded" | "no verdict";
+const VERDICT_MARK: Readonly<Record<VerdictWord, string>> = {
+  conformant: "✅",
+  "non-conformant": "❌",
+  regression: "❌",
+  "nothing graded": "⚪",
+  "no verdict": "⚠️",
+};
+/** Endpoints shown with a table of their checks; a config with more points at the report file for the rest. */
+const MAX_ENDPOINT_SECTIONS = 10;
+/** A Stellar transaction hash: the only reference a payment proof links, and only on the test network. */
+const STELLAR_TX = /^[0-9a-f]{64}$/;
+/** A run's page, as `GITHUB_SERVER_URL/GITHUB_REPOSITORY/actions/runs/GITHUB_RUN_ID` gives it. */
+const RUN_URL = /^https:\/\/[A-Za-z0-9.-]+(?::[0-9]{1,5})?\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/actions\/runs\/[0-9]{1,20}$/;
 const VERSION = /^[0-9A-Za-z.+-]{1,40}$/;
 
 const GROUP_LABEL: Readonly<Record<CheckGroup, string>> = {
@@ -120,10 +151,14 @@ function checksCell(endpoint: EndpointReport): string {
   return GROUP_ORDER.map((group) => groupText(endpoint, group)).filter((text) => text !== undefined).join("; ");
 }
 
-function renderBody(input: CiReportInput): string {
+/** The baseline the run is compared with (one of another environment is not), and the run's verdict. */
+function verdictOf(input: CiReportInput): {
+  readonly baseline: Baseline | undefined;
+  readonly note: string | undefined;
+  readonly code: number;
+  readonly word: VerdictWord;
+} {
   const { report } = input;
-  const md = (value: string): string => sanitizeForMarkdown(value, { redact: input.secrets ?? [] });
-
   // A baseline from another environment is another service: it is not compared.
   const problem = input.baseline === undefined ? undefined : baselineProblem(report, input.baseline.report);
   const baseline = problem === undefined ? input.baseline : undefined;
@@ -131,7 +166,7 @@ function renderBody(input: CiReportInput): string {
 
   const verdict = runExitCode(report, baseline?.report);
   const couldNotRun = report.endpoints.some((endpoint) => endpoint.results.some((result) => result.status === "ERROR"));
-  const word =
+  const word: VerdictWord =
     verdict.code === 0
       ? "conformant"
       : verdict.code === 1
@@ -141,10 +176,69 @@ function renderBody(input: CiReportInput): string {
         : report.totals.graded === 0 && !couldNotRun
           ? "nothing graded"
           : "no verdict";
+  return { baseline, note, code: verdict.code, word };
+}
+
+/**
+ * The payment proof under an endpoint: a link to X402-06's transaction on
+ * Stellar Expert, and only when every part is Wasit's own and checked: the run
+ * is on `stellar:testnet`, X402-06 passed, and its reference (read back from the
+ * chain by the check) is a 64-character lower-case hex hash. Never a link built
+ * from a service's text.
+ */
+function paymentProof(endpoint: EndpointReport, network: string): string | undefined {
+  if (network !== "stellar:testnet") return undefined;
+  const honest = endpoint.results.find((result) => result.id === "X402-06" && result.status === "PASS");
+  const reference = honest?.reference;
+  if (reference === undefined || !STELLAR_TX.test(reference)) return undefined;
+  return (
+    `**Payment proof**: X402-06 settled on stellar:testnet, ` +
+    `[tx ${reference.slice(0, 4)}…${reference.slice(-4)} on Stellar Expert](https://stellar.expert/explorer/testnet/tx/${reference}).`
+  );
+}
+
+/** An endpoint's heading and the table of its checks, each with its mark, then its payment proof. */
+function endpointSection(endpoint: EndpointReport, network: string, md: (value: string) => string): string[] {
+  const out = [
+    "",
+    `### ${OUTCOME_MARK[endpoint.outcome]} ${md(endpoint.name)} · ${endpoint.protocol} · ${endpoint.outcome}`,
+    "",
+    "|   | Check | Result |",
+    "| --- | --- | --- |",
+    ...endpoint.results.map((result) => `| ${STATUS_MARK[result.status]} | ${md(result.id)} ${md(result.name)} | ${result.status} |`),
+  ];
+  const proof = paymentProof(endpoint, network);
+  if (proof !== undefined) out.push("", proof);
+  return out;
+}
+
+/** Every check's detail, folded away at the end, so a long report cuts here and not in the verdict. */
+function detailsBlock(report: RunReport, md: (value: string) => string): string[] {
+  const out = ["", "<details><summary>Details of each check</summary>", ""];
+  for (const endpoint of report.endpoints.slice(0, MAX_ENDPOINT_SECTIONS)) {
+    out.push(`**${md(endpoint.name)}**`, "");
+    let lastSkip: string | undefined;
+    for (const result of endpoint.results) {
+      // A skip with the reason of the skip just above it says so instead of repeating it.
+      const repeated = result.status === "SKIP" && lastSkip === result.detail;
+      lastSkip = result.status === "SKIP" ? result.detail : undefined;
+      const detail = repeated ? "the same reason as above." : md(result.detail);
+      out.push(`- ${STATUS_MARK[result.status]} ${md(result.id)} ${md(result.name)}: ${detail}`);
+    }
+    out.push("");
+  }
+  out.push("</details>");
+  return out;
+}
+
+function renderBody(input: CiReportInput): string {
+  const { report } = input;
+  const md = (value: string): string => sanitizeForMarkdown(value, { redact: input.secrets ?? [] });
+  const { baseline, note, word } = verdictOf(input);
 
   const sdk = report.sdk;
   const out: string[] = [
-    `**Wasit: ${word}.** ${describeTotals(report.totals)} on ${md(report.environment)}, ${md(report.network)}. ` +
+    `**Wasit: ${VERDICT_MARK[word]} ${word}.** ${describeTotals(report.totals)} on ${md(report.environment)}, ${md(report.network)}. ` +
       `${wasitText(report.wasit)}, x402 v2, ` +
       `@x402/core ${version(sdk["@x402/core"])}, @x402/stellar ${version(sdk["@x402/stellar"])}, ` +
       `@stellar/mpp ${version(sdk["@stellar/mpp"])}, mppx ${version(sdk.mppx)}, ` +
@@ -153,9 +247,20 @@ function renderBody(input: CiReportInput): string {
     "| Endpoint | Protocol | Outcome | Checks |",
     "| --- | --- | --- | --- |",
     ...report.endpoints.map(
-      (endpoint) => `| ${md(endpoint.name)} | ${endpoint.protocol} | ${endpoint.outcome} | ${checksCell(endpoint)} |`,
+      (endpoint) =>
+        `| ${md(endpoint.name)} | ${endpoint.protocol} | ${OUTCOME_MARK[endpoint.outcome]} ${endpoint.outcome} | ${checksCell(endpoint)} |`,
     ),
   ];
+
+  for (const endpoint of report.endpoints.slice(0, MAX_ENDPOINT_SECTIONS)) out.push(...endpointSection(endpoint, report.network, md));
+  if (report.endpoints.length > MAX_ENDPOINT_SECTIONS) {
+    const rest = report.endpoints.length - MAX_ENDPOINT_SECTIONS;
+    out.push(
+      "",
+      `${rest} more endpoint${rest === 1 ? " is" : "s are"} not shown check by check here; ` +
+        "the JSON report of wasit run has every check (in the Action, the log of the step Run Wasit).",
+    );
+  }
 
   const notGraded = report.endpoints.filter(
     (endpoint) => (endpoint.outcome === "unsupported" || endpoint.outcome === "no-verdict") && endpoint.reason !== undefined,
@@ -214,6 +319,7 @@ function renderBody(input: CiReportInput): string {
     for (const item of report.notes) out.push(`- ${md(item)}`);
   }
 
+  out.push(...detailsBlock(report, md));
   return out.join("\n");
 }
 
@@ -261,7 +367,7 @@ function describeChange(change: Change, md: (value: string) => string): string {
 function withinLimit(text: string): string {
   if (text.length <= MAX_COMMENT_CHARACTERS) return text;
   const cut = text.lastIndexOf("\n", MAX_COMMENT_CHARACTERS - 200);
-  return `${text.slice(0, cut > 0 ? cut : MAX_COMMENT_CHARACTERS - 200)}\n\n(The rest is cut: the full report is in the job's wasit-report.json.)`;
+  return `${text.slice(0, cut > 0 ? cut : MAX_COMMENT_CHARACTERS - 200)}\n\n(The rest is cut: the JSON report of wasit run has all of it; in the Action, the log of the step Run Wasit.)`;
 }
 
 /** The pull request comment: the marker, then the report. */
@@ -284,7 +390,7 @@ export function renderSummary(input: CiReportInput): string {
 function renderNoReportBody(versions: ToolVersions): string {
   const sdk = versions.sdk;
   return [
-    "**Wasit: no verdict.** The run ended before it wrote a report, so nothing was graded. " +
+    "**Wasit: ⚠️ no verdict.** The run ended before it wrote a report, so nothing was graded. " +
       `${wasitText(versions.wasit)}, x402 v2, ` +
       `@x402/core ${version(sdk["@x402/core"])}, @x402/stellar ${version(sdk["@x402/stellar"])}, ` +
       `@stellar/mpp ${version(sdk["@stellar/mpp"])}, mppx ${version(sdk.mppx)}, ` +
@@ -303,4 +409,78 @@ export function renderNoReportComment(versions: ToolVersions): string {
 /** The job summary for a run that left no report: the same text without the marker. */
 export function renderNoReportSummary(versions: ToolVersions): string {
   return `${renderNoReportBody(versions)}\n`;
+}
+
+/** What a GitHub check run shows: its title, its summary and how it ended. */
+export interface CheckRunOutput {
+  /** At most 255 characters: the verdict and the counts, nothing a service chose. */
+  readonly title: string;
+  /** The job summary's text: the same sanitised report. */
+  readonly summary: string;
+  readonly conclusion: "success" | "failure" | "neutral";
+}
+
+/** The check run's limits, as GitHub sets them. */
+const MAX_CHECK_TITLE = 255;
+const MAX_CHECK_SUMMARY = 65_535;
+
+/** "10 passed, 1 failed, 1 could not run, 1 skipped", over every endpoint. */
+function statusCounts(report: RunReport): string {
+  const all = report.endpoints.flatMap((endpoint) => endpoint.results);
+  const count = (status: CheckStatus): number => all.filter((result) => result.status === status).length;
+  const parts = [`${count("PASS")} passed`];
+  if (count("FAIL") > 0) parts.push(`${count("FAIL")} failed`);
+  if (count("ERROR") > 0) parts.push(`${count("ERROR")} could not run`);
+  if (count("SKIP") > 0) parts.push(`${count("SKIP")} skipped`);
+  return parts.join(", ");
+}
+
+/**
+ * The check run "Wasit conformance" at the end of a run: success for a run that
+ * exits 0, failure for 1, neutral for no verdict. The title holds only the
+ * verdict word and counts; the summary is the job summary.
+ */
+export function renderCheckRun(input: CiReportInput): CheckRunOutput {
+  const { code, word } = verdictOf(input);
+  return {
+    title: `${VERDICT_MARK[word]} ${word} · ${statusCounts(input.report)}`.slice(0, MAX_CHECK_TITLE),
+    summary: renderSummary(input).slice(0, MAX_CHECK_SUMMARY),
+    conclusion: code === 0 ? "success" : code === 1 ? "failure" : "neutral",
+  };
+}
+
+/** The check run for a run that left no report: neutral, with the fixed text of the no-report comment. */
+export function renderNoReportCheckRun(versions: ToolVersions): CheckRunOutput {
+  return {
+    title: "⚠️ no verdict · the run ended before it wrote a report",
+    summary: renderNoReportSummary(versions).slice(0, MAX_CHECK_SUMMARY),
+    conclusion: "neutral",
+  };
+}
+
+export interface RunningCommentInput {
+  /** When the run started, as an ISO time; anything else is left out. */
+  readonly startedAt: string;
+  /** The run's page; left out unless it has the shape GitHub gives it. */
+  readonly runUrl?: string;
+  /** The environment the run tests, when the workflow names one. */
+  readonly environment?: string;
+  /** Values no output may carry. */
+  readonly secrets?: readonly string[];
+}
+
+/**
+ * The pull request comment while Wasit runs (Najmi, 2026-11-20): the marker,
+ * then a fixed line with the start time and a link to the run. The result
+ * replaces it when the run ends. The only value from outside is the
+ * environment's name, which goes through the sanitiser; the link is used only
+ * when it has the shape of a GitHub run page.
+ */
+export function renderRunningComment(input: RunningCommentInput): string {
+  const md = (value: string): string => sanitizeForMarkdown(value, { redact: input.secrets ?? [] });
+  const when = utcMinute(input.startedAt);
+  const environment = input.environment !== undefined && input.environment.trim() !== "" ? ` on ${md(input.environment)}` : "";
+  const started = when === undefined ? "" : ` · started ${when}`;
+  const link = input.runUrl !== undefined && RUN_URL.test(input.runUrl) ? ` · [follow the run](${input.runUrl})` : "";
+  return `${COMMENT_MARKER}\n⏳ **Wasit is running**${environment}${started}${link}\n\nThe result replaces this comment when the run ends.\n`;
 }

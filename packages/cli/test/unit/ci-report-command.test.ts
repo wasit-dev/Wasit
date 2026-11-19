@@ -71,7 +71,7 @@ describe("wasit ci-report", () => {
     assert.equal(result.code, 0, result.stderr);
     const text = await readFile(comment, "utf-8");
     assert.equal(text.split("\n")[0], "<!-- wasit-report -->");
-    assert.match(text.split("\n")[1] ?? "", /Wasit: conformant/);
+    assert.match(text.split("\n")[1] ?? "", /Wasit: ✅ conformant/);
     assert.match(text, /No baseline on main yet/);
   });
 
@@ -82,13 +82,13 @@ describe("wasit ci-report", () => {
     await ciReport({ report, summary, comment: path.join(dir, "s1.md") });
     const viaFlag = await readFile(summary, "utf-8");
     assert.ok(viaFlag.startsWith("earlier step\n"));
-    assert.match(viaFlag, /Wasit: nothing graded/);
+    assert.match(viaFlag, /Wasit: ⚪ nothing graded/);
     assert.ok(!viaFlag.includes("<!-- wasit-report -->"));
 
     const other = path.join(dir, "step-summary-env.md");
     appendFileSync(other, "");
     await ciReport({ report, comment: path.join(dir, "s2.md") }, { GITHUB_STEP_SUMMARY: other });
-    assert.match(await readFile(other, "utf-8"), /Wasit: nothing graded/);
+    assert.match(await readFile(other, "utf-8"), /Wasit: ⚪ nothing graded/);
   });
 
   it("compares with the baseline, and carries the history into --baseline-out", async () => {
@@ -118,7 +118,7 @@ describe("wasit ci-report", () => {
     const comment = path.join(dir, "c3.md");
     assert.equal((await ciReport({ report: bad, baseline: second, comment })).code, 0, "a failing run is the run's exit code, not ci-report's");
     const text = await readFile(comment, "utf-8");
-    assert.match(text, /Wasit: non-conformant/);
+    assert.match(text, /Wasit: ❌ non-conformant/);
     assert.match(text, /New FAIL: weather X402-01 \(was PASS on main\)/);
     assert.ok(!/### Recent failures/.test(text), "main never failed, so there is no recent-failures section");
   });
@@ -147,18 +147,39 @@ describe("wasit ci-report", () => {
 
   // The run left no usable report: the comment says "no verdict" (ci-report-no-report.test.ts
   // holds the detail), so the comment of the push before does not stay next to a red check.
+  it("writes the check run's title, summary and conclusion with --check-run, and a neutral one when there is no report", async () => {
+    const report = await reportFor(async (_request, response) => {
+      const { challengeHeader } = await import("./run-helpers.js");
+      response.writeHead(402, { "payment-required": challengeHeader() });
+      response.end("{}");
+    }, "check-run");
+    const checkRun = path.join(dir, "check-run.json");
+    const result = await ciReport({ report, comment: path.join(dir, "check-run.comment.md"), checkRun });
+    assert.equal(result.code, 0, result.stderr);
+    const output = JSON.parse(await readFile(checkRun, "utf-8")) as { title: string; summary: string; conclusion: string };
+    assert.equal(output.conclusion, "success");
+    assert.match(output.title, /^✅ conformant · 5 passed, 6 skipped$/);
+    assert.match(output.summary, /Wasit: ✅ conformant/);
+    assert.ok(!output.summary.includes("<!-- wasit-report -->"), "the summary is the job summary, without the marker");
+    const missing = path.join(dir, "check-run-missing.json");
+    await ciReport({ report: path.join(dir, "no-such-report.json"), comment: path.join(dir, "missing.comment.md"), checkRun: missing });
+    const neutral = JSON.parse(await readFile(missing, "utf-8")) as { conclusion: string; title: string };
+    assert.equal(neutral.conclusion, "neutral");
+    assert.match(neutral.title, /no verdict/);
+  });
+
   it("says no verdict when the report is missing (exit 0: the run step carries the failure) or is not a report (exit 2)", async () => {
     const comment = path.join(dir, "never.md");
     const missing = await ciReport({ report: path.join(dir, "no-such-report.json"), comment });
     assert.equal(missing.code, 0);
     assert.match(missing.stderr, /wrote no report/);
-    assert.match(await readFile(comment, "utf-8"), /Wasit: no verdict\./);
+    assert.match(await readFile(comment, "utf-8"), /Wasit: ⚠️ no verdict\./);
     const notReport = path.join(dir, "not-a-report.json");
     await writeFile(notReport, JSON.stringify({ schema: 7 }));
     const result = await ciReport({ report: notReport, comment });
     assert.equal(result.code, 2);
     assert.match(result.stderr, /not a Wasit report/);
-    assert.match(await readFile(comment, "utf-8"), /Wasit: no verdict\./);
+    assert.match(await readFile(comment, "utf-8"), /Wasit: ⚠️ no verdict\./);
   });
 
   describe("a hostile service, from the run to the comment", () => {

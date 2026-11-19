@@ -22,7 +22,9 @@ import {
   readBaseline,
   readBuildCommit,
   readToolVersions,
+  renderCheckRun,
   renderComment,
+  renderNoReportCheckRun,
   renderNoReportComment,
   renderNoReportSummary,
   renderSummary,
@@ -56,6 +58,8 @@ export interface CiReportOptions {
   readonly history?: string;
   /** The id of the run the baseline came from, named in the comment. Only a whole number above 0 is used. */
   readonly baselineRun?: string;
+  /** Where the check run's title, summary and conclusion go, as JSON, for the step that completes it. */
+  readonly checkRun?: string;
 }
 
 export interface CiReportContext {
@@ -96,6 +100,10 @@ export async function executeCiReport(options: CiReportOptions, context: CiRepor
       if (summary !== undefined && summary !== "") {
         appendFileSync(summary, renderNoReportSummary(versions));
         context.stdout(`Appended the summary to ${summary}`);
+      }
+      if (options.checkRun !== undefined) {
+        writeFileSync(options.checkRun, JSON.stringify(renderNoReportCheckRun(versions)));
+        context.stdout(`Wrote ${options.checkRun}`);
       }
     } catch (error) {
       const errno = (error as NodeJS.ErrnoException).code;
@@ -161,6 +169,11 @@ export async function executeCiReport(options: CiReportOptions, context: CiRepor
     if (options.baselineOut !== undefined) {
       writeFileSync(options.baselineOut, serializeBaseline(report, updateHistory(history, report)));
       context.stdout(`Wrote ${options.baselineOut}`);
+    }
+
+    if (options.checkRun !== undefined) {
+      writeFileSync(options.checkRun, JSON.stringify(renderCheckRun(input)));
+      context.stdout(`Wrote ${options.checkRun}`);
     }
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;

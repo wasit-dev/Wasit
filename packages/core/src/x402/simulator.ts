@@ -954,6 +954,8 @@ async function checkSignatureAccepted(options: X402PaymentCheckOptions): Promise
           name,
           pass: true,
           detail: `Valid payment accepted (HTTP ${paid.status}) and ${verdict.detail}.`,
+          // Read back from the chain and found to be this payment: a report may link it.
+          reference,
         }
       : fail(
           verdict.detail,
