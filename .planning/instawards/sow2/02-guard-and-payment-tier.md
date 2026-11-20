@@ -30,9 +30,9 @@ command line, without the opt-in, goes to beta testers at the end of the week.
 
 ## What shipped (first layer)
 
-- **A fixed table of networks.** Each network is a test network, a mainnet that needs the opt-in, or unknown. Unknown is refused. Code: [`networks.ts`](https://github.com/wasit-dev/Wasit/blob/sow2/s1-action/packages/core/src/guard/networks.ts).
+- **A fixed table of networks.** Each network is a test network, a mainnet that needs the opt-in, or unknown. Unknown is refused. Code: [`networks.ts`](https://github.com/wasit-dev/Wasit/blob/main/packages/core/src/guard/networks.ts).
 - **The check sits in every entry point that signs,** before a key is read: the x402 payment checks, MPP charge, every MPP channel check including the one that closes a channel. Commit: [`45834e1`](https://github.com/wasit-dev/Wasit/commit/45834e1).
-- **A channel commitment is signed only when it names the run's channel, amount and network.** Test: [`channel-commitment-binding.test.ts`](https://github.com/wasit-dev/Wasit/blob/sow2/s1-action/packages/core/test/unit/channel-commitment-binding.test.ts).
+- **A channel commitment is signed only when it names the run's channel, amount and network.** Test: [`channel-commitment-binding.test.ts`](https://github.com/wasit-dev/Wasit/blob/main/packages/core/test/unit/channel-commitment-binding.test.ts).
 - **`stellar-sdk` 16.4.1.** The test network is on protocol 30, which the previous version cannot read.
 
 ## What shipped (payment tier, 2026-11-16)
@@ -41,7 +41,7 @@ command line, without the opt-in, goes to beta testers at the end of the week.
 - **The payment tier of `wasit run` and of the Action,** on test networks only. In GitHub Actions it pays only on a push to the default branch, a schedule and a run started by hand. On a pull request the read-only checks run and the comment says why; a payer key given to a pull request run is refused before the service starts.
 - **The service runs as its own user** on a GitHub-hosted runner when a payer key is set, so it cannot read the key from Wasit's process. Code that ran earlier in the job as the runner's user is not kept from it; the guide will say so.
 - **"Changed since main"** compares with the last green run on `main` and names it; the recent-failures line counts every finished run on `main`.
-- Code: [draft pull request 30](https://github.com/wasit-dev/Wasit/pull/30), stacked on pull request 23.
+- Code: [pull request 30](https://github.com/wasit-dev/Wasit/pull/30), merged into `main` on 2026-11-21.
 
 ## What shipped (the new check, 2026-11-16)
 
@@ -49,14 +49,14 @@ command line, without the opt-in, goes to beta testers at the end of the week.
 - **It reads the chain, not the service's word.** Once a ledger it asks the Stellar RPC whether the nonce of that payment's authorization was used, in the same call as the nonce of `X402-06`'s payment, which was used and must be found. The payer's balance and the token's transfer events are second readings; when they disagree, there is no verdict.
 - **Verdicts.** Refused, and still unused after its expiration ledger: pass. Refused, and used: fail, with the transaction that took it. Served: fail.
 - **The wait.** A payment that stays valid for at most 300 seconds is waited out, with a hard stop 360 seconds after it was sent; a longer one is not signed, and the check is skipped.
-- Code: [draft pull request 30](https://github.com/wasit-dev/Wasit/pull/30); the check's entry in [`docs/CHECKS.md`](https://github.com/wasit-dev/Wasit/blob/sow2/s2-payment/docs/CHECKS.md) on that branch.
+- Code: [pull request 30](https://github.com/wasit-dev/Wasit/pull/30), merged into `main` on 2026-11-21; the check's entry in [`docs/CHECKS.md`](https://github.com/wasit-dev/Wasit/blob/main/docs/CHECKS.md) on that branch.
 
 ## What shipped (mainnet refused, 2026-11-16)
 
 - **The three switches of the opt-in, refusing.** `wasit run --mainnet` stops before the config is read; the Action's `mainnet` input stops the job in the step that checks the inputs, before Wasit is installed, and the job summary says so; the MCP server does not start with `WASIT_MAINNET_OPT_IN`, `WASIT_MAINNET_CONFIG` or `--mainnet`. Each says "the mainnet opt-in is not part of this version" and exits 2. On any GitHub event but a run started by hand, the message also says that the switch is refused on that event.
 - **No allow path.** A property test drives random combinations of flags, key variables, start-up variables, GitHub events and config values for a payment on `stellar:pubnet`, against a stand-in chain that opens every gate but Wasit's own: no paid request and no signature, ever. A control run on the test network shows the stand-in does record a signature when one is made.
 - **The MCP server's RPC.** `WASIT_RPC_URL`, set when the server starts, fixes the RPC of every tool call, and a call that names another RPC is refused before anything is sent. A result that reads the chain names its RPC by origin, and says when it is not Wasit's default.
-- Code: [draft pull request 30](https://github.com/wasit-dev/Wasit/pull/30).
+- Code: [pull request 30](https://github.com/wasit-dev/Wasit/pull/30), merged into `main` on 2026-11-21.
 
 ## Proof
 
