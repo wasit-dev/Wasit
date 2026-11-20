@@ -1,0 +1,222 @@
+# Copy of the job log of dzakwannajmi/x402-example-paywall run 43882283916 (taken 2026-11-16; the live run is authoritative)
+# https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43882283916
+
+The mainnet input is refused	Set up job	﻿2026-11-16T14:06:24.8838853Z Current runner version: '2.338.2'
+The mainnet input is refused	Set up job	2026-11-16T14:06:24.8859236Z ##[group]Runner Image Provisioner
+The mainnet input is refused	Set up job	2026-11-16T14:06:24.8859833Z Hosted Compute Agent
+The mainnet input is refused	Set up job	2026-11-16T14:06:24.8860184Z Version: 20261103.629
+The mainnet input is refused	Set up job	2026-11-16T14:06:24.8860698Z Commit: 15dbd9ccb5dbf34fae002b6ed1a2670f52df37bc
+The mainnet input is refused	Set up job	2026-11-16T14:06:24.8861146Z Build Date: 2026-11-03T17:26:59Z
+The mainnet input is refused	Set up job	2026-11-16T14:06:24.8861585Z Worker ID: {6090a186-097e-4cee-ab3e-35628cf8c37b}
+The mainnet input is refused	Set up job	2026-11-16T14:06:24.8862009Z Region: westus3
+The mainnet input is refused	Set up job	2026-11-16T14:06:24.8862331Z Cloud: Azure
+The mainnet input is refused	Set up job	2026-11-16T14:06:24.8862743Z ##[endgroup]
+The mainnet input is refused	Set up job	2026-11-16T14:06:24.8863539Z ##[group]Operating System
+The mainnet input is refused	Set up job	2026-11-16T14:06:24.8863941Z Ubuntu
+The mainnet input is refused	Set up job	2026-11-16T14:06:24.8864272Z 26.04.1
+The mainnet input is refused	Set up job	2026-11-16T14:06:24.8864647Z LTS
+The mainnet input is refused	Set up job	2026-11-16T14:06:24.8865411Z ##[endgroup]
+The mainnet input is refused	Set up job	2026-11-16T14:06:24.8865787Z ##[group]Runner Image
+The mainnet input is refused	Set up job	2026-11-16T14:06:24.8866187Z Image: ubuntu-26.04
+The mainnet input is refused	Set up job	2026-11-16T14:06:24.8866547Z Version: 20261111.196.1
+The mainnet input is refused	Set up job	2026-11-16T14:06:24.8867254Z Included Software: https://github.com/actions/runner-images/blob/ubuntu26/20261111.196/images/ubuntu/Ubuntu2604-Readme.md
+The mainnet input is refused	Set up job	2026-11-16T14:06:24.8868462Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu26%2F20261111.196
+The mainnet input is refused	Set up job	2026-11-16T14:06:24.8869080Z ##[endgroup]
+The mainnet input is refused	Set up job	2026-11-16T14:06:24.8869788Z ##[group]GITHUB_TOKEN Permissions
+The mainnet input is refused	Set up job	2026-11-16T14:06:24.8871601Z Actions: read
+The mainnet input is refused	Set up job	2026-11-16T14:06:24.8871968Z Contents: read
+The mainnet input is refused	Set up job	2026-11-16T14:06:24.8872325Z Metadata: read
+The mainnet input is refused	Set up job	2026-11-16T14:06:24.8872689Z ##[endgroup]
+The mainnet input is refused	Set up job	2026-11-16T14:06:24.8874143Z Secret source: Actions
+The mainnet input is refused	Set up job	2026-11-16T14:06:24.8875014Z Cache mode: write
+The mainnet input is refused	Set up job	2026-11-16T14:06:24.8875489Z Prepare workflow directory
+The mainnet input is refused	Set up job	2026-11-16T14:06:24.9098660Z Prepare all required actions
+The mainnet input is refused	Set up job	2026-11-16T14:06:24.9131797Z Getting action download info
+The mainnet input is refused	Set up job	2026-11-16T14:06:25.2391194Z Download action repository 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+The mainnet input is refused	Set up job	2026-11-16T14:06:25.3289672Z Download action repository 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+The mainnet input is refused	Set up job	2026-11-16T14:06:25.4651063Z Download action repository 'wasit-dev/wasit@9455066ee82a49ffe6d574f052da0904720ee818' (SHA:9455066ee82a49ffe6d574f052da0904720ee818)
+The mainnet input is refused	Set up job	2026-11-16T14:06:26.2562883Z Getting action download info
+The mainnet input is refused	Set up job	2026-11-16T14:06:26.3796597Z Download action repository 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+The mainnet input is refused	Set up job	2026-11-16T14:06:26.5256976Z Complete job name: The mainnet input is refused
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	﻿2026-11-16T14:06:26.5909316Z ##[group]Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.5910560Z with:
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.5911180Z   persist-credentials: false
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.5912027Z   repository: dzakwannajmi/x402-example-paywall
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.5917145Z   token: ***
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.5917752Z   ssh-strict: true
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.5918400Z   ssh-user: git
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.5919025Z   clean: true
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.5919702Z   sparse-checkout-cone-mode: true
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.5920455Z   fetch-depth: 1
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.5921089Z   fetch-tags: false
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.5921769Z   show-progress: true
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.5922408Z   lfs: false
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.5923006Z   submodules: false
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.5923682Z   set-safe-directory: true
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.5924384Z   allow-unsafe-pr-checkout: false
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.5925310Z ##[endgroup]
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8233093Z Syncing repository: dzakwannajmi/x402-example-paywall
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8236333Z ##[group]Getting Git version info
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8238107Z Working directory is '/home/runner/work/x402-example-paywall/x402-example-paywall'
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8240164Z [command]/usr/bin/git version
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8244265Z git version 2.56.1
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8265639Z ##[endgroup]
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8272815Z Temporarily overriding HOME='/home/runner/work/_temp/bffeb354-37da-4a92-b95c-94677ad9d133' before making global git config changes
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8275303Z Adding repository directory to the temporary git global config as a safe directory
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8278130Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/x402-example-paywall/x402-example-paywall
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8347270Z Deleting the contents of '/home/runner/work/x402-example-paywall/x402-example-paywall'
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8351094Z ##[group]Initializing the repository
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8355001Z [command]/usr/bin/git init /home/runner/work/x402-example-paywall/x402-example-paywall
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8460105Z hint: Using 'master' as the name for the initial branch. This default branch name
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8534949Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8537369Z hint: to use in all of your new repositories, which will suppress this warning,
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8538750Z hint: call:
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8539602Z hint:
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8540684Z hint: 	git config --global init.defaultBranch <name>
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8541922Z hint:
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8543108Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8545083Z hint: 'development'. The just-created branch can be renamed via this command:
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8546525Z hint:
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8547372Z hint: 	git branch -m <name>
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8548309Z hint:
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8549552Z hint: Disable this message with "git config set advice.defaultBranchName false"
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8551810Z Initialized empty Git repository in /home/runner/work/x402-example-paywall/x402-example-paywall/.git/
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8566913Z [command]/usr/bin/git remote add origin https://github.com/dzakwannajmi/x402-example-paywall
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8570053Z ##[endgroup]
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8571420Z ##[group]Disabling automatic garbage collection
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8572606Z [command]/usr/bin/git config --local gc.auto 0
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8597044Z ##[endgroup]
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8598002Z ##[group]Setting up auth
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8605240Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.8650600Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.9061326Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.9090879Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.9323601Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.9359532Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.9614287Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.9653616Z ##[endgroup]
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.9655414Z ##[group]Fetching the repository
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:26.9662136Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +9086a4520a44017b1dac001606d7dd88b29199a3:refs/remotes/origin/evidence/mainnet-input-refused
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:27.4967331Z From https://github.com/dzakwannajmi/x402-example-paywall
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:27.4969914Z  * [new ref]         9086a4520a44017b1dac001606d7dd88b29199a3 -> origin/evidence/mainnet-input-refused
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:27.4975706Z ##[endgroup]
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:27.4976725Z ##[group]Determining the checkout info
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:27.4978190Z ##[endgroup]
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:27.4984326Z [command]/usr/bin/git sparse-checkout disable
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:27.5038295Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:27.5068107Z ##[group]Checking out the ref
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:27.5073947Z [command]/usr/bin/git checkout --progress --force -B evidence/mainnet-input-refused refs/remotes/origin/evidence/mainnet-input-refused
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:27.5143511Z Switched to a new branch 'evidence/mainnet-input-refused'
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:27.5149254Z branch 'evidence/mainnet-input-refused' set up to track 'origin/evidence/mainnet-input-refused'.
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:27.5154580Z ##[endgroup]
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:27.5198101Z [command]/usr/bin/git log -1 --format=%H
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:27.5221013Z 9086a4520a44017b1dac001606d7dd88b29199a3
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:27.5231735Z ##[group]Removing auth
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:27.5233612Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:27.5262876Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:27.5514033Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:27.5539156Z http.https://github.com/.extraheader
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:27.5545678Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:27.5577415Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:27.5824889Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:27.5855158Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+The mainnet input is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:27.6101496Z ##[endgroup]
+The mainnet input is refused	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	﻿2026-11-16T14:06:27.6365062Z ##[group]Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+The mainnet input is refused	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-16T14:06:27.6365968Z with:
+The mainnet input is refused	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-16T14:06:27.6366444Z   node-version: 22
+The mainnet input is refused	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-16T14:06:27.6366955Z   always-auth: false
+The mainnet input is refused	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-16T14:06:27.6367471Z   check-latest: false
+The mainnet input is refused	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-16T14:06:27.6371830Z   token: ***
+The mainnet input is refused	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-16T14:06:27.6372350Z ##[endgroup]
+The mainnet input is refused	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-16T14:06:27.8255706Z Found in cache @ /opt/hostedtoolcache/node/22.23.4/x64
+The mainnet input is refused	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-16T14:06:27.8260214Z (node:2287) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+The mainnet input is refused	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-16T14:06:27.8261761Z (Use `node --trace-deprecation ...` to show where the warning was created)
+The mainnet input is refused	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-16T14:06:27.8263252Z ##[group]Environment details
+The mainnet input is refused	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-16T14:06:31.5872435Z node: v22.23.4
+The mainnet input is refused	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-16T14:06:31.5872810Z npm: 10.9.9
+The mainnet input is refused	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-16T14:06:31.5872986Z yarn: 1.22.22
+The mainnet input is refused	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-16T14:06:31.5873554Z ##[endgroup]
+The mainnet input is refused	Install the service	﻿2026-11-16T14:06:31.6022158Z ##[group]Run npm ci
+The mainnet input is refused	Install the service	2026-11-16T14:06:31.6022378Z ^[[36;1mnpm ci^[[0m
+The mainnet input is refused	Install the service	2026-11-16T14:06:31.6074969Z shell: /usr/bin/bash -e {0}
+The mainnet input is refused	Install the service	2026-11-16T14:06:31.6075173Z ##[endgroup]
+The mainnet input is refused	Install the service	2026-11-16T14:06:36.4562180Z 
+The mainnet input is refused	Install the service	2026-11-16T14:06:36.4568416Z added 132 packages, and audited 133 packages in 5s
+The mainnet input is refused	Install the service	2026-11-16T14:06:36.4568675Z 
+The mainnet input is refused	Install the service	2026-11-16T14:06:36.4568813Z 55 packages are looking for funding
+The mainnet input is refused	Install the service	2026-11-16T14:06:36.4608927Z   run `npm fund` for details
+The mainnet input is refused	Install the service	2026-11-16T14:06:36.4609208Z 
+The mainnet input is refused	Install the service	2026-11-16T14:06:36.4609592Z 5 high severity vulnerabilities
+The mainnet input is refused	Install the service	2026-11-16T14:06:36.4609808Z 
+The mainnet input is refused	Install the service	2026-11-16T14:06:36.4610044Z To address issues that do not require attention, run:
+The mainnet input is refused	Install the service	2026-11-16T14:06:36.4610392Z   npm audit fix
+The mainnet input is refused	Install the service	2026-11-16T14:06:36.4610519Z 
+The mainnet input is refused	Install the service	2026-11-16T14:06:36.4610633Z To address all issues, run:
+The mainnet input is refused	Install the service	2026-11-16T14:06:36.4610889Z   npm audit fix --force
+The mainnet input is refused	Install the service	2026-11-16T14:06:36.4611038Z 
+The mainnet input is refused	Install the service	2026-11-16T14:06:36.4611161Z Run `npm audit` for details.
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	﻿2026-11-16T14:06:36.5146888Z ##[group]Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5147161Z with:
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5147292Z   config: wasit.config.json
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5147436Z   tier: payment
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5147559Z   mainnet: true
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5147691Z ##[endgroup]
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5190899Z ##[start-action display=Check the runner;id=__wasit-dev_wasit.__run]
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5208883Z ##[group]Run if [ "$RUNNER_OS" != "Linux" ]; then
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5209305Z ^[[36;1mif [ "$RUNNER_OS" != "Linux" ]; then^[[0m
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5209542Z ^[[36;1m  echo "Wasit: this action runs on Linux runners in this version." >&2^[[0m
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5209763Z ^[[36;1m  exit 2^[[0m
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5209886Z ^[[36;1mfi^[[0m
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5210032Z ^[[36;1mif ! command -v node >/dev/null 2>&1; then^[[0m
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5210410Z ^[[36;1m  echo "Wasit: Node 22 or later is needed and node was not found. Add actions/setup-node with node-version: 22 before this step." >&2^[[0m
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5210762Z ^[[36;1m  exit 2^[[0m
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5210877Z ^[[36;1mfi^[[0m
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5211046Z ^[[36;1mmajor="$(node -p 'process.versions.node.split(".")[0]')"^[[0m
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5211252Z ^[[36;1mif [ "$major" -lt 22 ]; then^[[0m
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5211584Z ^[[36;1m  echo "Wasit: Node 22 or later is needed and this runner has Node $major. Add actions/setup-node with node-version: 22 before this step." >&2^[[0m
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5211917Z ^[[36;1m  exit 2^[[0m
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5212040Z ^[[36;1mfi^[[0m
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5255666Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5255879Z ##[endgroup]
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5548024Z ##[end-action id=__wasit-dev_wasit.__run;outcome=success;conclusion=success;duration_ms=35]
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5556607Z ##[start-action display=Check the inputs;id=__wasit-dev_wasit.__run_2]
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5571119Z ##[group]Run node "$ACTION_PATH/scripts/wasit.mjs" check
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5571377Z ^[[36;1mnode "$ACTION_PATH/scripts/wasit.mjs" check^[[0m
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5613773Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5613981Z env:
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5614235Z   ACTION_PATH: /home/runner/work/_actions/wasit-dev/wasit/9455066ee82a49ffe6d574f052da0904720ee818/action
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5614516Z   INPUT_CONFIG: wasit.config.json
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5614670Z   INPUT_ENVIRONMENT: 
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5614958Z   INPUT_TIER: payment
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5615103Z   INPUT_ENDPOINTS: 
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5615228Z   INPUT_MAINNET: true
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5615351Z ##[endgroup]
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5878006Z Wasit: mainnet: true is refused: the mainnet opt-in is not part of this version. Wasit pays on test networks only. The input is also refused on every event but workflow_dispatch, and this run's event is push. Nothing was installed, started, sent or signed.
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5920819Z ##[error]Process completed with exit code 2.
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5933658Z ##[end-action id=__wasit-dev_wasit.__run_2;outcome=failure;conclusion=failure;duration_ms=37]
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5937606Z ##[start-action display=Install Wasit;id=__wasit-dev_wasit.__run_3]
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5939655Z ##[end-action id=__wasit-dev_wasit.__run_3;outcome=skipped;conclusion=skipped;duration_ms=0]
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5941263Z ##[start-action display=Find the baseline;id=__wasit-dev_wasit.baseline]
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5966499Z ##[end-action id=__wasit-dev_wasit.baseline;outcome=skipped;conclusion=skipped;duration_ms=0]
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5969680Z ##[start-action display=Run Wasit;id=__wasit-dev_wasit.run]
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5970893Z ##[end-action id=__wasit-dev_wasit.run;outcome=skipped;conclusion=skipped;duration_ms=0]
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5972805Z ##[start-action display=Write the report;id=__wasit-dev_wasit.__run_4]
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5977867Z ##[end-action id=__wasit-dev_wasit.__run_4;outcome=skipped;conclusion=skipped;duration_ms=0]
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5990614Z ##[start-action display=Comment on the pull request;id=__wasit-dev_wasit.__run_5]
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5993828Z ##[end-action id=__wasit-dev_wasit.__run_5;outcome=skipped;conclusion=skipped;duration_ms=0]
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5995172Z ##[start-action display=Upload the baseline;id=__wasit-dev_wasit.__actions_upload-artifact]
+The mainnet input is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:36.5998770Z ##[end-action id=__wasit-dev_wasit.__actions_upload-artifact;outcome=skipped;conclusion=skipped;duration_ms=0]
+The mainnet input is refused	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	﻿2026-11-16T14:06:36.6085553Z Post job cleanup.
+The mainnet input is refused	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:36.6660971Z [command]/usr/bin/git version
+The mainnet input is refused	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:36.6725779Z git version 2.56.1
+The mainnet input is refused	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:36.6750375Z Temporarily overriding HOME='/home/runner/work/_temp/a469033f-3eac-4f7a-b6c4-73cbd4975968' before making global git config changes
+The mainnet input is refused	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:36.6751387Z Adding repository directory to the temporary git global config as a safe directory
+The mainnet input is refused	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:36.6753702Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/x402-example-paywall/x402-example-paywall
+The mainnet input is refused	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:36.6795656Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+The mainnet input is refused	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:36.6830119Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+The mainnet input is refused	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:36.7105856Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+The mainnet input is refused	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:36.7138718Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+The mainnet input is refused	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:36.7388227Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+The mainnet input is refused	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:36.7418286Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+The mainnet input is refused	Complete job	﻿2026-11-16T14:06:36.7807746Z Cleaning up orphan processes
+The mainnet input is refused	Complete job	2026-11-16T14:06:36.8077674Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@11d5960a326750d5838078e36cf38b85af677262, actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

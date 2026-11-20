@@ -1,0 +1,109 @@
+# Output of `wasit run` on the maintainer's machine, 2026-11-16 (10:30 to 10:35 UTC), Stellar test network.
+# Target: Wasit's own test fixture (packages/core/test/fixtures/x402-reject-server.ts on the branch of draft pull request 30),
+# three routes that differ only in what they do with a paid request carrying the header x-wasit-invalid:
+# /refuses answers 400; /settles-then-refuses settles the payment, then answers 400; /serves answers 200.
+# Each endpoint's reject case is that header. Test funds only. The transactions are public on the test network.
+
+Payment tier on stellar:testnet (test network): test funds. Payer GCWG7X3Z2RHWEXIYQ4IG24STQAD3OORWCAV63X7K3KW3VFUBOU7TKPB2; at most $1.00 per payment; this run could spend up to $0.135 of the $1.00 cap.
+Caps: $1.00 a payment, $1.00 this run (maxRunUsd).
+  refuses: pays "GDPAPDZWAKBXUPCNMI4YHAZ7DS7UOUTPGXAFDSWZG4URRMWHFSQTDQBM" in "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA", up to $0.045
+    X402-06 100000, X402-07 100000, X402-09 50000, X402-10 100000, X402-11 100000 (base units)
+  settles-then-refuses: pays "GDPAPDZWAKBXUPCNMI4YHAZ7DS7UOUTPGXAFDSWZG4URRMWHFSQTDQBM" in "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA", up to $0.045
+    X402-06 100000, X402-07 100000, X402-09 50000, X402-10 100000, X402-11 100000 (base units)
+  serves: pays "GDPAPDZWAKBXUPCNMI4YHAZ7DS7UOUTPGXAFDSWZG4URRMWHFSQTDQBM" in "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA", up to $0.045
+    X402-06 100000, X402-07 100000, X402-09 50000, X402-10 100000, X402-11 100000 (base units)
+Worst case: $0.135 of $1.00.
+X402-11: the payment was sent with the request the service must refuse (HTTP 400); reading the chain once a ledger until its authorization expires at ledger 5760294, for at most 360 s.
+X402-11: the payment was sent with the request the service must refuse (HTTP 400); reading the chain once a ledger until its authorization expires at ledger 5760325, for at most 360 s.
+X402-11: the payment was sent with the request the service must refuse (HTTP 200); reading the chain once a ledger until its authorization expires at ledger 5760338, for at most 360 s.
+Environment local: http://127.0.0.1:3009
+Network: stellar:testnet (test network)
+Per-run cap: $1
+Endpoints: 3
+  refuses  x402  GET /refuses
+  settles-then-refuses  x402  GET /settles-then-refuses
+  serves  x402  GET /serves
+Tier: payment on stellar:testnet. The run charged $0.135 of the $1.00 cap, at most $1.00 a payment; every signature is counted as if it settled.
+
+refuses  x402  GET /refuses: conformant
+  PASS  X402-01  402 Response Status
+        Server responded with 402 as required.
+  PASS  X402-02  Payment Header Present
+        Payment header found.
+  PASS  X402-03  Header Payload Decodable
+        Header decoded to valid JSON.
+  PASS  X402-04  Required Fields Present
+        All required v2 fields present.
+  PASS  X402-05  Network Identifier Valid
+        Network identifier "stellar:testnet" is valid.
+  PASS  X402-06  Signature Resubmit Accepted
+        Valid payment accepted (HTTP 200) and settled on-chain for exactly the advertised 100000 base units of CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA to GDPAPDZWAKBXUPCNMI4YHAZ7DS7UOUTPGXAFDSWZG4URRMWHFSQTDQBM, verified from the transfer event (tx 182556dfb332e927db347912ef3e89bb316da3dba882df0f28ea5ad01838f298).
+  PASS  X402-07  Invalid Signature Rejected
+        Payment with a corrupted authorization signature correctly rejected (HTTP 402: invalid_exact_stellar_payload_simulation_failed).
+  PASS  X402-08  Payment Replay Rejected
+        The same payment, sent again, was refused (HTTP 402: invalid_exact_stellar_payload_simulation_failed).
+  PASS  X402-09  Underpayment Rejected
+        A validly signed payment for 50000 of the advertised 100000 base units was refused (HTTP 402: invalid_exact_stellar_payload_wrong_amount).
+  PASS  X402-10  Expired Authorization Rejected
+        A payment whose authorization had expired was refused (HTTP 402: invalid_exact_stellar_payload_simulation_failed).
+  PASS  X402-11  Rejected Request Not Settled
+        The request the config declares invalid was refused (HTTP 400: invalid request), and the payment was not taken: its authorization expired at ledger 5760294 unused (read at ledger 5760295, in the same read that found X402-06's used authorization); no transfer of it to payTo was recorded, and the payer's balance did not fall by it.
+
+settles-then-refuses  x402  GET /settles-then-refuses: non-conformant
+  PASS  X402-01  402 Response Status
+        Server responded with 402 as required.
+  PASS  X402-02  Payment Header Present
+        Payment header found.
+  PASS  X402-03  Header Payload Decodable
+        Header decoded to valid JSON.
+  PASS  X402-04  Required Fields Present
+        All required v2 fields present.
+  PASS  X402-05  Network Identifier Valid
+        Network identifier "stellar:testnet" is valid.
+  PASS  X402-06  Signature Resubmit Accepted
+        Valid payment accepted (HTTP 200) and settled on-chain for exactly the advertised 100000 base units of CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA to GDPAPDZWAKBXUPCNMI4YHAZ7DS7UOUTPGXAFDSWZG4URRMWHFSQTDQBM, verified from the transfer event (tx 75bbffafaf421d68863675879c5ddf7aea2fa1a052a62422845313b339ec7b94).
+  PASS  X402-07  Invalid Signature Rejected
+        Payment with a corrupted authorization signature correctly rejected (HTTP 402: invalid_exact_stellar_payload_simulation_failed).
+  PASS  X402-08  Payment Replay Rejected
+        The same payment, sent again, was refused (HTTP 402: invalid_exact_stellar_payload_simulation_failed).
+  PASS  X402-09  Underpayment Rejected
+        A validly signed payment for 50000 of the advertised 100000 base units was refused (HTTP 402: invalid_exact_stellar_payload_wrong_amount).
+  PASS  X402-10  Expired Authorization Rejected
+        A payment whose authorization had expired was refused (HTTP 402: invalid_exact_stellar_payload_simulation_failed).
+  FAIL  X402-11  Rejected Request Not Settled
+        The request the config declares invalid was refused (HTTP 400: invalid request) and the payment was taken: 100000 base units moved from the payer to payTo in 7463f7c0a490a7b05b6d12d063a8aa850d54a6e2e2652911921672f6dee9d93f (ledger 5760316); the chain records its authorization as used.
+        Expected: a refused request leaves its payment unsettled
+        Actual: the payment settled (ledger 5760316)
+        Fix: A refused request must not cost the payer: settle a payment only after the request has been accepted. The official x402 Express middleware does not settle when the handler answers 400 or above; code that settles before validating the request, or settles on its own, takes the payment for a request it then refuses.
+        Docs: https://usewasit.dev/docs/checks/x402
+
+serves  x402  GET /serves: non-conformant
+  PASS  X402-01  402 Response Status
+        Server responded with 402 as required.
+  PASS  X402-02  Payment Header Present
+        Payment header found.
+  PASS  X402-03  Header Payload Decodable
+        Header decoded to valid JSON.
+  PASS  X402-04  Required Fields Present
+        All required v2 fields present.
+  PASS  X402-05  Network Identifier Valid
+        Network identifier "stellar:testnet" is valid.
+  PASS  X402-06  Signature Resubmit Accepted
+        Valid payment accepted (HTTP 200) and settled on-chain for exactly the advertised 100000 base units of CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA to GDPAPDZWAKBXUPCNMI4YHAZ7DS7UOUTPGXAFDSWZG4URRMWHFSQTDQBM, verified from the transfer event (tx af051e3e9ded8f34532cc51c120c90c7aac08b6db015fb7f7f4647604a69c283).
+  PASS  X402-07  Invalid Signature Rejected
+        Payment with a corrupted authorization signature correctly rejected (HTTP 402: invalid_exact_stellar_payload_simulation_failed).
+  PASS  X402-08  Payment Replay Rejected
+        The same payment, sent again, was refused (HTTP 402: invalid_exact_stellar_payload_simulation_failed).
+  PASS  X402-09  Underpayment Rejected
+        A validly signed payment for 50000 of the advertised 100000 base units was refused (HTTP 402: invalid_exact_stellar_payload_wrong_amount).
+  PASS  X402-10  Expired Authorization Rejected
+        A payment whose authorization had expired was refused (HTTP 402: invalid_exact_stellar_payload_simulation_failed).
+  FAIL  X402-11  Rejected Request Not Settled
+        A request the config declares invalid was served (HTTP 200) with a valid payment for 100000 base units. The payment was taken: 4c34078cf88319df2fb6c0797c0f3d73b2bd7d1ab6a725de52cd5bab443d5106 (ledger 5760328).
+        Expected: the invalid request refused
+        Actual: HTTP 200
+        Fix: Refuse an invalid request before its payment is settled. The official x402 Express middleware does not settle when the handler answers 400 or above; a route that serves every request it is paid for sells what it should refuse.
+        Docs: https://usewasit.dev/docs/checks/x402
+
+Summary: 3 graded (2 non-conformant).
+Result: 2 endpoints are non-conformant (3 graded (2 non-conformant)) (exit 1).

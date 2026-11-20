@@ -1,0 +1,310 @@
+# Copy of the job log of dzakwannajmi/x402-example-paywall run 43882304954 (taken 2026-11-16; the live run is authoritative)
+# https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43882304954
+
+Payment tier on stellar:pubnet is refused	Set up job	﻿2026-11-16T14:06:33.1870300Z Current runner version: '2.338.2'
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.1908176Z ##[group]Runner Image Provisioner
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.1910012Z Hosted Compute Agent
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.1911299Z Version: 20261103.629
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.1912532Z Commit: 15dbd9ccb5dbf34fae002b6ed1a2670f52df37bc
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.1913841Z Build Date: 2026-11-03T17:26:59Z
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.1915334Z Worker ID: {dfbc2ec8-2df7-4e38-b3f1-30cbc67f1f10}
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.1916653Z Region: centralus
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.1918091Z Cloud: Azure
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.1919088Z ##[endgroup]
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.1921323Z ##[group]Operating System
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.1922581Z Ubuntu
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.1923526Z 26.04.1
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.1924543Z LTS
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.1925522Z ##[endgroup]
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.1926281Z ##[group]Runner Image
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.1926976Z Image: ubuntu-26.04
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.1927856Z Version: 20261111.196.1
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.1929021Z Included Software: https://github.com/actions/runner-images/blob/ubuntu26/20261111.196/images/ubuntu/Ubuntu2604-Readme.md
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.1930804Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu26%2F20261111.196
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.1931840Z ##[endgroup]
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.1933103Z ##[group]GITHUB_TOKEN Permissions
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.1935270Z Actions: read
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.1935970Z Contents: read
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.1936916Z Metadata: read
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.1937816Z ##[endgroup]
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.1939858Z Secret source: Actions
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.1940952Z Cache mode: write
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.1941908Z Prepare workflow directory
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.2347734Z Prepare all required actions
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.2421829Z Getting action download info
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.5115713Z Download action repository 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.6124059Z Download action repository 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:33.6825663Z Download action repository 'wasit-dev/wasit@9455066ee82a49ffe6d574f052da0904720ee818' (SHA:9455066ee82a49ffe6d574f052da0904720ee818)
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:34.2180130Z Getting action download info
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:34.3266815Z Download action repository 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+Payment tier on stellar:pubnet is refused	Set up job	2026-11-16T14:06:34.4458286Z Complete job name: Payment tier on stellar:pubnet is refused
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	﻿2026-11-16T14:06:34.5454347Z ##[group]Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.5455800Z with:
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.5456405Z   persist-credentials: false
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.5457472Z   repository: dzakwannajmi/x402-example-paywall
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.5461594Z   token: ***
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.5462164Z   ssh-strict: true
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.5462850Z   ssh-user: git
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.5463412Z   clean: true
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.5464028Z   sparse-checkout-cone-mode: true
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.5464766Z   fetch-depth: 1
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.5465316Z   fetch-tags: false
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.5465932Z   show-progress: true
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.5466510Z   lfs: false
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.5467227Z   submodules: false
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.5468067Z   set-safe-directory: true
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.5468727Z   allow-unsafe-pr-checkout: false
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.5469845Z ##[endgroup]
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.7952290Z Syncing repository: dzakwannajmi/x402-example-paywall
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.7955600Z ##[group]Getting Git version info
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.7958043Z Working directory is '/home/runner/work/x402-example-paywall/x402-example-paywall'
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8045130Z [command]/usr/bin/git version
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8052210Z git version 2.56.1
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8056873Z ##[endgroup]
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8065425Z Temporarily overriding HOME='/home/runner/work/_temp/34c22396-aeee-477c-8f93-2bc493912f2f' before making global git config changes
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8068093Z Adding repository directory to the temporary git global config as a safe directory
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8070338Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/x402-example-paywall/x402-example-paywall
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8112357Z Deleting the contents of '/home/runner/work/x402-example-paywall/x402-example-paywall'
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8114922Z ##[group]Initializing the repository
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8121968Z [command]/usr/bin/git init /home/runner/work/x402-example-paywall/x402-example-paywall
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8216069Z hint: Using 'master' as the name for the initial branch. This default branch name
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8218008Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8219450Z hint: to use in all of your new repositories, which will suppress this warning,
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8220535Z hint: call:
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8221109Z hint:
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8221854Z hint: 	git config --global init.defaultBranch <name>
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8222729Z hint:
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8223587Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8225483Z hint: 'development'. The just-created branch can be renamed via this command:
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8227294Z hint:
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8228554Z hint: 	git branch -m <name>
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8229942Z hint:
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8231675Z hint: Disable this message with "git config set advice.defaultBranchName false"
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8234666Z Initialized empty Git repository in /home/runner/work/x402-example-paywall/x402-example-paywall/.git/
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8239943Z [command]/usr/bin/git remote add origin https://github.com/dzakwannajmi/x402-example-paywall
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8314746Z ##[endgroup]
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8316078Z ##[group]Disabling automatic garbage collection
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8318480Z [command]/usr/bin/git config --local gc.auto 0
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8355121Z ##[endgroup]
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8355939Z ##[group]Setting up auth
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8364283Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8399349Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8854729Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.8894357Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.9167447Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.9202059Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.9475879Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.9515847Z ##[endgroup]
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.9516769Z ##[group]Fetching the repository
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:34.9526285Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +f0357bb81e305d0d824c3e9396b95c2e47550fdf:refs/remotes/origin/main
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:35.2498477Z From https://github.com/dzakwannajmi/x402-example-paywall
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:35.2501214Z  * [new ref]         f0357bb81e305d0d824c3e9396b95c2e47550fdf -> origin/main
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:35.2506856Z ##[endgroup]
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:35.2509901Z ##[group]Determining the checkout info
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:35.2514293Z ##[endgroup]
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:35.2518823Z [command]/usr/bin/git sparse-checkout disable
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:35.2577879Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:35.2609253Z ##[group]Checking out the ref
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:35.2613568Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:35.2687745Z Switched to a new branch 'main'
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:35.2716847Z branch 'main' set up to track 'origin/main'.
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:35.2723390Z ##[endgroup]
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:35.2767785Z [command]/usr/bin/git log -1 --format=%H
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:35.2791925Z f0357bb81e305d0d824c3e9396b95c2e47550fdf
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:35.2802013Z ##[group]Removing auth
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:35.2805466Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:35.2836517Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:35.3111290Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:35.3133062Z http.https://github.com/.extraheader
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:35.3142474Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:35.3176292Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:35.3450889Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:35.3481863Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Payment tier on stellar:pubnet is refused	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:06:35.3755010Z ##[endgroup]
+Payment tier on stellar:pubnet is refused	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	﻿2026-11-16T14:06:35.4155101Z ##[group]Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+Payment tier on stellar:pubnet is refused	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-16T14:06:35.4156779Z with:
+Payment tier on stellar:pubnet is refused	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-16T14:06:35.4157729Z   node-version: 22
+Payment tier on stellar:pubnet is refused	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-16T14:06:35.4158634Z   always-auth: false
+Payment tier on stellar:pubnet is refused	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-16T14:06:35.4159565Z   check-latest: false
+Payment tier on stellar:pubnet is refused	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-16T14:06:35.4169302Z   token: ***
+Payment tier on stellar:pubnet is refused	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-16T14:06:35.4170151Z ##[endgroup]
+Payment tier on stellar:pubnet is refused	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-16T14:06:35.5644426Z Found in cache @ /opt/hostedtoolcache/node/22.23.4/x64
+Payment tier on stellar:pubnet is refused	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-16T14:06:35.5649244Z (node:2511) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Payment tier on stellar:pubnet is refused	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-16T14:06:35.5652482Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Payment tier on stellar:pubnet is refused	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-16T14:06:35.5654794Z ##[group]Environment details
+Payment tier on stellar:pubnet is refused	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-16T14:06:35.9484715Z node: v22.23.4
+Payment tier on stellar:pubnet is refused	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-16T14:06:35.9486445Z npm: 10.9.9
+Payment tier on stellar:pubnet is refused	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-16T14:06:35.9487968Z yarn: 1.22.22
+Payment tier on stellar:pubnet is refused	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-16T14:06:35.9490773Z ##[endgroup]
+Payment tier on stellar:pubnet is refused	Install the service	﻿2026-11-16T14:06:35.9693743Z ##[group]Run npm ci
+Payment tier on stellar:pubnet is refused	Install the service	2026-11-16T14:06:35.9694843Z ^[[36;1mnpm ci^[[0m
+Payment tier on stellar:pubnet is refused	Install the service	2026-11-16T14:06:35.9758643Z shell: /usr/bin/bash -e {0}
+Payment tier on stellar:pubnet is refused	Install the service	2026-11-16T14:06:35.9759782Z ##[endgroup]
+Payment tier on stellar:pubnet is refused	Install the service	2026-11-16T14:06:42.3815882Z 
+Payment tier on stellar:pubnet is refused	Install the service	2026-11-16T14:06:42.3823840Z added 132 packages, and audited 133 packages in 6s
+Payment tier on stellar:pubnet is refused	Install the service	2026-11-16T14:06:42.3824340Z 
+Payment tier on stellar:pubnet is refused	Install the service	2026-11-16T14:06:42.3824587Z 55 packages are looking for funding
+Payment tier on stellar:pubnet is refused	Install the service	2026-11-16T14:06:42.3824949Z   run `npm fund` for details
+Payment tier on stellar:pubnet is refused	Install the service	2026-11-16T14:06:42.3922724Z 
+Payment tier on stellar:pubnet is refused	Install the service	2026-11-16T14:06:42.3923447Z 5 high severity vulnerabilities
+Payment tier on stellar:pubnet is refused	Install the service	2026-11-16T14:06:42.3924060Z 
+Payment tier on stellar:pubnet is refused	Install the service	2026-11-16T14:06:42.3924739Z To address issues that do not require attention, run:
+Payment tier on stellar:pubnet is refused	Install the service	2026-11-16T14:06:42.3925594Z   npm audit fix
+Payment tier on stellar:pubnet is refused	Install the service	2026-11-16T14:06:42.3929198Z 
+Payment tier on stellar:pubnet is refused	Install the service	2026-11-16T14:06:42.3929856Z To address all issues, run:
+Payment tier on stellar:pubnet is refused	Install the service	2026-11-16T14:06:42.3930423Z   npm audit fix --force
+Payment tier on stellar:pubnet is refused	Install the service	2026-11-16T14:06:42.3930703Z 
+Payment tier on stellar:pubnet is refused	Install the service	2026-11-16T14:06:42.3930940Z Run `npm audit` for details.
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	﻿2026-11-16T14:06:42.4623141Z ##[group]Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.4623624Z with:
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.4623897Z   config: evidence/pubnet-refused.config.json
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.4624223Z   tier: payment
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.4624436Z   mainnet: false
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.4624646Z ##[endgroup]
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.4685123Z ##[start-action display=Check the runner;id=wasit.__run]
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.4712414Z ##[group]Run if [ "$RUNNER_OS" != "Linux" ]; then
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.4712826Z ^[[36;1mif [ "$RUNNER_OS" != "Linux" ]; then^[[0m
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.4713265Z ^[[36;1m  echo "Wasit: this action runs on Linux runners in this version." >&2^[[0m
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.4713853Z ^[[36;1m  exit 2^[[0m
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.4714061Z ^[[36;1mfi^[[0m
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.4714302Z ^[[36;1mif ! command -v node >/dev/null 2>&1; then^[[0m
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.4714960Z ^[[36;1m  echo "Wasit: Node 22 or later is needed and node was not found. Add actions/setup-node with node-version: 22 before this step." >&2^[[0m
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.4715622Z ^[[36;1m  exit 2^[[0m
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.4715827Z ^[[36;1mfi^[[0m
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.4716131Z ^[[36;1mmajor="$(node -p 'process.versions.node.split(".")[0]')"^[[0m
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.4716517Z ^[[36;1mif [ "$major" -lt 22 ]; then^[[0m
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.4717413Z ^[[36;1m  echo "Wasit: Node 22 or later is needed and this runner has Node $major. Add actions/setup-node with node-version: 22 before this step." >&2^[[0m
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.4718081Z ^[[36;1m  exit 2^[[0m
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.4718284Z ^[[36;1mfi^[[0m
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.4768870Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.4769270Z ##[endgroup]
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.5144623Z ##[end-action id=wasit.__run;outcome=success;conclusion=success;duration_ms=45]
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.5156833Z ##[start-action display=Check the inputs;id=wasit.__run_2]
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.5177359Z ##[group]Run node "$ACTION_PATH/scripts/wasit.mjs" check
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.5178076Z ^[[36;1mnode "$ACTION_PATH/scripts/wasit.mjs" check^[[0m
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.5226704Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.5227277Z env:
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.5227729Z   ACTION_PATH: /home/runner/work/_actions/wasit-dev/wasit/9455066ee82a49ffe6d574f052da0904720ee818/action
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.5228305Z   INPUT_CONFIG: evidence/pubnet-refused.config.json
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.5228637Z   INPUT_ENVIRONMENT: 
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.5228867Z   INPUT_TIER: payment
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.5229087Z   INPUT_ENDPOINTS: 
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.5229310Z   INPUT_MAINNET: false
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.5229527Z ##[endgroup]
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.5610965Z ##[end-action id=wasit.__run_2;outcome=success;conclusion=success;duration_ms=45]
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.5614709Z ##[start-action display=Install Wasit;id=wasit.__run_3]
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.5659164Z ##[group]Run cd "$ACTION_PATH/.."
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.5659492Z ^[[36;1mcd "$ACTION_PATH/.."^[[0m
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.5659829Z ^[[36;1mnpm ci --ignore-scripts --no-audit --no-fund^[[0m
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.5660184Z ^[[36;1mnpm run build -w packages/core^[[0m
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.5660502Z ^[[36;1mnpm run build -w packages/cli^[[0m
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.5660803Z ^[[36;1mnpm run build -w packages/server^[[0m
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.5710715Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.5711087Z env:
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.5711524Z   ACTION_PATH: /home/runner/work/_actions/wasit-dev/wasit/9455066ee82a49ffe6d574f052da0904720ee818/action
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:42.5712051Z ##[endgroup]
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:52.6005051Z 
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:52.6005897Z added 364 packages in 10s
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:52.7395717Z 
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:52.7396361Z > @wasit-dev/core@0.7.0 build
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:52.7397337Z > tsc -p tsconfig.json
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:52.7397714Z 
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:53.7955961Z 
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:53.7956506Z > @wasit-dev/cli@0.7.0 build
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:53.7956953Z > tsc -p tsconfig.json
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:53.7957457Z 
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:54.6794318Z 
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:54.6795180Z > @wasit-dev/server@0.7.0 build
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:54.6796446Z > tsc -p tsconfig.json
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:54.6796786Z 
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:55.3692871Z ##[end-action id=wasit.__run_3;outcome=success;conclusion=success;duration_ms=12807]
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:55.3700509Z ##[start-action display=Find the baseline;id=wasit.baseline]
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:55.3722599Z ##[group]Run node "$ACTION_PATH/scripts/baseline.mjs"
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:55.3722976Z ^[[36;1mnode "$ACTION_PATH/scripts/baseline.mjs"^[[0m
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:55.3771786Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:55.3772128Z env:
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:55.3772544Z   ACTION_PATH: /home/runner/work/_actions/wasit-dev/wasit/9455066ee82a49ffe6d574f052da0904720ee818/action
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:55.3775588Z   GH_TOKEN: ***
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:55.3775811Z ##[endgroup]
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:56.3965004Z Wasit: no baseline (no successful push, schedule or workflow_dispatch run of this workflow on main yet). The comment will say there is nothing to compare with.
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:56.8310827Z ##[end-action id=wasit.baseline;outcome=success;conclusion=success;duration_ms=1460]
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:56.8318403Z ##[start-action display=Run Wasit;id=wasit.run]
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:56.8335885Z ##[group]Run node "$ACTION_PATH/scripts/wasit.mjs" run
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:56.8336251Z ^[[36;1mnode "$ACTION_PATH/scripts/wasit.mjs" run^[[0m
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:56.8384424Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:56.8384765Z env:
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:56.8385187Z   ACTION_PATH: /home/runner/work/_actions/wasit-dev/wasit/9455066ee82a49ffe6d574f052da0904720ee818/action
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:56.8385725Z   INPUT_CONFIG: evidence/pubnet-refused.config.json
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:56.8386059Z   INPUT_ENVIRONMENT: 
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:56.8386279Z   INPUT_TIER: payment
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:56.8386486Z   INPUT_ENDPOINTS: 
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:56.8386689Z   INPUT_MAINNET: false
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:56.8386891Z   BASELINE_PATH: 
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:56.8387402Z   WASIT_BUILD_COMMIT: 9455066ee82a49ffe6d574f052da0904720ee818
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:56.8387735Z ##[endgroup]
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:58.2304792Z wasit run: stellar:pubnet is Stellar mainnet. This version of Wasit pays on test networks only (stellar:testnet, eip155:84532, eip155:11155111, solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1); the mainnet opt-in is not part of this version. Nothing was sent and nothing was signed. Nothing was started, sent or signed.
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:58.2608968Z ##[error]Process completed with exit code 2.
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:58.2616838Z ##[end-action id=wasit.run;outcome=failure;conclusion=failure;duration_ms=1429]
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:58.2622888Z ##[start-action display=Write the report;id=wasit.__run_4]
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:58.2647705Z ##[group]Run node "$ACTION_PATH/scripts/wasit.mjs" report
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:58.2648280Z ^[[36;1mnode "$ACTION_PATH/scripts/wasit.mjs" report^[[0m
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:58.2696821Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:58.2697404Z env:
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:58.2697843Z   ACTION_PATH: /home/runner/work/_actions/wasit-dev/wasit/9455066ee82a49ffe6d574f052da0904720ee818/action
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:58.2698351Z   BASELINE_PATH: 
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:58.2698555Z   HISTORY_PATH: 
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:58.2698744Z   BASELINE_RUN: 
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:58.2699007Z   WASIT_BUILD_COMMIT: 9455066ee82a49ffe6d574f052da0904720ee818
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:58.2699327Z ##[endgroup]
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:59.6464089Z wasit ci-report: wasit run wrote no report, so the comment says no verdict (the reason is in the log of the run step)
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:59.6484652Z Wrote /home/runner/work/_temp/wasit/comment.md
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:59.6486204Z Appended the summary to /home/runner/work/_temp/_runner_file_commands/step_summary_69d966cb-7d7b-474b-a6d4-98439dadd36b
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:59.6816692Z ##[end-action id=wasit.__run_4;outcome=success;conclusion=success;duration_ms=1419]
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:59.6844103Z ##[start-action display=Comment on the pull request;id=wasit.__run_5]
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:59.6850430Z ##[end-action id=wasit.__run_5;outcome=skipped;conclusion=skipped;duration_ms=0]
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:59.6852366Z ##[start-action display=Upload the baseline;id=wasit.__actions_upload-artifact]
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:59.6897684Z ##[group]Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:59.6898093Z with:
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:59.6898288Z   name: wasit-baseline
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:59.6898570Z   path: /home/runner/work/_temp/wasit/baseline-next.json
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:59.6898894Z   if-no-files-found: warn
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:59.6899128Z   compression-level: 6
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:59.6899340Z   overwrite: false
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:59.6899553Z   include-hidden-files: false
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:59.6899785Z ##[endgroup]
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:59.8579164Z (node:2732) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:59.8580340Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:59.8611334Z ##[warning]No files were found with the provided path: /home/runner/work/_temp/wasit/baseline-next.json. No artifacts will be uploaded.
+Payment tier on stellar:pubnet is refused	Run wasit-dev/wasit/action@9455066ee82a49ffe6d574f052da0904720ee818	2026-11-16T14:06:59.8759592Z ##[end-action id=wasit.__actions_upload-artifact;outcome=success;conclusion=success;duration_ms=190]
+Payment tier on stellar:pubnet is refused	Expect the refusal	﻿2026-11-16T14:06:59.8816271Z ##[group]Run if [ "$OUTCOME" != "failure" ]; then
+Payment tier on stellar:pubnet is refused	Expect the refusal	2026-11-16T14:06:59.8816680Z ^[[36;1mif [ "$OUTCOME" != "failure" ]; then^[[0m
+Payment tier on stellar:pubnet is refused	Expect the refusal	2026-11-16T14:06:59.8817464Z ^[[36;1m  echo "Wasit did not refuse the payment tier on stellar:pubnet (outcome: $OUTCOME)." >&2^[[0m
+Payment tier on stellar:pubnet is refused	Expect the refusal	2026-11-16T14:06:59.8817921Z ^[[36;1m  exit 1^[[0m
+Payment tier on stellar:pubnet is refused	Expect the refusal	2026-11-16T14:06:59.8818120Z ^[[36;1mfi^[[0m
+Payment tier on stellar:pubnet is refused	Expect the refusal	2026-11-16T14:06:59.8818378Z ^[[36;1mif [ -e "$RUNNER_TEMP/wasit/report.json" ]; then^[[0m
+Payment tier on stellar:pubnet is refused	Expect the refusal	2026-11-16T14:06:59.8818850Z ^[[36;1m  echo "Wasit wrote a report, so it ran checks: it should have stopped before them." >&2^[[0m
+Payment tier on stellar:pubnet is refused	Expect the refusal	2026-11-16T14:06:59.8819281Z ^[[36;1m  exit 1^[[0m
+Payment tier on stellar:pubnet is refused	Expect the refusal	2026-11-16T14:06:59.8819476Z ^[[36;1mfi^[[0m
+Payment tier on stellar:pubnet is refused	Expect the refusal	2026-11-16T14:06:59.8820021Z ^[[36;1mecho "As expected: Wasit refused the payment tier on stellar:pubnet with exit 2 and wrote no report. Its reason is in the log of the Wasit step."^[[0m
+Payment tier on stellar:pubnet is refused	Expect the refusal	2026-11-16T14:06:59.8884764Z shell: /usr/bin/bash -e {0}
+Payment tier on stellar:pubnet is refused	Expect the refusal	2026-11-16T14:06:59.8885173Z env:
+Payment tier on stellar:pubnet is refused	Expect the refusal	2026-11-16T14:06:59.8885479Z   OUTCOME: failure
+Payment tier on stellar:pubnet is refused	Expect the refusal	2026-11-16T14:06:59.8885813Z ##[endgroup]
+Payment tier on stellar:pubnet is refused	Expect the refusal	2026-11-16T14:06:59.8976056Z As expected: Wasit refused the payment tier on stellar:pubnet with exit 2 and wrote no report. Its reason is in the log of the Wasit step.
+Payment tier on stellar:pubnet is refused	Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	﻿2026-11-16T14:06:59.9088883Z Post job cleanup.
+Payment tier on stellar:pubnet is refused	Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-16T14:07:00.0298720Z (node:2745) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Payment tier on stellar:pubnet is refused	Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-16T14:07:00.0299772Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Payment tier on stellar:pubnet is refused	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	﻿2026-11-16T14:07:00.0538839Z Post job cleanup.
+Payment tier on stellar:pubnet is refused	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:07:00.1448851Z [command]/usr/bin/git version
+Payment tier on stellar:pubnet is refused	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:07:00.1494211Z git version 2.56.1
+Payment tier on stellar:pubnet is refused	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:07:00.1537595Z Temporarily overriding HOME='/home/runner/work/_temp/5836d5b0-c758-4541-869e-5becbfe0877a' before making global git config changes
+Payment tier on stellar:pubnet is refused	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:07:00.1539434Z Adding repository directory to the temporary git global config as a safe directory
+Payment tier on stellar:pubnet is refused	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:07:00.1543369Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/x402-example-paywall/x402-example-paywall
+Payment tier on stellar:pubnet is refused	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:07:00.1589588Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Payment tier on stellar:pubnet is refused	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:07:00.1648188Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Payment tier on stellar:pubnet is refused	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:07:00.1974764Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Payment tier on stellar:pubnet is refused	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:07:00.2021752Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Payment tier on stellar:pubnet is refused	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:07:00.2380111Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Payment tier on stellar:pubnet is refused	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-16T14:07:00.2445521Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Payment tier on stellar:pubnet is refused	Complete job	﻿2026-11-16T14:07:00.2863184Z Cleaning up orphan processes
+Payment tier on stellar:pubnet is refused	Complete job	2026-11-16T14:07:00.3248299Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@11d5960a326750d5838078e36cf38b85af677262, actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020, actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
