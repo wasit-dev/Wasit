@@ -17,6 +17,7 @@ import {
 } from "./channel.js";
 import { fetchChannelChallenge } from "./channel-credential.js";
 import { assertMppNetwork } from "./network.js";
+import { assertPaymentNetworkAllowed } from "../guard/networks.js";
 
 const DEPLOY_ID = "MPP-10";
 const DEPLOY_NAME = "Channel Deploy";
@@ -170,10 +171,13 @@ export async function runMppChannelSuite(
   } = options;
 
   // A bad URL or an unknown network is wrong for every check in the suite, so
-  // it is reported once here instead of repeated identically per check.
+  // it is reported once here instead of repeated identically per check. L0
+  // runs here too: the suite signs commitments and may close a channel, so a
+  // network that is not a test network stops it before any request.
   try {
     assertHttpUrl(target);
     assertMppNetwork(network);
+    assertPaymentNetworkAllowed("mpp-channel", network);
   } catch (error) {
     const preflight = errored("PREFLIGHT", "Run Preflight", error);
     options.onResult?.(preflight);

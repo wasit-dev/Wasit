@@ -198,12 +198,16 @@ describe("X402-01 to X402-03 hints", () => {
     }
   });
 
-  it("X402-02 moves a v1 body challenge to v2", async () => {
+  // A v1 body challenge is unsupported, not a FAIL (spec A3), so the move to v2
+  // is said in the skip's reason; a hint is shown only under a FAIL.
+  it("X402-02 tells a v1 body challenge how to move to v2, in the reason it is unsupported", async () => {
     const body = JSON.stringify({ x402Version: 1, accepts: [] });
     const target = await answer(402, { "content-type": "application/json" }, body);
     try {
       const results = byId(await runX402ReadChecks({ target: target.url }));
-      assert.match(results["X402-02"]?.hint ?? "", /Move to x402 v2/);
+      assert.equal(results["X402-02"]?.skipKind, "unsupported");
+      assert.match(results["X402-02"]?.skipReason ?? "", /move to x402 v2: send the challenge base64-encoded in a PAYMENT-REQUIRED response header/);
+      assert.equal(results["X402-02"]?.hint, undefined);
     } finally {
       await target.close();
     }

@@ -163,6 +163,14 @@ describe("skip builders", () => {
     assert.equal(built.detail, "Skipped: the target was never reached");
   });
 
+  it("records why a check was skipped when the caller says", () => {
+    const built = skipped("X402-02", "Payment Header Present", "x402 v1", "unsupported");
+
+    assert.equal(built.skipKind, "unsupported");
+    assert.equal(skipped("X402-02", "Payment Header Present", "x").skipKind, undefined);
+    assert.ok(!("skipKind" in skipped("X402-02", "Payment Header Present", "x")));
+  });
+
   it("flags a destructive skip so a reporter can gate on it", () => {
     const built = skippedDestructive("MPP-13", "Close Settlement", "not opted in");
 
@@ -191,6 +199,35 @@ describe("toStructuredRun", () => {
 
     assert.ok(!("errorKind" in run.results[0]!));
     assert.equal(run.results[1]!.errorKind, "configuration");
+  });
+
+  it("carries skipKind only for skipped results that have one", () => {
+    const run = toStructuredRun([
+      result({ id: "A", pass: true }),
+      skipped("B", "b", "why", "unsupported"),
+      skipped("C", "c", "why"),
+    ]);
+
+    assert.ok(!("skipKind" in run.results[0]!));
+    assert.equal(run.results[1]!.skipKind, "unsupported");
+    assert.ok(!("skipKind" in run.results[2]!));
+  });
+
+  // What a service answered reaches the report through `detail`, `name` and
+  // the fix text, so the structured run is a sink for the one sanitiser.
+  it("passes service-supplied text through the sanitiser", () => {
+    const run = toStructuredRun([
+      result({
+        pass: false,
+        name: "Check\u001b[2J",
+        detail: "got \u0007bell\n::error::injected",
+        hint: "fix \u0000this\n::warning::x",
+      }),
+    ]);
+
+    assert.equal(run.results[0]!.name, "Check[2J");
+    assert.equal(run.results[0]!.detail, "got bell\n: :error::injected");
+    assert.equal(run.results[0]!.fix, "fix this\n: :warning::x");
   });
 
   it("always states destructive as a boolean", () => {

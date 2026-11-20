@@ -22,15 +22,20 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { SERVER_VERSION } from "./version.js";
 import {
   checkStatus,
+  deniedEnvValues,
   fixFor,
   paymentChainFor,
+  redactValue,
   runMppChannelSuite,
   runMppChargeSuite,
   runX402PaymentChecks,
   runX402ReadChecks,
+  sanitizeText,
   summarize,
+  toGradedRun,
   toStructuredRun,
   type CheckResult,
+  type ProtocolId,
 } from "@wasit-dev/core";
 import { z } from "zod";
 
@@ -62,6 +67,13 @@ const resultShape = {
   destructive: z.boolean(),
   /** Present only on ERROR: unreachable | configuration | harness | setup. */
   errorKind: z.string().optional(),
+  /** Present only on a SKIP whose reason has a kind: why the check did not run. */
+  skipKind: z
+    .enum(["unsupported", "resource-consumed", "needs-payer", "read-only", "not-applicable", "dependency"])
+    .optional(),
+  /** Present only on a FAIL whose check recorded them: what it expected, and what the service sent. */
+  expected: z.string().optional(),
+  actual: z.string().optional(),
   /** Present only on FAIL: what to change. */
   fix: z.string().optional(),
   /** Present only on FAIL: the check's docs page. */
@@ -83,12 +95,18 @@ const runOutputShape = {
  * `outcome` is deliberately named rather than numeric: an exit code means
  * nothing to an agent, and "no-verdict" must never be read as "compliant".
  */
-function present(results: CheckResult[]): {
+function present(results: CheckResult[], protocol?: ProtocolId): {
   content: Array<{ type: "text"; text: string }>;
   structuredContent: Record<string, unknown>;
 } {
   const counts = summarize(results);
-  const structured = toStructuredRun(results);
+  // Given the protocol of the one endpoint, a service that was never graded is
+  // `no-verdict`, as it is for the CLI's exit code (spec A8 #3).
+  const structured = protocol === undefined ? toStructuredRun(results) : toGradedRun(results, protocol);
+  // Text a service sent reaches both channels through the check details. Both
+  // go through the one sanitiser, with this server's own keys and header values
+  // taken out (spec A8 #6).
+  const secrets = deniedEnvValues(process.env);
 
   const lines = results.map((result) => {
     const flag = result.destructive === true ? " [destructive]" : "";
@@ -97,7 +115,9 @@ function present(results: CheckResult[]): {
       guidance === undefined
         ? ""
         : `\n      Fix: ${guidance.fix}${guidance.docs ? `\n      Docs: ${guidance.docs}` : ""}`;
-    return `${checkStatus(result)}  ${result.id}  ${result.name}${flag}\n      ${result.detail}${advice}`;
+    return sanitizeText(`${checkStatus(result)}  ${result.id}  ${result.name}${flag}\n      ${result.detail}${advice}`, {
+      redact: secrets,
+    });
   });
 
   const summaryLine =
@@ -109,7 +129,10 @@ function present(results: CheckResult[]): {
       ? "\n\nSome checks produced no verdict: they never reached the target, or " +
         "the run is misconfigured. That is not a statement about the target's " +
         "conformance, and must not be reported as one."
-      : "";
+      : structured.outcome === "no-verdict" && counts.failed === 0
+        ? "\n\nNo verdict: Wasit could not grade this service (unsupported; the skipped " +
+          "checks say why). That is not a failure of the service, and not a pass."
+        : "";
 
   // structuredContent is `toStructuredRun()` verbatim — the same reshape
   // the CLI's `--json` output calls — so the two front ends can never
@@ -120,7 +143,7 @@ function present(results: CheckResult[]): {
     // no index signature and so is not directly assignable to the SDK's
     // looser Record<string, unknown>. It is still a plain JSON-serializable
     // object — this cast widens the type, it does not change the value.
-    structuredContent: structured as unknown as Record<string, unknown>,
+    structuredContent: redactValue(structured, secrets) as unknown as Record<string, unknown>,
   };
 }
 
@@ -186,10 +209,12 @@ server.registerTool(
         .optional()
         .describe(
           'Network the payment checks pay on: "stellar:testnet" (default), ' +
-            '"stellar:pubnet", "eip155:84532" (Base Sepolia), "eip155:11155111" ' +
+            '"eip155:84532" (Base Sepolia), "eip155:11155111" ' +
             '(Ethereum Sepolia) or ' +
-            '"solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1" (Solana devnet). The ' +
-            "read-only checks apply to a challenge on any chain.",
+            '"solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1" (Solana devnet). Test ' +
+            'networks only: on any other network, "stellar:pubnet" included, the ' +
+            "payment checks stop before anything is signed. The read-only checks " +
+            "apply to a challenge on any chain.",
         ),
       readOnly: z
         .boolean()
@@ -256,7 +281,7 @@ server.registerTool(
       );
     }
 
-    return present(results);
+    return present(results, "x402");
   },
 );
 
@@ -275,7 +300,13 @@ server.registerTool(
       "refused before anything is signed. Testnet only.",
     inputSchema: {
       target: z.string().describe("Full URL of the paid resource, including scheme"),
-      network: z.string().optional().describe('CAIP-2 network id, default "stellar:testnet"'),
+      network: z
+        .string()
+        .optional()
+        .describe(
+          'CAIP-2 network id, default "stellar:testnet". "stellar:testnet" only: ' +
+            "any other network is refused before anything is sent.",
+        ),
       rpcUrl: z
         .string()
         .optional()
@@ -308,7 +339,13 @@ server.registerTool(
 
 const channelInputShape = {
   target: z.string().describe("Full URL of the paid resource, including scheme"),
-  network: z.string().optional().describe('CAIP-2 network id, default "stellar:testnet"'),
+  network: z
+    .string()
+    .optional()
+    .describe(
+      'CAIP-2 network id, default "stellar:testnet". "stellar:testnet" only: ' +
+        "any other network is refused before anything is sent.",
+    ),
   rpcUrl: z.string().optional().describe("Override the Soroban RPC endpoint"),
   channel: z
     .string()

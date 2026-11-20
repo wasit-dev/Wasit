@@ -15,7 +15,9 @@ export type MppNetwork = "stellar:testnet" | "stellar:pubnet";
 export class UnsupportedNetworkError extends ConfigurationError {
   public constructor(network: string) {
     super(
-      `Unsupported network "${network}". Expected "stellar:testnet" or "stellar:pubnet".`,
+      // stellar:pubnet is a known network (a challenge may name it), but the
+      // MPP checks never pay on it (L0), so only the test network is offered.
+      `Unsupported network "${network}". The MPP checks run on "stellar:testnet" only.`,
     );
     this.name = "UnsupportedNetworkError";
   }

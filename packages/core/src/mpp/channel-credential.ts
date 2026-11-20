@@ -13,6 +13,7 @@ import { Challenge, Credential } from "mppx";
 import { MalformedResponseError, fetchTarget } from "../errors.js";
 import { signChannelCommitment } from "./channel-commitment.js";
 import { networkPassphrase, resolveRpcUrl } from "./network.js";
+import { assertPaymentNetworkAllowed } from "../guard/networks.js";
 
 export type ChannelAction = "voucher" | "close";
 
@@ -165,6 +166,8 @@ export async function buildChannelCredential(
 ): Promise<{ credential: string; signature: string }> {
   const { challenge, amount, commitmentSecretHex, network, rpcUrl, action } = parameters;
 
+  // L0 at the signature itself, whoever calls it.
+  assertPaymentNetworkAllowed("mpp-channel", network);
   const signature = await signChannelCommitment({
     channelContract: challenge.channelContract,
     amount,

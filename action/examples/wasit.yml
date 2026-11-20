@@ -1,0 +1,50 @@
+# Wasit on every pull request and every push to main.
+#
+# What this does: starts your x402 service inside the job (service.start in
+# wasit.config.json), runs Wasit's read-only challenge checks against it,
+# comments the result on the pull request, and compares it with the last run on
+# main. The job named Wasit is the check on the pull request.
+#
+# Replace <tag-or-commit-sha> below with a release tag or a full commit SHA of
+# the Wasit repository. Do not use a branch name.
+#
+# Wasit needs Node 22 or later and does not install it: keep the setup-node step.
+#
+# A header your service needs to issue a challenge: set it with WASIT_HEADER_<NAME>
+# in the env: of the Wasit step, from a secret, for example
+#   env:
+#     WASIT_HEADER_X_API_KEY: ${{ secrets.X_API_KEY }}
+# The service Wasit starts is not given that variable, and neither is it given
+# the key variables or WASIT_RPC_URL. Never put a key in wasit.config.json.
+#
+# Do not use pull_request_target. It would give the code of a pull request the
+# token and the secrets of your repository.
+
+name: Wasit
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+  actions: read
+
+jobs:
+  wasit:
+    name: Wasit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - uses: wasit-dev/wasit/action@<tag-or-commit-sha>
+        with:
+          config: wasit.config.json

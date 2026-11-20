@@ -30,6 +30,7 @@ import {
   fetchTarget,
 } from "../errors.js";
 import { type MppNetwork, assertMppNetwork, isMppNetwork, resolveRpcUrl } from "./network.js";
+import { assertPaymentNetworkAllowed } from "../guard/networks.js";
 import { verifySettlement } from "../settlement.js";
 
 const CHECK_ID = "MPP-01";
@@ -205,6 +206,9 @@ export async function payCharge(
   network: MppNetwork,
   method: ChargeClient,
 ): Promise<Response> {
+  // L0 again at the signing call itself: it is exported, so a caller can
+  // reach it without going through runMppChargeChecks.
+  assertPaymentNetworkAllowed("mpp-charge", network);
   const mppx = Mppx.create({
     methods: [onNetwork(method, network)],
     polyfill: false,
@@ -229,6 +233,8 @@ function pass(detail: string): CheckResult[] {
  *
  * @throws {ConfigurationError} Invalid target URL, network, or missing key, or
  *   a challenge for another network than the run's (nothing is signed).
+ * @throws {PaymentNetworkRefusedError} The run's network is not a test network
+ *   (nothing is sent).
  * @throws {TargetUnreachableError} The target never answered.
  * @throws {MalformedResponseError} The target answered, non-conformantly.
  * @throws {Error} RPC failure — reported as `harness`, never as a target defect.
@@ -240,6 +246,9 @@ export async function runMppChargeChecks(
 
   assertHttpUrl(target);
   const runNetwork = assertMppNetwork(network);
+  // L0: before the key is read, any request is sent or the SDK's charge
+  // client is built. MPP pays on test networks only.
+  assertPaymentNetworkAllowed("mpp-charge", runNetwork);
 
   if (!payerSecretKey) {
     throw new ConfigurationError(

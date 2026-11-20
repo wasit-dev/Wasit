@@ -108,10 +108,27 @@ async function rejection(promise: Promise<unknown>): Promise<unknown> {
 }
 
 describe("MPP-01 and the challenge's network", () => {
-  for (const [asked, run] of [
-    ["stellar:pubnet", "stellar:testnet"],
-    ["stellar:testnet", "stellar:pubnet"],
-  ] as const) {
+  // A stellar:pubnet run no longer reaches the challenge at all: L0 refuses it
+  // first (network-guard.test.ts). The run-network rule below still guards a
+  // testnet run against a challenge that asks for pubnet.
+  it("refuses a stellar:pubnet run before the challenge is read", async () => {
+    const target = await chargeTarget(() => "stellar:testnet");
+    const rpc = await countingRpc();
+    try {
+      const error = await rejection(
+        runMppChargeChecks({ target: target.url, network: "stellar:pubnet", payerSecretKey: Keypair.random().secret(), rpcUrl: rpc.url }),
+      );
+      assert.match(String((error as Error).message), /MPP stays on test networks/);
+      assert.equal(classifyCheckError(error).kind, "configuration");
+      assert.equal(target.requests(), 0);
+      assert.equal(rpc.calls(), 0);
+    } finally {
+      await target.close();
+      await rpc.close();
+    }
+  });
+
+  for (const [asked, run] of [["stellar:pubnet", "stellar:testnet"]] as const) {
     it(`refuses a ${asked} challenge on a ${run} run before anything is signed`, async () => {
       const target = await chargeTarget(() => asked);
       const rpc = await countingRpc();

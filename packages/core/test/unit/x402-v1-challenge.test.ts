@@ -3,11 +3,12 @@
  *
  * x402 v1 signals payment in the 402 response body; v2 uses the
  * PAYMENT-REQUIRED header, and the `exact` scheme on Stellar is defined for v2
- * only. A v1 service therefore fails X402-02, but its terms are still worth
- * checking, and neither payment check has a verdict when no payment could be
- * built. Before this, a v1 target got X402-03..05 skipped and X402-06/07
- * reported as FAIL, so X402-07 read as a corrupted signature that was not
- * rejected although nothing was ever sent.
+ * only. Wasit grades v2, so a v1 service is "unsupported": X402-02..05 are
+ * SKIPs of kind `unsupported`, not a FAIL on a service that may be conformant
+ * to the version it speaks (spec A3). The v1 field findings are kept as notes
+ * in the skip's detail. Neither payment check has a verdict when no payment
+ * could be built. Before 0.5.0 a v1 target got X402-06/07 reported as FAIL;
+ * before this change it got X402-02 reported as FAIL.
  */
 
 import assert from "node:assert/strict";
@@ -16,7 +17,7 @@ import { after, before, describe, it } from "node:test";
 
 import { Keypair } from "@stellar/stellar-sdk";
 
-import type { CheckResult } from "../../src/check.js";
+import { checkStatus, type CheckResult } from "../../src/check.js";
 import {
   readV1BodyChallenge,
   runX402PaymentChecks,
@@ -82,43 +83,81 @@ describe("readV1BodyChallenge", () => {
 });
 
 describe("read checks against a v1 body challenge", () => {
-  it("fails X402-02, checks the v1 terms, and flags a non-CAIP-2 network", async () => {
+  it("reports X402-02..05 as unsupported skips, not failures, and keeps the v1 findings as notes", async () => {
     const target = await serve(v1Body("stellar-testnet"));
     try {
       const results = byId(await runX402ReadChecks({ target: target.url }));
       assert.equal(results["X402-01"]?.pass, true);
-      assert.equal(results["X402-02"]?.pass, false);
-      assert.match(results["X402-02"]?.detail ?? "", /x402 v1 challenge/);
-      assert.equal(results["X402-03"]?.pass, true);
-      assert.equal(results["X402-04"]?.pass, true);
-      assert.equal(results["X402-05"]?.pass, false);
-      assert.equal(results["X402-05"]?.skipped, undefined);
+      for (const id of ["X402-02", "X402-03", "X402-04", "X402-05"]) {
+        assert.equal(checkStatus(results[id]!), "SKIP", id);
+        assert.equal(results[id]?.skipKind, "unsupported", id);
+        assert.equal(results[id]?.pass, false, id);
+        assert.match(results[id]?.skipReason ?? "", /x402 v1/, id);
+      }
+      assert.equal(Object.values(results).some((result) => checkStatus(result) === "FAIL"), false);
+      // The v1 field findings stay visible, labelled as notes and not as verdicts.
+      assert.match(results["X402-04"]?.detail ?? "", /Note, not a verdict: All required v1 fields present/);
+      assert.match(
+        results["X402-05"]?.detail ?? "",
+        /Note, not a verdict: "stellar-testnet" is not a CAIP-2 identifier.*x402 v1 used plain names/,
+      );
     } finally {
       await target.close();
     }
   });
 
-  it("passes X402-05 when a v1 challenge uses the CAIP-2 identifier", async () => {
+  it("notes a valid CAIP-2 network on a v1 challenge, still as a skip", async () => {
     const target = await serve(v1Body("stellar:testnet"));
     try {
       const results = byId(await runX402ReadChecks({ target: target.url }));
-      assert.equal(results["X402-02"]?.pass, false);
-      assert.equal(results["X402-05"]?.pass, true);
+      assert.equal(checkStatus(results["X402-02"]!), "SKIP");
+      assert.equal(checkStatus(results["X402-05"]!), "SKIP");
+      assert.match(results["X402-05"]?.detail ?? "", /Note, not a verdict: Network identifier "stellar:testnet" is valid/);
     } finally {
       await target.close();
     }
   });
 
-  it("still skips X402-03..05 when the body is not a challenge at all", async () => {
+  it("notes a v1 challenge missing a field, without failing it", async () => {
+    const broken = JSON.stringify({ x402Version: 1, accepts: [{ scheme: "exact", network: "stellar:testnet" }] });
+    const target = await serve(broken);
+    try {
+      const results = byId(await runX402ReadChecks({ target: target.url }));
+      assert.equal(checkStatus(results["X402-04"]!), "SKIP");
+      assert.match(results["X402-04"]?.detail ?? "", /Note, not a verdict: Missing: maxAmountRequired, asset, payTo/);
+    } finally {
+      await target.close();
+    }
+  });
+
+  it("fails X402-02 and skips the rest as a dependency when the body is not a challenge at all", async () => {
     const target = await serve("payment required");
     try {
       const results = byId(await runX402ReadChecks({ target: target.url }));
-      assert.equal(results["X402-02"]?.pass, false);
+      assert.equal(checkStatus(results["X402-02"]!), "FAIL");
       for (const id of ["X402-03", "X402-04", "X402-05"]) {
         assert.equal(results[id]?.skipped, true, id);
+        assert.equal(results[id]?.skipKind, "dependency", id);
       }
     } finally {
       await target.close();
+    }
+  });
+
+  it("does not turn a v2 header challenge into unsupported, even with a v1 body", async () => {
+    const v2Header = Buffer.from(JSON.stringify({ x402Version: 2, accepts: [] })).toString("base64");
+    const server = http.createServer((_request, response) => {
+      response.writeHead(402, { "payment-required": v2Header, "content-type": "application/json" });
+      response.end(v1Body("stellar:testnet"));
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    try {
+      const { port } = server.address() as { port: number };
+      const results = byId(await runX402ReadChecks({ target: `http://127.0.0.1:${port}/paid` }));
+      assert.equal(checkStatus(results["X402-02"]!), "PASS");
+      assert.equal(results["X402-02"]?.skipKind, undefined);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
     }
   });
 });

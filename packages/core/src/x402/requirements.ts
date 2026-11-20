@@ -8,7 +8,7 @@
  * may offer several options on several chains at once.
  */
 
-import { skipped, type CheckResult } from "../check.js";
+import { quoteValue, skipped, type CheckResult } from "../check.js";
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return typeof value === "object" && value !== null
@@ -95,7 +95,11 @@ interface OptionProblem {
   readonly detail: string;
   readonly fixes: readonly string[];
   readonly missing: boolean;
+  /** What the option should carry and what it carried, in a few words each. */
+  readonly expected: string;
+  readonly actual: string;
 }
+
 
 function describeValue(value: unknown): string {
   return typeof value === "object" ? "an object" : `${typeof value} ${JSON.stringify(value)}`;
@@ -124,11 +128,16 @@ function fieldProblem(
           `service speaks that version.`,
       ],
       missing: false,
+      expected: `the field \`${expected}\` (v${version})`,
+      actual: `the field \`${wrongVersionField}\` (v${version === 2 ? 1 : 2})`,
     };
   }
 
   const missing: string[] = [];
   const wrongType: string[] = [];
+  // The same findings as short expected and actual values, in the same order.
+  const wrongExpected: string[] = [];
+  const wrongActual: string[] = [];
   for (const field of REQUIRED_FIELDS[version]) {
     const value = accept?.[field];
     if (value === undefined || value === null || value === "") {
@@ -139,9 +148,13 @@ function fieldProblem(
         wrongType.push(
           `maxTimeoutSeconds must be a positive number of seconds (got ${describeValue(value)})`,
         );
+        wrongExpected.push("maxTimeoutSeconds as a positive number");
+        wrongActual.push(`maxTimeoutSeconds is ${describeValue(value)}`);
       }
     } else if (typeof value !== "string") {
       wrongType.push(`${field} must be a string (got ${describeValue(value)})`);
+      wrongExpected.push(`${field} as a string`);
+      wrongActual.push(`${field} is ${describeValue(value)}`);
     }
   }
 
@@ -162,7 +175,13 @@ function fieldProblem(
         ]
       : []),
   ];
-  return { detail, fixes, missing: missing.length > 0 };
+  return {
+    detail,
+    fixes,
+    missing: missing.length > 0,
+    expected: [...(missing.length > 0 ? [`${missing.join(", ")} present`] : []), ...wrongExpected].join("; "),
+    actual: [...(missing.length > 0 ? [`${missing.join(", ")} missing`] : []), ...wrongActual].join("; "),
+  };
 }
 
 /** X402-04: every payment option must carry the fields its version requires. */
@@ -181,11 +200,14 @@ export function checkRequiredFields(payload: unknown): CheckResult {
         `neither 1 nor 2. The payment terms use different field names per ` +
         `version, so they cannot be checked against an unknown one.`,
       hint: "Set `x402Version` to 2, the current protocol version, and use its field names.",
+      expected: "x402Version 2",
+      actual: version === undefined ? "no x402Version" : `x402Version ${quoteValue(version)}`,
     };
   }
 
   const accepts = acceptsOf(payload);
   if (accepts === undefined || accepts.length === 0) {
+    const raw = asRecord(payload)?.["accepts"];
     return {
       id,
       name,
@@ -196,6 +218,8 @@ export function checkRequiredFields(payload: unknown): CheckResult {
       hint:
         "List at least one payment option in `accepts`, each with " +
         `${REQUIRED_FIELDS[version].join(", ")}.`,
+      expected: "at least one entry in accepts",
+      actual: raw === undefined ? "accepts is missing" : Array.isArray(raw) ? "accepts is empty" : "accepts is not a list",
     };
   }
 
@@ -204,7 +228,12 @@ export function checkRequiredFields(payload: unknown): CheckResult {
       const problem = fieldProblem(accept, version);
       return problem === undefined
         ? undefined
-        : { ...problem, detail: optionLabel(index, accepts.length) + problem.detail };
+        : {
+            ...problem,
+            detail: optionLabel(index, accepts.length) + problem.detail,
+            expected: optionLabel(index, accepts.length) + problem.expected,
+            actual: optionLabel(index, accepts.length) + problem.actual,
+          };
     })
     .filter((problem): problem is OptionProblem => problem !== undefined);
 
@@ -221,6 +250,8 @@ export function checkRequiredFields(payload: unknown): CheckResult {
       pass: false,
       detail: problems.map((problem) => problem.detail).join(" "),
       hint: fixes.join(" "),
+      expected: problems.map((problem) => problem.expected).join("; "),
+      actual: problems.map((problem) => problem.actual).join("; "),
     };
   }
   return {
@@ -245,6 +276,8 @@ const BASE58_32 = /^[1-9A-HJ-NP-Za-km-z]{32}$/;
 interface NetworkProblem {
   readonly reason: string;
   readonly fix: string;
+  /** What the network should look like, in a few words. */
+  readonly expected: string;
 }
 
 const CAIP2_EXAMPLES =
@@ -281,6 +314,7 @@ const NAMESPACE_RULES: Readonly<
             `"stellar:${reference}" does not match stellar:testnet or stellar:pubnet, ` +
             `the only Stellar networks CAIP-2 defines.`,
           fix: "Use stellar:testnet or stellar:pubnet.",
+          expected: "stellar:testnet or stellar:pubnet",
         },
   eip155: (reference) =>
     /^[1-9][0-9]*$/.test(reference)
@@ -290,6 +324,7 @@ const NAMESPACE_RULES: Readonly<
             `"eip155:${reference}" does not carry an EIP-155 chain id in base 10, ` +
             `which the eip155 namespace requires (Base Sepolia is eip155:84532).`,
           fix: eip155Fix(reference),
+          expected: "eip155:<chain id in base 10>",
         },
   solana: (reference) =>
     BASE58_32.test(reference)
@@ -303,13 +338,14 @@ const NAMESPACE_RULES: Readonly<
             "Use the first 32 characters of the cluster's genesis hash (RPC " +
             "getGenesisHash): solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1 for devnet, " +
             "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp for mainnet.",
+          expected: "solana:<first 32 characters of the base58 genesis hash>",
         },
 };
 
 /** What X402-05 established about one network identifier. */
 export type NetworkVerdict =
   | { readonly valid: true; readonly namespace: string; readonly known: boolean }
-  | { readonly valid: false; readonly reason: string; readonly fix: string };
+  | { readonly valid: false; readonly reason: string; readonly fix: string; readonly expected: string };
 
 /**
  * Validates one network identifier against CAIP-2, which x402 v2 requires,
@@ -329,6 +365,7 @@ export function validateNetwork(network: string): NetworkVerdict {
         `"${network}" is not a CAIP-2 identifier (namespace:reference, e.g. ` +
         `stellar:testnet or eip155:84532), which x402 v2 requires.`,
       fix: `Use the network's CAIP-2 id, namespace:reference, such as ${CAIP2_EXAMPLES}.`,
+      expected: "a CAIP-2 id, namespace:reference, such as stellar:testnet",
     };
   }
   const namespace = match[1]!;
@@ -353,7 +390,7 @@ export function checkNetworkIdentifier(payload: unknown): CheckResult {
 
   // Absent is X402-04's finding, not a second one: report it there only.
   if (advertised.length === 0) {
-    return skipped(id, name, "the challenge carries no network field to validate (see X402-04).");
+    return skipped(id, name, "the challenge carries no network field to validate (see X402-04).", "dependency");
   }
 
   const v1 = asRecord(payload)?.["x402Version"] === 1;
@@ -374,6 +411,8 @@ export function checkNetworkIdentifier(payload: unknown): CheckResult {
       pass: false,
       detail: reasons.join(" ") + v1Note,
       hint: [...new Set(problems.map((problem) => problem.fix))].join(" "),
+      expected: invalid.map((entry, i) => optionLabel(entry.index, accepts.length) + problems[i]!.expected).join("; "),
+      actual: invalid.map((entry) => optionLabel(entry.index, accepts.length) + quoteValue(entry.network)).join("; "),
     };
   }
 
