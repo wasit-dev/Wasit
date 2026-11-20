@@ -61,12 +61,14 @@ runs:
     # For the same reason BASH_ENV and ENV (a file the shell runs before the
     # step) and LD_PRELOAD, LD_LIBRARY_PATH and LD_AUDIT (libraries loaded into
     # bash, node and gh) are set empty in every step, so the workflow's env does
-    # not reach them. That a step's env also wins over an earlier step's
-    # GITHUB_ENV for these names is not yet seen on a runner. A service that
-    # needs one sets it in its service.start command. None of this keeps the steps apart from code
-    # that ran earlier in the job as the runner's user: such code can also put a
-    # program of its own first on PATH (GITHUB_PATH), change files on disk, or
-    # leave a process running; the example workflow states that limit.
+    # not reach them, and neither does an earlier step's GITHUB_ENV: seen for
+    # BASH_ENV on a GitHub-hosted runner, 2026-11-21 (each step of this action
+    # showed it empty, a plain step after the earlier one ran the file). A
+    # service that needs one sets it in its service.start command. None of this
+    # keeps the steps apart from code that ran earlier in the job as the
+    # runner's user: such code can also put a program of its own first on PATH
+    # (GITHUB_PATH), change files on disk, or leave a process running; the
+    # example workflow states that limit.
 
     - name: Check the runner
       shell: bash
