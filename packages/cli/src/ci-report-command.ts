@@ -16,12 +16,15 @@ import { appendFileSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import {
   MAX_BASELINE_BYTES,
   ReportFormatError,
+  baselineProblem,
   deniedEnvValues,
   parseRunReport,
   readBaseline,
   readBuildCommit,
   readToolVersions,
+  renderCheckRun,
   renderComment,
+  renderNoReportCheckRun,
   renderNoReportComment,
   renderNoReportSummary,
   renderSummary,
@@ -30,6 +33,7 @@ import {
   serializeBaseline,
   updateHistory,
   type BaselineResult,
+  type History,
   type RunReport,
 } from "@wasit-dev/core";
 
@@ -44,8 +48,18 @@ export interface CiReportOptions {
   readonly comment: string;
   /** The job summary file, appended to. Default: `$GITHUB_STEP_SUMMARY`, if set. */
   readonly summary?: string;
-  /** Where the next baseline goes: the report with its history. The caller uploads it on a push to the default branch. */
+  /** Where the next baseline goes: the report with its history. The caller uploads it on a run on the default branch. */
   readonly baselineOut?: string;
+  /**
+   * The baseline file of the newest completed run on the default branch, failed
+   * or not (D-022b): its history is the one the recent-failures line counts and
+   * the next baseline carries on. Absent or unusable: the baseline's own.
+   */
+  readonly history?: string;
+  /** The id of the run the baseline came from, named in the comment. Only a whole number above 0 is used. */
+  readonly baselineRun?: string;
+  /** Where the check run's title, summary and conclusion go, as JSON, for the step that completes it. */
+  readonly checkRun?: string;
 }
 
 export interface CiReportContext {
@@ -87,6 +101,10 @@ export async function executeCiReport(options: CiReportOptions, context: CiRepor
         appendFileSync(summary, renderNoReportSummary(versions));
         context.stdout(`Appended the summary to ${summary}`);
       }
+      if (options.checkRun !== undefined) {
+        writeFileSync(options.checkRun, JSON.stringify(renderNoReportCheckRun(versions)));
+        context.stdout(`Wrote ${options.checkRun}`);
+      }
     } catch (error) {
       const errno = (error as NodeJS.ErrnoException).code;
       return fail(`wasit ci-report: cannot write a file${typeof errno === "string" ? ` (${errno})` : ""}`);
@@ -109,10 +127,32 @@ export async function executeCiReport(options: CiReportOptions, context: CiRepor
   }
 
   const selected = selectBaseline(report, options.baseline === undefined ? undefined : readBaselineFile(options.baseline));
+
+  // D-022b: the history of every completed run on main, when the newest one is given.
+  let history: History | undefined = selected.baseline?.history;
+  let historyGiven = false;
+  if (options.history !== undefined) {
+    const read = readBaselineFile(options.history);
+    const problem = read.ok ? baselineProblem(report, read.baseline.report) : read.reason;
+    if (read.ok && problem === undefined) {
+      history = read.baseline.history;
+      historyGiven = true;
+    } else {
+      context.stderr(
+        sanitizeText(`wasit ci-report: the history file is not used (${problem ?? "unknown"}); the history of the baseline is used`, {
+          redact: secrets,
+        }),
+      );
+    }
+  }
+  const run = options.baselineRun !== undefined && /^[1-9][0-9]{0,15}$/.test(options.baselineRun) ? Number(options.baselineRun) : undefined;
+
   const input = {
     report,
     ...(selected.baseline === undefined ? {} : { baseline: selected.baseline }),
     ...(selected.note === undefined ? {} : { baselineNote: selected.note }),
+    ...(run === undefined || !Number.isSafeInteger(run) ? {} : { baselineRun: run }),
+    ...(historyGiven && history !== undefined ? { history } : {}),
     secrets,
   };
 
@@ -127,8 +167,13 @@ export async function executeCiReport(options: CiReportOptions, context: CiRepor
     }
 
     if (options.baselineOut !== undefined) {
-      writeFileSync(options.baselineOut, serializeBaseline(report, updateHistory(selected.baseline?.history, report)));
+      writeFileSync(options.baselineOut, serializeBaseline(report, updateHistory(history, report)));
       context.stdout(`Wrote ${options.baselineOut}`);
+    }
+
+    if (options.checkRun !== undefined) {
+      writeFileSync(options.checkRun, JSON.stringify(renderCheckRun(input)));
+      context.stdout(`Wrote ${options.checkRun}`);
     }
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;

@@ -32,6 +32,72 @@ export interface ExpiredSigning {
   readonly holdMs: number;
 }
 
+/**
+ * One signed authorization of a payment, as the chain records its use
+ * (X402-11, D-032). Decoded from what the payer signed, never computed.
+ */
+export interface SignedAuthorization {
+  /** The address that signed it. X402-11 holds it to the run's payer. */
+  readonly payer: string;
+  /** Its single-use id on the chain (on Stellar the auth entry's nonce), as text. */
+  readonly nonce: string;
+  /** The last ledger (or block) it can be used in, as signed. */
+  readonly expiresAt: number;
+}
+
+/** One read of the chain about some authorizations, all at the same state. */
+export interface AuthorizationRead {
+  /** The chain's latest closed ledger when it answered. */
+  readonly latest: number;
+  /**
+   * Per authorization asked for, in order: the ledger its use was recorded in,
+   * or undefined when the chain holds no record of a use.
+   */
+  readonly used: readonly (number | undefined)[];
+}
+
+/** A transfer the chain recorded, as X402-11's second reading counts it. */
+export interface RecordedTransfer {
+  readonly amount: bigint;
+  /** The transaction that made it (a hash), for the report. */
+  readonly reference: string;
+  readonly ledger: number;
+}
+
+/**
+ * How X402-11 reads whether an authorization was used, on chains where that
+ * can be read directly. A chain without one does not run X402-11.
+ */
+export interface AuthorizationWatch {
+  /** What the chain's unit of time is called in a report: "ledger". */
+  readonly unit: string;
+  /** About how long one unit lasts, in milliseconds: the watch reads once per unit. */
+  readonly unitMs: number;
+  /**
+   * The seconds one unit counts for when a client turns an advertised lifetime
+   * into an expiration (the lifetime divided by this, rounded up). X402-11 does
+   * not send an authorization that outlives its 300 s by more than that count.
+   */
+  readonly unitSeconds: number;
+  /**
+   * The authorization a payment payload's inner `payload` carries. Throws
+   * `CheckSetupError` when it carries none that can be read, or more than one.
+   */
+  decode(payload: Record<string, unknown>): SignedAuthorization;
+  /** Whether each authorization was used, read in one call, so all at one state of the chain. */
+  read(network: string, rpcUrl: string, authorizations: readonly SignedAuthorization[]): Promise<AuthorizationRead>;
+  /**
+   * Every successful transfer of `asset` from `from` to `to` recorded from
+   * ledger `fromLedger` on. Throws when the chain cannot serve that range in
+   * full: a partial answer is never read as "no transfer".
+   */
+  transfers(
+    network: string,
+    rpcUrl: string,
+    query: { readonly asset: string; readonly from: string; readonly to: string; readonly fromLedger: number },
+  ): Promise<{ readonly latest: number; readonly transfers: readonly RecordedTransfer[] }>;
+}
+
 export interface PaymentChain {
   /** The chain family's name, for reports. */
   readonly name: string;
@@ -96,4 +162,6 @@ export interface PaymentChain {
    * signature to corrupt.
    */
   corruptPayload(payload: Record<string, unknown>): Record<string, unknown>;
+  /** X402-11's chain reads. Absent: X402-11 is skipped on this chain, nothing signed. */
+  readonly authorizations?: AuthorizationWatch;
 }

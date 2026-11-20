@@ -16,12 +16,18 @@ import {
   type ServeMode,
 } from "./serve.js";
 import { executeCiReport } from "./ci-report-command.js";
-import { note, report } from "./output.js";
+import { exitCodeFor, note, report, verdictNotes } from "./output.js";
+import { LiveReport } from "./live.js";
+import { colorDepth, colorEnabled, lineWidth, liveEnabled, styler } from "./style.js";
 import { executeRun } from "./run.js";
 import {
   CHECK_CATALOGUE,
   PROTOCOL_IDS,
+  X402_PAYMENT_CHECK_IDS,
+  catalogueEntry,
   deniedEnvValues,
+  endpointOutcome,
+  networkClass,
   paymentChainFor,
   runMppChannelSuite,
   runMppChargeSuite,
@@ -210,7 +216,7 @@ program
     "Extra request header the endpoint needs before it will issue a challenge. Repeatable.",
     collectHeader,
   )
-  .option("--read-only", "Skip the payment checks (X402-06..10)", false)
+  .option("--read-only", "Skip the payment checks (X402-06..11)", false)
   .option("--json", "Print results as JSON instead of formatted text", false)
   .addHelpText(
     "after",
@@ -224,7 +230,13 @@ X402-01..05 (challenge/header checks) always run and cost nothing. X402-06..10
 (real payment checks) run only when a payer key is available and --read-only
 is not set: X402-06 settles a payment; X402-07..10 send payments the target
 must refuse (a corrupted signature, a replay, an underpayment, an expired
-authorization). See docs/CHECKS.md for what each check ID verifies.`,
+authorization). X402-11 needs a request the service must refuse, the reject case
+of a wasit.config.json endpoint: it runs in wasit run and is skipped here. See
+docs/CHECKS.md for what each check ID verifies.
+
+At a terminal the output is coloured and live: each check shows while it runs,
+with its duration, and the run's duration comes at the end. A pipe, CI, --json
+or NO_COLOR gives the plain text; FORCE_COLOR=1 colours a pipe.`,
   )
   .action(async (opts) => {
     const jsonMode = opts.json === true;
@@ -233,6 +245,12 @@ authorization). See docs/CHECKS.md for what each check ID verifies.`,
       ...(opts.body !== undefined ? { body: opts.body as string } : {}),
       ...(opts.header ? { headers: opts.header as Record<string, string> } : {}),
     };
+
+    // A person at a terminal gets the coloured, live output; a pipe, CI, NO_COLOR
+    // and --json get the plain text below, unchanged.
+    if (!jsonMode && colorEnabled(process.stdout, process.env)) {
+      process.exit(await liveX402Test(opts, shape));
+    }
 
     const results = await runX402ReadChecks({ target: opts.target, ...shape });
     // Each chain reads its own payer key: a Stellar secret is no use on EVM.
@@ -269,7 +287,7 @@ authorization). See docs/CHECKS.md for what each check ID verifies.`,
 
 program
   .command("run")
-  .description("Run the endpoints of a wasit.config.json and write one report (read-only in this version)")
+  .description("Run the endpoints of a wasit.config.json and write one report: the payment tier on a test network, --read-only, or --dry-run")
   .option("--config <path>", "The config file", "wasit.config.json")
   .option("--env <name>", "The environment to run (default: defaultEnvironment, else the only one)")
   .option(
@@ -280,7 +298,14 @@ program
   )
   .option(
     "--read-only",
-    "Run the unpaid challenge checks (X402-01..05). They send no payment and sign nothing. The only tier in this version, so it is required.",
+    "Run the unpaid challenge checks (X402-01..05) only. They send no payment and sign nothing. Without it (and without --dry-run) the run is the payment tier.",
+    false,
+  )
+  .option(
+    "--dry-run",
+    "Print what the payment checks would sign: per endpoint the payee, the asset, the amount of each signature and the worst case, " +
+      "against the caps ($1 a payment, $5 a run, lower with maxRunUsd). Reads each x402 endpoint's unpaid challenge; " +
+      "uses no key, sends no payment, signs nothing. Exit 2 when a paying run would be refused. Not with --read-only.",
     false,
   )
   .option("--json", "Print the report as JSON instead of text", false)
@@ -301,6 +326,11 @@ program
     "--baseline <file>",
     "The report of the default branch: an endpoint graded there that is unsupported or without a verdict now is a regression (exit 1)",
   )
+  .option(
+    "--mainnet",
+    "Refused in this version: the mainnet opt-in is not part of it. The run stops with exit 2 before the config is read; nothing is started, sent or signed.",
+    false,
+  )
   .addHelpText(
     "after",
     `
@@ -309,10 +339,24 @@ Examples:
   $ wasit run --read-only --env staging --endpoint weather --json --out wasit-report.json
   $ wasit run --read-only --start
   $ wasit run --read-only --start-if-local --env mainnet
+  $ wasit run --dry-run --start
+  $ wasit run --start                     (payment tier: STELLAR_PRIVATE_KEY on stellar:testnet)
 
 Exit codes: 0 every graded endpoint conforms; 1 an endpoint does not conform, or one
 graded on the baseline is not graded now; 2 no verdict (nothing could be graded, a
-check could not run, the config or the service could not be used).
+check could not run, the config or the service could not be used, or the payment
+tier was asked for and did not pay: no payer key, or operatedByMe not true).
+The payment tier pays on test networks only: at most $1.00 a payment and $5.00 a run
+(lower with maxRunUsd), only the pinned payTo and asset when the config pins them.
+In GitHub Actions it pays only on push to the default branch, schedule and
+workflow_dispatch; a pull request runs the read-only checks, and a payer key set on
+a run that may not pay is refused before the service starts. In another CI (CI set,
+not GitHub Actions) the payment tier is refused with exit 2: use --read-only there,
+with no payer key in the job.
+X402-11 runs for an endpoint with a reject case, on Stellar: it sends a valid payment
+with the request the service must refuse, then reads the chain until that payment's
+authorization has expired, up to six minutes; a lifetime above 300 s or below 30 s is
+not signed, and an authorization signed to outlive 300 s is not sent.
 In CI (CI or GITHUB_ACTIONS set) a .env file in the working directory is not read.`,
   )
   .exitOverride(exitTwoOnUsageError)
@@ -325,11 +369,13 @@ In CI (CI or GITHUB_ACTIONS set) a .env file in the working directory is not rea
           ...(opts.env === undefined ? {} : { env: opts.env as string }),
           endpoint: opts.endpoint as string[],
           readOnly: opts.readOnly === true,
+          dryRun: opts.dryRun === true,
           json: opts.json === true,
           ...(opts.out === undefined ? {} : { out: opts.out as string }),
           start: opts.start === true,
           startIfLocal: opts.startIfLocal === true,
           ...(opts.baseline === undefined ? {} : { baseline: opts.baseline as string }),
+          mainnet: opts.mainnet === true,
         },
         { env: process.env, stdout: (line) => console.log(line), stderr: (line) => console.error(line) },
       );
@@ -351,8 +397,14 @@ program
   .option("--summary <file>", "The job summary file, appended to (default: $GITHUB_STEP_SUMMARY)")
   .option(
     "--baseline-out <file>",
-    "Write the next baseline here: this report with its history. For a push to the default branch.",
+    "Write the next baseline here: this report with its history. For a run on the default branch.",
   )
+  .option(
+    "--history <file>",
+    "The baseline file of the newest completed run on the default branch, failed or not: the recent failures are counted from its history",
+  )
+  .option("--baseline-run <id>", "The id of the run the baseline came from, named in the comment")
+  .option("--check-run <file>", "Write the check run's title, summary and conclusion here, as JSON")
   .exitOverride(exitTwoOnUsageError)
   .action(async (opts) => {
     let code: number;
@@ -364,6 +416,9 @@ program
           comment: opts.comment as string,
           ...(opts.summary === undefined ? {} : { summary: opts.summary as string }),
           ...(opts.baselineOut === undefined ? {} : { baselineOut: opts.baselineOut as string }),
+          ...(opts.history === undefined ? {} : { history: opts.history as string }),
+          ...(opts.baselineRun === undefined ? {} : { baselineRun: opts.baselineRun as string }),
+          ...(opts.checkRun === undefined ? {} : { checkRun: opts.checkRun as string }),
         },
         { env: process.env, stdout: (line) => console.log(line), stderr: (line) => console.error(line) },
       );
@@ -532,8 +587,92 @@ that channel.`,
       },
     });
 
-    process.exit(report(results, jsonMode));
+    process.exit(report(results, jsonMode, terminalStyle(jsonMode)));
   });
+
+
+/** Colours for the MPP commands' text output, when a person is at the terminal. */
+function terminalStyle(jsonMode: boolean): { style: ReturnType<typeof styler>; width: number } {
+  return {
+    style: styler(!jsonMode && colorEnabled(process.stdout, process.env), colorDepth(process.env)),
+    width: lineWidth(process.stdout),
+  };
+}
+
+/**
+ * `wasit test` for a person at a terminal: the same checks, notes and exit code
+ * as the plain output, drawn live (a RUNNING line with a timer while a check is
+ * in flight, each result as it arrives, the counts and the duration at the end).
+ */
+async function liveX402Test(
+  opts: Record<string, unknown>,
+  shape: { method?: string; body?: string; headers?: Record<string, string> },
+): Promise<number> {
+  const secrets = deniedEnvValues(process.env);
+  const live = new LiveReport({
+    stream: process.stdout,
+    live: liveEnabled(process.stdout, process.env),
+    depth: colorDepth(process.env),
+    clean: (text) => sanitizeText(text, { redact: secrets }),
+  });
+  const target = opts["target"] as string;
+  const network = opts["network"] as string;
+  live.header(CLI_VERSION, "x402 conformance", [
+    ["target", `${target}${shape.method !== undefined ? `  ${shape.method.toUpperCase()}` : ""}`],
+    ["network", network],
+  ]);
+
+  live.phase("challenge", [["no payment"]]);
+  live.running("X402-01..05", "Challenge checks");
+  const results = await runX402ReadChecks({ target, ...shape, onResult: (result) => live.result(result) });
+  live.gap();
+
+  const keyEnv = paymentChainFor(network)?.payerKeyEnv ?? "STELLAR_PRIVATE_KEY";
+  const payerKey = (opts["payerKey"] as string | undefined) ?? process.env[keyEnv];
+  if (opts["readOnly"] === true) {
+    live.phase("payment", [["not run"]]);
+    live.note("--read-only set: the payment checks were not run.");
+  } else if (!payerKey) {
+    live.phase("payment", [["not run"]]);
+    live.note(`No payer key: set ${keyEnv} in .env or pass --payer-key. The payment checks were not run.`);
+  } else if (networkClass(network) !== "test") {
+    // Not a test network: the guard refuses the payment checks before anything
+    // is signed (the PREFLIGHT line says why), so no money moves.
+    live.phase("payment", [[network], ["not a test network: refused", "danger"]]);
+  } else {
+    live.phase("payment", [[network], ["testnet funds move", "warning"]]);
+    live.note(
+      `When the target offers a ${network} option, X402-06 settles a real payment and X402-07..10 send ` +
+        "payments it must refuse.",
+    );
+  }
+  if (opts["readOnly"] !== true && payerKey) {
+    const order = X402_PAYMENT_CHECK_IDS;
+    const startAt = (index: number): void => {
+      const id = order[index];
+      if (id !== undefined) live.running(id, catalogueEntry(id)?.name ?? id);
+    };
+    startAt(0);
+    results.push(
+      ...(await runX402PaymentChecks({
+        target,
+        network,
+        payerSecretKey: payerKey,
+        ...(opts["rpcUrl"] ? { rpcUrl: opts["rpcUrl"] as string } : {}),
+        ...shape,
+        onResult: (result) => {
+          live.result(result);
+          const index = order.indexOf(result.id);
+          if (index >= 0) startAt(index + 1);
+        },
+        onProgress: (line) => live.progress(line),
+      })),
+    );
+  }
+
+  live.finish(results, endpointOutcome(results, "x402"), verdictNotes(results, "x402"));
+  return exitCodeFor(results, "x402");
+}
 
 program
   .command("mpp-charge")
@@ -577,7 +716,7 @@ a real payment and moves testnet funds, because charge mode has no dry run.`,
       ...(opts.rpcUrl ? { rpcUrl: opts.rpcUrl } : {}),
     });
 
-    process.exit(report(results, jsonMode));
+    process.exit(report(results, jsonMode, terminalStyle(jsonMode)));
   });
 
 registerWalletCommand(program);

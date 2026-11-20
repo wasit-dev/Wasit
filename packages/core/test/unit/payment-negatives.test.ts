@@ -24,6 +24,7 @@ import {
   runX402PaymentChecks,
   underpaymentVerdict,
 } from "../../src/x402/simulator.js";
+import { planX402Run } from "../../src/x402/plan.js";
 
 const NETWORK = "eip155:84532";
 
@@ -113,24 +114,32 @@ async function standIn(options: {
 }
 
 /**
- * A JSON-RPC endpoint that answers every `eth_call` (the ERC-20 `balanceOf`
- * X402-06 reads) with `balance`, or fails every request with 500.
+ * A JSON-RPC endpoint that says it serves `chainId` (the RPC identity check,
+ * D-023) and answers every `eth_call` (the ERC-20 `balanceOf` X402-06 reads)
+ * with `balance`, or fails every balance read with 500. `calls` counts the
+ * balance reads only.
  */
 async function rpcStandIn(
   balance: bigint | "unreadable",
+  chainId = 84532n,
 ): Promise<{ url: string; calls: () => number; close: () => Promise<void> }> {
   let calls = 0;
   const server = http.createServer((request, response) => {
     let body = "";
     request.on("data", (chunk) => (body += chunk));
     request.on("end", () => {
+      const { id, method } = JSON.parse(body) as { id: number; method: string };
+      if (method === "eth_chainId") {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify({ jsonrpc: "2.0", id, result: `0x${chainId.toString(16)}` }));
+        return;
+      }
       calls++;
       if (balance === "unreadable") {
         response.writeHead(500);
         response.end();
         return;
       }
-      const { id, method } = JSON.parse(body) as { id: number; method: string };
       response.writeHead(200, { "content-type": "application/json" });
       response.end(
         JSON.stringify(
@@ -175,10 +184,12 @@ describe("the negative checks against a target that takes anything", () => {
       });
       assert.deepEqual(
         results.map((result) => result.id),
-        ["X402-06", "X402-07", "X402-08", "X402-09", "X402-10"],
+        ["X402-06", "X402-07", "X402-08", "X402-09", "X402-10", "X402-11"],
       );
       const r = byId(results);
       assert.match(r["X402-06"]!.detail, /no PAYMENT-RESPONSE header/);
+      // X402-11 needs a reject case, which this run has none of: skipped, nothing signed for it.
+      assert.equal(r["X402-11"]?.skipKind, "not-applicable");
       for (const id of ["X402-07", "X402-08", "X402-09", "X402-10"]) {
         assert.equal(r[id]?.pass, false, id);
         assert.equal(r[id]?.skipped, undefined, id);
@@ -312,46 +323,56 @@ describe("a refused valid payment", () => {
 
 describe("on Ethereum Sepolia", () => {
   // Circle's Sepolia USDC is not an SDK default asset, and the SDK client's
-  // spend controls refuse non-default assets unless they are allowed.
-  it("pays in Circle's Sepolia USDC, up to the SDK's own $1 cap", async () => {
-    for (const [amount, paid] of [
-      ["10000", true],
-      ["1000001", false],
-    ] as const) {
-      const target = await standIn({
-        mode: "refuse",
-        amount,
-        network: "eip155:11155111",
-        asset: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
-      });
-      try {
-        const r = byId(
-          await runX402PaymentChecks({
-            target: target.url,
-            network: "eip155:11155111",
-            payerSecretKey: generatePrivateKey(),
-            rpcUrl: funded.url,
-          }),
-        );
-        assert.equal(target.received.length, paid ? 1 : 0, amount);
-        if (paid) assert.match(r["X402-06"]?.detail ?? "", /got 402/);
-        else {
-          assert.equal(r["X402-06"]?.error?.kind, "setup");
-          assert.match(r["X402-06"]?.detail ?? "", /asks for 1000001 base units .* more than the \$1 a payment/);
+  // spend controls refuse non-default assets unless they are allowed. Wasit's
+  // own cap (L2) refuses above $1 first, before the SDK's (L3) is reached.
+  it("pays in Circle's Sepolia USDC, up to the $1 cap", async () => {
+    const sepolia = await rpcStandIn(10n ** 12n, 11155111n);
+    try {
+      for (const [amount, paid] of [
+        ["10000", true],
+        ["1000001", false],
+      ] as const) {
+        const target = await standIn({
+          mode: "refuse",
+          amount,
+          network: "eip155:11155111",
+          asset: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+        });
+        try {
+          const r = byId(
+            await runX402PaymentChecks({
+              target: target.url,
+              network: "eip155:11155111",
+              payerSecretKey: generatePrivateKey(),
+              rpcUrl: sepolia.url,
+            }),
+          );
+          assert.equal(target.received.length, paid ? 1 : 0, amount);
+          if (paid) assert.match(r["X402-06"]?.detail ?? "", /got 402/);
+          else {
+            assert.equal(r["X402-06"]?.error?.kind, "setup");
+            assert.match(
+              r["X402-06"]?.detail ?? "",
+              /X402-06 would sign 1000001 base units of USDC \(\$1\.000001\), above the \$1\.00 per payment fixed in Wasit\. .*Nothing was signed\./,
+            );
+          }
+        } finally {
+          await target.close();
         }
-      } finally {
-        await target.close();
       }
+    } finally {
+      await sepolia.close();
     }
   });
 });
 
-describe("a target the SDK client's spend controls refuse", () => {
-  // Not the target's fault, and nothing is sent: no verdict, saying why.
+describe("a target the guard refuses before the SDK client's spend controls", () => {
+  // Not the target's fault, and nothing is sent: no verdict, saying why. L2
+  // refuses first; the SDK's own controls (L3) stay behind it.
   it("is a setup error on a price above $1, or on an asset the client does not pay in", async () => {
     for (const [label, options, reason] of [
-      ["above $1", { amount: "1000001" }, /more than the \$1 a payment the official x402 client pays by default/],
-      ["other asset", { asset: "0x0000000000000000000000000000000000000Bad" }, /not an asset the official x402 client pays in by default/],
+      ["above $1", { amount: "1000001" }, /above the \$1\.00 per payment fixed in Wasit/],
+      ["other asset", { asset: "0x0000000000000000000000000000000000000Bad" }, /an asset Wasit does not value in US dollars/],
     ] as const) {
       const target = await standIn({ mode: "accept", ...options });
       try {
@@ -446,6 +467,34 @@ describe("when a negative check has nothing to test", () => {
       assert.equal(r["X402-10"]?.pass, false);
       // honest, corrupted, expired: no replay and no underpayment were sent.
       assert.equal(target.received.length, 3);
+    } finally {
+      await target.close();
+    }
+  });
+});
+
+describe("when a negative check has nothing to test, under the plan of wasit run", () => {
+  it("skips X402-09 at a 1-unit price, as without a plan, and fetches nothing for it (review R3)", async () => {
+    const target = await standIn({ mode: "accept", amount: "1" });
+    try {
+      const plan = await planX402Run({ network: NETWORK, endpoints: [{ name: "paid", target: target.url }] });
+      const entry = plan.endpoints[0]!;
+      assert.equal(entry.status, "planned", entry.reason ?? "");
+      assert.ok(!entry.signatures.some((signature) => signature.check === "X402-09"), "the plan has no X402-09 signature");
+      const r = byId(
+        await runX402PaymentChecks({
+          target: target.url,
+          network: NETWORK,
+          payerSecretKey: generatePrivateKey(),
+          rpcUrl: funded.url,
+          plan: entry,
+        }),
+      );
+      assert.equal(r["X402-09"]?.error, undefined, r["X402-09"]?.detail);
+      assert.equal(r["X402-09"]?.skipped, true, r["X402-09"]?.detail);
+      assert.match(r["X402-09"]?.skipReason ?? "", /1 base unit/);
+      // honest, replay, corrupted, expired: no underpayment was sent.
+      assert.equal(target.received.length, 4);
     } finally {
       await target.close();
     }

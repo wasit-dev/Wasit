@@ -185,17 +185,20 @@ Wasit exists so these are found by a tool, before they are found by a user.
 | x402 payment checks (`X402-06`–`10`)  | Done on Stellar testnet, Base Sepolia, Ethereum Sepolia and Solana devnet, settlement verified from each chain's own record                                                                                    |
 | MPP charge mode (`MPP-01`)             | Done, settlement verified from contract events; pays only on the run's network                                                                                                                               |
 | MPP channel mode (`MPP-10`–`14`)       | Done, including destructive close                                                                                                                                                                            |
-| CLI                                    | Done — six subcommands, `wasit serve` among them, plus an interactive dashboard                                                                                                                              |
+| CLI                                    | Done — six subcommands in 0.7.0, `wasit serve` among them, and eight in 0.8.0-beta.1 (`wasit run`, `wasit ci-report`), plus an interactive dashboard                                                                                                                              |
 | Testnet wallet tooling                 | Done — `wasit wallet` create/fund/status on Stellar testnet, and for the x402 payer on Base Sepolia, Ethereum Sepolia and Solana devnet                                                                      |
 | MCP server                             | Done, three tools + one behind an opt-in                                                                                                                                                                     |
+| `wasit.config.json`, `wasit run`, `wasit ci-report` | In 0.8.0-beta.1 (npm tag `beta`): every endpoint of a service from one config, a read-only tier and a payment tier, and the pull request comment and job summary from the report |
+| GitHub Action (`action/`)              | In 0.8.0-beta.1: runs `wasit run` in a workflow; on a pull request it comments and, with `checks: write`, adds a check, "Wasit conformance"; it pays only on a push to the default branch, a schedule or a run started by hand, on test networks |
+| `X402-11`, rejected request not settled | In 0.8.0-beta.1: on Stellar, through `wasit run`, for an endpoint with a `reject` case |
 | Error taxonomy and exit codes          | Done                                                                                                                                                                                                         |
 | Wasit's own test suite                 | Done — offline (no keys, no target, no network); type-check and tests both run in CI                                                                                                                          |
 | Testing against third-party services   | Done — one third-party service, [defi-copilot](docs/evidence/2026-09-28-authorized-third-party-run.md), tested with its operator's written authorization as a local instance, plus Stellar's own reference implementations ([x402](docs/evidence/2026-09-06-reference-implementation-run.md), [MPP](docs/evidence/2026-09-24-official-sdk-reference-run.md)); reported in aggregate in [conformance-findings.md](docs/findings/conformance-findings.md) |
 | Upstream reports to SDK maintainers    | Filed — [stellar-mpp-sdk#66](https://github.com/stellar/stellar-mpp-sdk/issues/66), [#67](https://github.com/stellar/stellar-mpp-sdk/issues/67), [#70](https://github.com/stellar/stellar-mpp-sdk/issues/70) (closed; fix merged, unreleased), [#82](https://github.com/stellar/stellar-mpp-sdk/issues/82) (fixed in [#83](https://github.com/stellar/stellar-mpp-sdk/pull/83), verified), [#89](https://github.com/stellar/stellar-mpp-sdk/issues/89) |
-| Published to npm                       | Yes — `@wasit-dev/core`, `@wasit-dev/cli`, `@wasit-dev/server`                                                                                                                                               |
-| Mainnet                                | Out of scope — see [Design Notes](#design-notes)                                                                                                                                                             |
+| Published to npm                       | Yes — `@wasit-dev/core`, `@wasit-dev/cli`, `@wasit-dev/server`: 0.7.0 under `latest`, 0.8.0-beta.1 under `beta` |
+| Mainnet                                | Out of scope — see [Design Notes](#design-notes). In 0.8.0-beta.1 a payment on any network but the test networks is refused before a key is read |
 
-Sixteen checks are implemented and reachable from both front ends. Every one is
+Seventeen checks are implemented. Sixteen are reachable from both front ends; `X402-11`, new in 0.8.0-beta.1, runs through `wasit run`. Every one is
 traced to a written spec clause in [docs/CHECKS.md](docs/CHECKS.md); a check that
 cannot be traced is out of scope by construction.
 
@@ -212,6 +215,9 @@ npx @wasit-dev/cli test --target https://your-service.example/paid --read-only
 # or keep it around
 npm install -g @wasit-dev/cli
 wasit test --target https://your-service.example/paid --read-only
+
+# the pre-release, 0.8.0-beta.1: wasit run, wasit ci-report and X402-11
+npm install -g @wasit-dev/cli@beta
 ```
 
 That runs `X402-01` through `X402-05` against your own service. It costs

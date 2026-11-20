@@ -31,6 +31,17 @@ permissions:
   contents: read
   pull-requests: write
   actions: read
+  # Optional: lets Wasit add its own check, "Wasit conformance", with the result
+  # of each check. Without it the action works the same and skips that check.
+  checks: write
+
+# One Wasit run per pull request: a newer push cancels the older run, so two runs
+# never write the pull request's comment over each other. Any other run (a push to
+# main, a schedule, a run started by hand) has a group of its own: nothing waits
+# for it and nothing cancels it, since a run there may be paying.
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('wasit-pr-{0}', github.event.pull_request.number) || format('wasit-run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   wasit:
@@ -45,6 +56,22 @@ jobs:
         with:
           node-version: 22
 
+      # The payment tier (test networks only, at most $1.00 a payment and $5.00 a
+      # run) also runs X402-06 to X402-10. It pays on push to main, schedule and
+      # workflow_dispatch; on a pull request it runs the read-only checks. To use
+      # it, store a dedicated testnet payer as a repository secret and change this
+      # step to:
+      #   with:
+      #     config: wasit.config.json
+      #     tier: payment
+      #   env:
+      #     STELLAR_PRIVATE_KEY: ${{ github.event_name != 'pull_request' && secrets.WASIT_TESTNET_PAYER || '' }}
+      # Give the key on this step only, never in a job-level env: the earlier
+      # steps of this job (an npm ci with install scripts) would get it too. A key
+      # given to a pull request run is refused before your service starts. On a
+      # GitHub-hosted runner your service then runs as a separate user, so it
+      # cannot read the key from Wasit's process; code that ran earlier in the job
+      # as the runner's user is not kept from it.
       - uses: wasit-dev/wasit/action@<tag-or-commit-sha>
         with:
           config: wasit.config.json

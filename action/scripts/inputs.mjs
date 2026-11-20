@@ -21,16 +21,48 @@ export class InputError extends Error {
   }
 }
 
+/**
+ * The input asked for mainnet (spec B5). This version has no mainnet opt-in, so
+ * the input exists only to be refused, before Wasit is installed (spec B12). The
+ * step that checks the inputs writes this message to the job summary too.
+ */
+export class MainnetRefusedError extends InputError {
+  constructor(message) {
+    super(message);
+    this.name = "MainnetRefusedError";
+  }
+}
+
+/** An event name as GitHub writes them; anything else is never echoed. */
+const EVENT_NAME = /^[a-z_]{1,64}$/;
+
 function trimmed(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+/** Refuses `mainnet: true`, always; refuses a value that is not true or false. */
+function checkMainnet(env) {
+  const value = trimmed(env["INPUT_MAINNET"]).toLowerCase();
+  if (value === "" || value === "false") return;
+  if (value !== "true") throw new InputError("mainnet must be true or false.");
+  const event = typeof env["GITHUB_EVENT_NAME"] === "string" ? env["GITHUB_EVENT_NAME"] : "";
+  const eventRule =
+    event === "workflow_dispatch"
+      ? ""
+      : ` The input is also refused on every event but workflow_dispatch, and this run's event is ${EVENT_NAME.test(event) ? event : "another event"}.`;
+  throw new MainnetRefusedError(
+    "mainnet: true is refused: the mainnet opt-in is not part of this version. Wasit pays on test networks only." +
+      `${eventRule} Nothing was installed, started, sent or signed.`,
+  );
+}
+
 /**
  * Reads and checks the inputs from the step's environment (`INPUT_CONFIG`,
- * `INPUT_ENVIRONMENT`, `INPUT_TIER`, `INPUT_ENDPOINTS`, and the event name).
+ * `INPUT_ENVIRONMENT`, `INPUT_TIER`, `INPUT_ENDPOINTS`, `INPUT_MAINNET`, and the
+ * event name). `mainnet: true` is refused here, so it never reaches the CLI.
  *
  * @param {Record<string, string | undefined>} env
- * @returns {{ config: string, environment: string | undefined, tier: "read-only", endpoints: string[] }}
+ * @returns {{ config: string, environment: string | undefined, tier: "read-only" | "payment", endpoints: string[] }}
  */
 export function parseInputs(env) {
   // pull_request_target hands the base repository's token and secrets to a workflow that runs a pull request's code.
@@ -40,9 +72,13 @@ export function parseInputs(env) {
     );
   }
 
+  // B12: no mainnet opt-in in this version. Refused before anything else is read.
+  checkMainnet(env);
+
+  // Whether this event may pay is the CLI's to say (D-022a): on a pull request it runs the
+  // read-only checks and says so, and it refuses a payer key given to a run that may not pay.
   const tier = trimmed(env["INPUT_TIER"]) || "read-only";
-  if (tier === "payment") throw new InputError("tier: payment is not available in this version. Use tier: read-only.");
-  if (tier !== "read-only") throw new InputError("tier must be read-only.");
+  if (tier !== "read-only" && tier !== "payment") throw new InputError("tier must be read-only or payment.");
 
   const config = trimmed(env["INPUT_CONFIG"]) || DEFAULT_CONFIG;
   if (/[\u0000-\u001f\u007f]/.test(config) || config.length > MAX_CONFIG_PATH || config.startsWith("-")) {
@@ -67,12 +103,12 @@ export function parseInputs(env) {
     throw new InputError("each entry of endpoints must be a name: letters, digits, dot, underscore and hyphen, at most 64 characters; separate them with commas or line breaks.");
   }
 
-  return { config, environment: environment === "" ? undefined : environment, tier: "read-only", endpoints };
+  return { config, environment: environment === "" ? undefined : environment, tier, endpoints };
 }
 
 /**
- * The one call that runs Wasit: `wasit run --read-only --start-if-local --json --out`: the CLI starts service.start only when it is set and the environment is on this machine.
- * No flag that pays, signs or opts into mainnet is offered by this version.
+ * The one call that runs Wasit: `wasit run [--read-only] --start-if-local --json --out`: the CLI starts service.start only when it is set and the environment is on this machine.
+ * The payment tier is the same call without --read-only. No flag that opts into mainnet or carries a key is offered.
  *
  * @param {ReturnType<typeof parseInputs>} inputs
  * @param {{ cli: string, report: string, baseline?: string }} paths
@@ -82,7 +118,7 @@ export function buildRunArgs(inputs, paths) {
   return [
     paths.cli,
     "run",
-    "--read-only",
+    ...(inputs.tier === "payment" ? [] : ["--read-only"]),
     "--start-if-local",
     "--json",
     "--out",
@@ -98,7 +134,10 @@ export function buildRunArgs(inputs, paths) {
 /**
  * The call that turns the report into the comment, the summary and the next baseline.
  *
- * @param {{ cli: string, report: string, comment: string, baselineOut: string, baseline?: string }} paths
+ * The history file and the run id (D-022b) come after the baseline; each is left
+ * out when it is empty.
+ *
+ * @param {{ cli: string, report: string, comment: string, baselineOut: string, checkRun?: string, baseline?: string, history?: string, baselineRun?: string }} paths
  * @returns {string[]}
  */
 export function buildReportArgs(paths) {
@@ -111,7 +150,10 @@ export function buildReportArgs(paths) {
     paths.comment,
     "--baseline-out",
     paths.baselineOut,
+    ...(paths.checkRun === undefined || paths.checkRun === "" ? [] : ["--check-run", paths.checkRun]),
     ...(paths.baseline === undefined || paths.baseline === "" ? [] : ["--baseline", paths.baseline]),
+    ...(paths.history === undefined || paths.history === "" ? [] : ["--history", paths.history]),
+    ...(paths.baselineRun === undefined || paths.baselineRun === "" ? [] : ["--baseline-run", paths.baselineRun]),
   ];
 }
 

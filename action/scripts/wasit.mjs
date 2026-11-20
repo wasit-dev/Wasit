@@ -12,12 +12,12 @@
  */
 
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, statSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { InputError, buildReportArgs, buildRunArgs, parseInputs, scrubTokens } from "./inputs.mjs";
+import { InputError, MainnetRefusedError, buildReportArgs, buildRunArgs, parseInputs, scrubTokens } from "./inputs.mjs";
 
 const SIGNALS = ["SIGINT", "SIGTERM", "SIGHUP"];
 
@@ -35,9 +35,9 @@ function cliPath(env) {
   return path.resolve(actionPath, "..", "packages", "cli", "dist", "index.js");
 }
 
-/** The baseline file the earlier step downloaded, if it is a file inside the work directory. Anything else is ignored. */
-function baselineFile(env, work) {
-  const given = env["BASELINE_PATH"];
+/** A file the baseline step downloaded (`BASELINE_PATH`, `HISTORY_PATH`), if it is a file inside the work directory. Anything else is ignored. */
+function baselineFile(env, work, name = "BASELINE_PATH") {
+  const given = env[name];
   if (typeof given !== "string" || given === "") return undefined;
   const resolved = path.resolve(given);
   if (!resolved.startsWith(`${work}${path.sep}`)) return undefined;
@@ -45,6 +45,17 @@ function baselineFile(env, work) {
     return statSync(resolved).isFile() ? resolved : undefined;
   } catch {
     return undefined;
+  }
+}
+
+/** Appends `text` to the job summary, when the runner gives one. A summary that cannot be written is not an error. */
+function writeSummary(env, text) {
+  const file = env["GITHUB_STEP_SUMMARY"];
+  if (typeof file !== "string" || !path.isAbsolute(file)) return;
+  try {
+    appendFileSync(file, text);
+  } catch {
+    // The refusal is in the log already.
   }
 }
 
@@ -87,7 +98,11 @@ export async function main(command, env = process.env, io = {}) {
         report: path.join(work, "report.json"),
         comment: path.join(work, "comment.md"),
         baselineOut: path.join(work, "baseline-next.json"),
+        checkRun: path.join(work, "check-run.json"),
         baseline: baselineFile(env, work),
+        history: baselineFile(env, work, "HISTORY_PATH"),
+        // A run id is digits only; anything else is not passed on.
+        baselineRun: /^[1-9][0-9]{0,15}$/.test(env["BASELINE_RUN"] ?? "") ? env["BASELINE_RUN"] : undefined,
       };
       const args = command === "run" ? buildRunArgs(parseInputs(env), paths) : buildReportArgs(paths);
       return await runCli(args, env);
@@ -97,6 +112,8 @@ export async function main(command, env = process.env, io = {}) {
   } catch (error) {
     if (error instanceof InputError) {
       stderr(`Wasit: ${error.message}`);
+      // Spec B5: a run that asked for mainnet says in its summary that it was refused.
+      if (error instanceof MainnetRefusedError) writeSummary(env, `## Wasit: refused\n\n${error.message}\n`);
       return 2;
     }
     throw error;

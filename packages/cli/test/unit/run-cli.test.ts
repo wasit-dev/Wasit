@@ -76,10 +76,33 @@ describe("the wasit binary", () => {
   });
 
   describe("flags that are not offered", () => {
-    for (const flag of [["--dry-run"], ["--mainnet"], ["--payer-key", "x"], ["--commitment-key", "x"], ["--allow-destructive"]]) {
+    for (const flag of [["--payer-key", "x"], ["--commitment-key", "x"], ["--allow-destructive"]]) {
       it(`wasit run ${flag[0]} is an unknown option, exit 2`, async () => {
         const result = await wasit(["run", "--read-only", ...flag], cwd);
         assert.equal(result.code, 2, result.stderr);
+        assert.match(result.stderr, /unknown option/);
+      });
+    }
+
+    it("wasit run --mainnet is a switch that always refuses (B12): exit 2, the sentence, nothing read", async () => {
+      for (const args of [["run", "--mainnet"], ["run", "--read-only", "--mainnet"], ["run", "--dry-run", "--mainnet", "--config", "nope.json"]]) {
+        const result = await wasit(args, cwd);
+        assert.equal(result.code, 2, result.stderr);
+        assert.match(result.stderr, /^wasit run --mainnet is refused: the mainnet opt-in is not part of this version\./);
+        assert.doesNotMatch(result.stderr, /nope\.json|unknown option/);
+      }
+    });
+
+    it("wasit run --mainnet takes no value", async () => {
+      const result = await wasit(["run", "--mainnet=true"], cwd);
+      assert.equal(result.code, 2);
+    });
+
+    for (const command of [["test", "--target", "http://127.0.0.1:9/paid"], ["mpp-charge", "--target", "http://127.0.0.1:9/paid"]]) {
+      it(`wasit ${command[0]} --mainnet is an unknown option: the switch is on wasit run only`, async () => {
+        const result = await wasit([...command, "--mainnet"], cwd);
+        // These commands keep commander's own exit code for a usage error, as in 0.7.0.
+        assert.notEqual(result.code, 0, result.stderr);
         assert.match(result.stderr, /unknown option/);
       });
     }
@@ -88,24 +111,50 @@ describe("the wasit binary", () => {
       assert.equal((await wasit(["ci-report"], cwd)).code, 2);
     });
 
-    it("the payment tier is refused with a message, exit 2, nothing sent", async () => {
+    it("the payment tier with no payer key sends no payment and exits 2, with the variable to set", async () => {
       const paywall = await startPaywall();
       try {
         const config = await writeConfig(cwd, { baseUrl: paywall.base });
         const result = await wasit(["run", "--config", config], cwd);
         assert.equal(result.code, 2);
-        assert.match(result.stderr, /not available in this version/);
+        assert.match(result.stdout, /no payer key: set STELLAR_PRIVATE_KEY/);
+        for (const request of paywall.received) assert.equal(request.headers["payment-signature"], undefined);
+      } finally {
+        await paywall.close();
+      }
+    });
+
+    it("a pull request run with a payer key is refused before anything is sent, exit 2", async () => {
+      const paywall = await startPaywall();
+      try {
+        const config = await writeConfig(cwd, { baseUrl: paywall.base });
+        const result = await wasit(["run", "--config", config], cwd, {
+          GITHUB_ACTIONS: "true",
+          GITHUB_EVENT_NAME: "pull_request",
+          GITHUB_REF: "refs/pull/1/merge",
+          STELLAR_PRIVATE_KEY: "SNOTAKEY",
+        });
+        assert.equal(result.code, 2);
+        assert.match(result.stderr, /STELLAR_PRIVATE_KEY is set, and this run may not pay \(pull request\)/);
         assert.equal(paywall.received.length, 0);
       } finally {
         await paywall.close();
       }
     });
 
-    it("--help works and exits 0", async () => {
+    it("--help works and exits 0, offers --dry-run, shows --mainnet as refused in this version, and no key flag", async () => {
       const result = await wasit(["run", "--help"], cwd);
       assert.equal(result.code, 0);
       assert.match(result.stdout, /--start/);
-      assert.ok(!/--mainnet|--dry-run|--payer-key/.test(result.stdout));
+      assert.match(result.stdout, /--dry-run/);
+      assert.match(result.stdout, /--mainnet\s+Refused in this version/);
+      assert.ok(!/--payer-key/.test(result.stdout));
+    });
+
+    it("wasit run --dry-run with --read-only is refused, exit 2", async () => {
+      const result = await wasit(["run", "--read-only", "--dry-run"], cwd);
+      assert.equal(result.code, 2, result.stderr);
+      assert.match(result.stderr, /choose --dry-run or --read-only/);
     });
   });
 

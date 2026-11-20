@@ -46,13 +46,13 @@ describe("wasit ci-report without a usable report", () => {
     assert.equal(result.code, 0, result.stderr);
     const comment = await readFile(result.comment, "utf-8");
     assert.ok(comment.startsWith(`${MARKER}\n`), "the marker is the first line, so the comment replaces the earlier one");
-    assert.match(comment, /Wasit: no verdict\./);
+    assert.match(comment, /Wasit: ⚠️ no verdict\./);
     assert.match(comment, /nothing was graded/i);
     assert.match(comment, /job log/);
     assert.ok(!/conformant\./.test(comment.replace("non-conformant", "")), "it never says conformant");
     const summary = await readFile(result.summary, "utf-8");
     assert.ok(!summary.includes(MARKER), "the summary has no marker");
-    assert.match(summary, /Wasit: no verdict\./);
+    assert.match(summary, /Wasit: ⚠️ no verdict\./);
   });
 
   it("names the Wasit and SDK versions, as every result does", async () => {
@@ -81,7 +81,7 @@ describe("wasit ci-report without a usable report", () => {
     assert.equal(result.code, 2);
     const comment = await readFile(result.comment, "utf-8");
     assert.ok(comment.startsWith(`${MARKER}\n`));
-    assert.match(comment, /Wasit: no verdict\./);
+    assert.match(comment, /Wasit: ⚠️ no verdict\./);
     assert.ok(!comment.includes("canary-from-the-file"), "nothing from the file reaches the comment");
     assert.ok(!result.stderr.includes("canary-from-the-file"));
     assert.equal(existsSync(result.baselineOut), false);

@@ -185,6 +185,7 @@ describe("payment checks when no payment can be built", () => {
             ["X402-08", true],
             ["X402-09", true],
             ["X402-10", true],
+            ["X402-11", true],
           ],
         );
         for (const result of results) assert.match(result.detail, reason);

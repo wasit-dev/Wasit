@@ -28,9 +28,11 @@ import {
   MalformedResponseError,
   assertHttpUrl,
   fetchTarget,
+  fetchWithoutRedirects,
 } from "../errors.js";
 import { type MppNetwork, assertMppNetwork, isMppNetwork, resolveRpcUrl } from "./network.js";
 import { assertPaymentNetworkAllowed } from "../guard/networks.js";
+import { assertRpcServesNetwork } from "../guard/rpc-identity.js";
 import { verifySettlement } from "../settlement.js";
 
 const CHECK_ID = "MPP-01";
@@ -213,6 +215,9 @@ export async function payCharge(
     methods: [onNetwork(method, network)],
     polyfill: false,
     maxPaymentRetries: 1,
+    // Every request mppx makes here refuses a redirect (D-022c): it pays at the
+    // URL it read the challenge from, never at a URL the target sends it on to.
+    fetch: fetchWithoutRedirects,
   });
   return mppx.fetch(target);
 }
@@ -278,6 +283,10 @@ export async function runMppChargeChecks(
         `https RPC endpoint, and ${endpoint} is http. Nothing was sent.`,
     );
   }
+
+  // The payment is built and its settlement read through this endpoint: it
+  // must serve the run's network before the target is asked anything (D-023).
+  await assertRpcServesNetwork(runNetwork, endpoint);
 
   const advertised = await fetchChargeChallenge(target);
   assertRunNetwork(advertised.network, runNetwork);

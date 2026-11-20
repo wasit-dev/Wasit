@@ -4,9 +4,33 @@ import {
   ConfigurationError,
   MalformedResponseError,
   assertHttpUrl,
+  fetchPaymentChallenge,
   fetchTarget,
 } from "../errors.js";
+import {
+  PER_PAYMENT_CAP_USD,
+  PaymentGuardRefusedError,
+  RunBudget,
+  assertPinned,
+  sameAddress,
+  type PinTerms,
+} from "../guard/budget.js";
 import { assertPaymentNetworkAllowed } from "../guard/networks.js";
+import { assertRpcServesNetwork } from "../guard/rpc-identity.js";
+import type { EndpointPlan } from "./plan.js";
+import {
+  REJECTED_REQUEST_ID,
+  REJECTED_REQUEST_MAX_LIFETIME_SECONDS,
+  REJECTED_REQUEST_MIN_LIFETIME_SECONDS,
+  REJECTED_REQUEST_MIN_UNITS_LEFT,
+  REJECTED_REQUEST_NAME,
+  rejectRequestShape,
+  rejectedRequestHardStopMs,
+  rejectedRequestVerdict,
+  watchAuthorization,
+  type RejectCase,
+  type WatchOutcome,
+} from "./rejected-request.js";
 import { sanitizeText } from "../sanitize.js";
 import { checkNetworkIdentifier, checkRequiredFields } from "./requirements.js";
 
@@ -201,14 +225,16 @@ async function readText(response: Response): Promise<string> {
 
 /**
  * Why an x402 v1 challenge is not graded: the reason on X402-02..05 and on the
- * endpoint. Kept under 300 characters, the longest a value goes into a pull
- * request comment, so the way to get graded is not cut off.
+ * endpoint, on every chain (a v1 service on an EVM chain gets it too). Kept
+ * under 300 characters, the longest a value goes into a pull request comment,
+ * so the way to get graded is not cut off. It names no URL: the comment's
+ * sanitiser removes links from check text, so it points at docs/CHECKS.md,
+ * whose note on x402 v1 links the x402 specification.
  */
 const V1_UNSUPPORTED_REASON =
-  "the service sent an x402 v1 challenge in its response body. Wasit grades x402 v2, and the " +
-  "`exact` scheme on Stellar exists for v2 only, so this endpoint is unsupported, not failed. " +
-  "To have it graded, move to x402 v2: send the challenge base64-encoded in a PAYMENT-REQUIRED " +
-  "response header.";
+  "the service sent an x402 v1 challenge (x402Version 1, in the body). Wasit grades only x402 v2, on " +
+  "every chain: challenge in a PAYMENT-REQUIRED header, CAIP-2 networks, v2 `exact` scheme (Stellar is " +
+  "v2 only). Unsupported, not failed. Fix: move it to that header. Why: docs/CHECKS.md.";
 
 /** What a check found on a challenge Wasit does not grade, to be shown as a note. */
 function noteOf(result: CheckResult): string {
@@ -398,6 +424,23 @@ export interface X402PaymentCheckOptions extends RequestShape {
   readonly rpcUrl?: string;
   /** See {@link X402SimulatorOptions.onResult} — same contract. */
   readonly onResult?: (result: CheckResult) => void;
+  /**
+   * The run's budget, shared by every endpoint of one run. Without one, these
+   * checks get their own: $5, of which they sign at most 3.5 times a $1 price.
+   */
+  readonly budget?: RunBudget;
+  /** Every `exact` option on the run's network must pay this `payTo` in this asset. */
+  readonly pin?: PinTerms;
+  /** This endpoint's entry of the run's plan (L1): no signature beyond it. */
+  readonly plan?: EndpointPlan;
+  /** The request the service must refuse (`endpoints[].reject`), for X402-11. Absent: X402-11 is skipped. */
+  readonly reject?: RejectCase;
+  /**
+   * Called with one line when a check starts a long wait on the chain (X402-11
+   * waits up to six minutes), so a log does not look stuck. The line holds no
+   * text from the service.
+   */
+  readonly onProgress?: (line: string) => void;
 }
 
 /** One check has nothing to test against this target; it is skipped with the reason. */
@@ -453,16 +496,27 @@ async function buildX402Client(
   network: string,
   payerSecretKey: string,
   rpcUrl: string,
+  pin: PinTerms | undefined,
 ) {
   const client = new x402Client();
+  // L3 (spec B3): the SDK's own spend controls, set here rather than left to
+  // its default, as a second implementation of the $1 cap. An adapter that
+  // allows more assets replaces them and states the cap again (`evm.ts`).
+  client.setSpendControls({ maxAmountPerPayment: `$${PER_PAYMENT_CAP_USD}` });
   await chain.registerPayer(client, network, payerSecretKey, rpcUrl);
   client
     // A challenge may offer several networks, including both Stellar ones.
     // The client's default pick is the first it supports, which would sign
     // for one network with a signer built for another; pay only on the
-    // network this run was asked to use.
+    // network this run was asked to use. With a pin, L3 also keeps only the
+    // pinned payee and asset, whatever else picked the option.
     .registerPolicy((_version, requirements) =>
-      requirements.filter((requirement) => requirement.network === network),
+      requirements.filter(
+        (requirement) =>
+          requirement.network === network &&
+          (pin === undefined ||
+            (sameAddress(network, requirement.payTo, pin.payTo) && sameAddress(network, requirement.asset, pin.asset))),
+      ),
     );
   return { client, httpClient: new x402HTTPClient(client) };
 }
@@ -516,38 +570,27 @@ async function withinSpendControls<T>(
 }
 
 /**
- * Reads the challenge and produces a signed payment payload for it.
+ * What a payment check reads before it can pay: the challenge, the URL to pay
+ * at, and the one option it would pay. Shared by `preparePayment` and the plan
+ * (L1), so both judge the same option by the same rules.
  *
- * Shared by every payment check so each one starts from a challenge the
- * target issued just now, rather than reusing a stale one. With `altered`,
- * the payment is signed for those terms instead, and its `accepted` is set
- * back to what the target advertised. `beforeSigning` runs once the option
- * to pay is known and before the client builds anything: the Stellar client
- * simulates the transfer while building, so a check placed later would never
- * see an unfunded payer.
+ * Throws `PaymentNotAttemptedError` when there is nothing to pay: an
+ * unreadable or v1 challenge, no option on the run's network, or none in the
+ * `exact` scheme.
  */
-async function preparePayment(
-  options: X402PaymentCheckOptions,
-  alter?: (selected: PaymentRequirements) => AlteredSigning | Promise<AlteredSigning>,
-  beforeSigning?: (selected: PaymentRequirements) => Promise<void>,
-) {
-  // L0 again at the one function every x402 signature goes through, whoever
-  // reaches it: nothing is fetched or signed on a network that is not a test
-  // network.
-  assertPaymentNetworkAllowed("x402", options.network);
-  const chain = chainFor(options.network);
-  const { client, httpClient } = await buildX402Client(
-    chain,
-    options.network,
-    options.payerSecretKey,
-    chain.resolveRpcUrl(options.network, options.rpcUrl),
-  );
+export async function readPaymentChallenge(options: RequestShape & { readonly target: string; readonly network: string }) {
+  // The payment goes where this challenge came from, never through a redirect
+  // (D-022c): `payUrl` is the target, or the URL one same-origin redirect led to.
+  const { response: challenge, url: payUrl } = await fetchPaymentChallenge(options.target, buildInit(options));
+  return { ...(await paymentTerms(challenge, options.network)), payUrl };
+}
 
-  const challenge = await fetchTarget(options.target, buildInit(options));
-
+/** The terms of a challenge already fetched, by the rules of {@link readPaymentChallenge}. */
+async function paymentTerms(challenge: Response, network: string) {
+  const options = { network };
   let paymentRequired;
   try {
-    paymentRequired = httpClient.getPaymentRequiredResponse((name) =>
+    paymentRequired = new x402HTTPClient(new x402Client()).getPaymentRequiredResponse((name) =>
       challenge.headers.get(name),
     );
   } catch (error) {
@@ -567,6 +610,7 @@ async function preparePayment(
             `(see X402-02–04).`,
     );
   }
+  await challenge.body?.cancel().catch(() => undefined);
 
   // A target that offers no option Wasit can pay has not refused anything:
   // there is no payment to judge, so neither check gets a verdict. X402-05
@@ -593,24 +637,125 @@ async function preparePayment(
   // The payment-identifier extension lets a server answer a repeated payload
   // with its cached response (specs/extensions/payment_identifier.md).
   const idempotent = paymentRequired.extensions?.["payment-identifier"] !== undefined;
+  return { paymentRequired, selected, idempotent };
+}
+
+/** A stable text of a value, keys sorted, for a field-by-field comparison. */
+function canonical(value: unknown): string {
+  return JSON.stringify(value, (_key, item: unknown) =>
+    item !== null && typeof item === "object" && !Array.isArray(item)
+      ? Object.fromEntries(Object.entries(item as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+      : item,
+  );
+}
+
+/**
+ * L2 against the plan: the option a check is about to pay must be the one the
+ * plan read, and the amount at most what the plan allowed for that check.
+ * Returns that amount, or undefined when the run has no plan.
+ */
+function plannedAmount(plan: EndpointPlan | undefined, check: string, selected: PaymentRequirements): bigint | undefined {
+  if (plan === undefined) return undefined;
+  const option = plan.option;
+  if (plan.status !== "planned" || option === undefined) {
+    throw new PaymentGuardRefusedError(
+      "plan",
+      `The plan of this run did not plan a payment for ${plan.name} (${plan.status}), so ${check} does not pay it.` +
+        (plan.reason === undefined ? "" : ` The plan says: ${plan.reason}`),
+    );
+  }
+  for (const field of ["scheme", "network", "payTo", "asset"] as const) {
+    const same =
+      field === "payTo" || field === "asset"
+        ? sameAddress(option.network, String(selected[field]), option[field])
+        : selected[field] === option[field];
+    if (!same) {
+      throw new PaymentGuardRefusedError(
+        "plan",
+        `${check}: the service changed its ${field} after the plan (the plan read ${option[field]}), ` +
+          `so the payment the plan allowed is not the one it now asks for.`,
+      );
+    }
+  }
+  const entry = plan.signatures.find((signature) => signature.check === check);
+  if (entry === undefined) {
+    throw new PaymentGuardRefusedError("plan", `The plan of this run has no signature for ${check}.`);
+  }
+  return entry.amount;
+}
+
+/**
+ * Reads the challenge and produces a signed payment payload for it.
+ *
+ * Shared by every payment check so each one starts from a challenge the
+ * target issued just now, rather than reusing a stale one. With `altered`,
+ * the payment is signed for those terms instead, and its `accepted` is set
+ * back to what the target advertised. `beforeSigning` runs once the option
+ * to pay is known and before the client builds anything: the Stellar client
+ * simulates the transfer while building, so a check placed later would never
+ * see an unfunded payer.
+ *
+ * L2 (spec B3) is here, between the fresh challenge and the SDK: the pin over
+ * every `exact` option, the plan, the $1 cap and the run's cap, the run charged
+ * before the signature. The SDK is then handed exactly the one option checked,
+ * and a payload whose `accepted` is not that option is discarded unsent.
+ */
+async function preparePayment(
+  options: X402PaymentCheckOptions,
+  check: string,
+  alter?: (selected: PaymentRequirements) => AlteredSigning | Promise<AlteredSigning>,
+  beforeSigning?: (selected: PaymentRequirements) => Promise<void>,
+) {
+  // L0 again at the one function every x402 signature goes through, whoever
+  // reaches it: nothing is fetched or signed on a network that is not a test
+  // network.
+  assertPaymentNetworkAllowed("x402", options.network);
+  const chain = chainFor(options.network);
+  const budget = options.budget ?? new RunBudget();
+  const { client, httpClient } = await buildX402Client(
+    chain,
+    options.network,
+    options.payerSecretKey,
+    chain.resolveRpcUrl(options.network, options.rpcUrl),
+    options.pin,
+  );
+
+  const { paymentRequired, selected, idempotent, payUrl } = await readPaymentChallenge(options);
+
+  // L2, before anything is built: the service may change its challenge between
+  // requests, so the plan alone is not enough.
+  assertPinned(options.network, paymentRequired.accepts, options.pin);
+  const planned = plannedAmount(options.plan, check, selected);
+  const signing: PaymentRequirements = alter === undefined ? selected : { ...selected, ...(await alter(selected)) };
+  for (const field of ["scheme", "network", "payTo", "asset"] as const) {
+    if (signing[field] !== selected[field]) {
+      throw new PaymentGuardRefusedError("accepted", `${check} would sign different ${field} terms than the target's.`);
+    }
+  }
+  budget.charge({
+    check,
+    network: options.network,
+    asset: signing.asset,
+    amount: signing.amount,
+    ...(planned === undefined ? {} : { planned }),
+  });
 
   await beforeSigning?.(selected);
-  if (alter === undefined) {
-    const paymentPayload = await withinSpendControls(options.network, selected, () =>
-      client.createPaymentPayload(paymentRequired),
-    );
-    return { httpClient, paymentPayload, selected, idempotent };
-  }
-
-  const altered = await alter(selected);
   const signed = await withinSpendControls(options.network, selected, () =>
-    client.createPaymentPayload({
-      ...paymentRequired,
-      accepts: [{ ...selected, ...altered }],
-    }),
+    client.createPaymentPayload({ ...paymentRequired, accepts: [signing] }),
   );
-  const paymentPayload = { ...signed, accepted: selected };
-  return { httpClient, paymentPayload, selected, idempotent };
+  // What the SDK says it signed must be the option checked, field by field;
+  // otherwise the payload is discarded here, unsent. It stays charged.
+  if (canonical(signed.accepted) !== canonical(signing)) {
+    throw new PaymentGuardRefusedError(
+      "accepted",
+      `The payment the x402 client built for ${check} names other terms in its accepted field than the ` +
+        `option Wasit checked.`,
+      { signed: true },
+    );
+  }
+  const paymentPayload = alter === undefined ? signed : { ...signed, accepted: selected };
+  return { httpClient, paymentPayload, selected, idempotent, payUrl };
 }
 
 /**
@@ -679,8 +824,12 @@ interface HonestPayment {
   readonly accepted: boolean;
   /** The exact headers the honest payment was sent with. */
   readonly headers: Record<string, string>;
+  /** Where the honest payment was sent: the replay goes to the same URL. */
+  readonly url: string;
   /** True when the challenge advertised the payment-identifier extension. */
   readonly idempotent: boolean;
+  /** The honest payment's inner payload: X402-11 reads its authorization as the control. */
+  readonly payload: Record<string, unknown>;
 }
 
 /**
@@ -733,19 +882,18 @@ async function checkSignatureAccepted(options: X402PaymentCheckOptions): Promise
   const name = "Signature Resubmit Accepted";
   const fail = (detail: string, hint: string): CheckResult => ({ id, name, pass: false, detail, hint });
 
-  const { httpClient, paymentPayload, idempotent } = await preparePayment(options, undefined, (selected) =>
+  const { httpClient, paymentPayload, idempotent, payUrl } = await preparePayment(options, "X402-06", undefined, (selected) =>
     assertPayerCanPay(options, selected),
   );
   const paymentHeaders = httpClient.encodePaymentSignatureHeader(paymentPayload);
-  const paid = await fetchTarget(
-    options.target,
-    withPaymentHeaders(options, paymentHeaders),
-  );
+  const paid = await fetchTarget(payUrl, withPaymentHeaders(options, paymentHeaders));
   const honest = (result: CheckResult, accepted: boolean): HonestPayment => ({
     result,
     accepted,
     headers: paymentHeaders,
+    url: payUrl,
     idempotent,
+    payload: paymentPayload.payload,
   });
 
   if (paid.status < 200 || paid.status >= 300) {
@@ -808,6 +956,8 @@ async function checkSignatureAccepted(options: X402PaymentCheckOptions): Promise
           name,
           pass: true,
           detail: `Valid payment accepted (HTTP ${paid.status}) and ${verdict.detail}.`,
+          // Read back from the chain and found to be this payment: a report may link it.
+          reference,
         }
       : fail(
           verdict.detail,
@@ -835,7 +985,7 @@ async function checkSignatureAccepted(options: X402PaymentCheckOptions): Promise
 async function checkInvalidSignatureRejected(
   options: X402PaymentCheckOptions,
 ): Promise<CheckResult> {
-  const { httpClient, paymentPayload } = await preparePayment(options);
+  const { httpClient, paymentPayload, payUrl } = await preparePayment(options, "X402-07");
 
   const corrupted = {
     ...paymentPayload,
@@ -843,10 +993,7 @@ async function checkInvalidSignatureRejected(
   };
 
   const paymentHeaders = httpClient.encodePaymentSignatureHeader(corrupted);
-  const response = await fetchTarget(
-    options.target,
-    withPaymentHeaders(options, paymentHeaders),
-  );
+  const response = await fetchTarget(payUrl, withPaymentHeaders(options, paymentHeaders));
 
   return signatureRejectionVerdict(response.status, await refusalReason(response));
 }
@@ -949,7 +1096,7 @@ async function checkReplayRejected(
         "server may answer a repeated payment with its cached response.",
     );
   }
-  const response = await fetchTarget(options.target, withPaymentHeaders(options, honest.headers));
+  const response = await fetchTarget(honest.url, withPaymentHeaders(options, honest.headers));
   return replayVerdict(response.status, await refusalReason(response));
 }
 
@@ -986,11 +1133,28 @@ export function replayVerdict(status: number, reason?: string): CheckResult {
  * accepts, the lower amount may settle.
  */
 async function checkUnderpaymentRejected(options: X402PaymentCheckOptions): Promise<CheckResult> {
+  // The plan of `wasit run` leaves X402-09 out at a price below 2 base units;
+  // the check is then skipped as it is without a plan, and nothing is fetched.
+  const plan = options.plan;
+  if (
+    plan?.status === "planned" &&
+    plan.option !== undefined &&
+    plan.option.amount < 2n &&
+    !plan.signatures.some((signature) => signature.check === "X402-09")
+  ) {
+    const price = plan.option.amount;
+    return skipped(
+      "X402-09",
+      "Underpayment Rejected",
+      `the advertised price is ${price} base unit${price === 1n ? "" : "s"} (as the plan read it before the run), so ` +
+        `there is no smaller payment to offer.`,
+    );
+  }
   let advertised = 0n;
   let offered = 0n;
   let prepared;
   try {
-    prepared = await preparePayment(options, (selected) => {
+    prepared = await preparePayment(options, "X402-09", (selected) => {
       try {
         advertised = BigInt(selected.amount);
       } catch {
@@ -1013,9 +1177,9 @@ async function checkUnderpaymentRejected(options: X402PaymentCheckOptions): Prom
     }
     throw error;
   }
-  const { httpClient, paymentPayload } = prepared;
+  const { httpClient, paymentPayload, payUrl } = prepared;
   const response = await fetchTarget(
-    options.target,
+    payUrl,
     withPaymentHeaders(options, httpClient.encodePaymentSignatureHeader(paymentPayload)),
   );
   return underpaymentVerdict(response.status, offered, advertised, await refusalReason(response));
@@ -1065,14 +1229,14 @@ async function checkExpiredRejected(options: X402PaymentCheckOptions): Promise<C
   const chain = chainFor(options.network);
   const rpcUrl = chain.resolveRpcUrl(options.network, options.rpcUrl);
   let holdMs = 0;
-  const { httpClient, paymentPayload } = await preparePayment(options, async (selected) => {
+  const { httpClient, paymentPayload, payUrl } = await preparePayment(options, "X402-10", async (selected) => {
     const expired = await chain.expiredSigning(selected, rpcUrl);
     holdMs = expired.holdMs;
     return expired.terms;
   });
   await new Promise<void>((done) => setTimeout(done, holdMs));
   const response = await fetchTarget(
-    options.target,
+    payUrl,
     withPaymentHeaders(options, httpClient.encodePaymentSignatureHeader(paymentPayload)),
   );
   return expiredVerdict(response.status, await refusalReason(response));
@@ -1100,6 +1264,257 @@ export function expiredVerdict(status: number, reason?: string): CheckResult {
   };
 }
 
+/** A signed authorization, decoded and held to the run's payer; `what` names it in a message. */
+function authorizationOf(
+  chain: PaymentChain,
+  payload: Record<string, unknown>,
+  payer: string,
+  what: string,
+): ReturnType<NonNullable<PaymentChain["authorizations"]>["decode"]> {
+  const watch = chain.authorizations!;
+  let decoded;
+  try {
+    decoded = watch.decode(payload);
+  } catch (error) {
+    if (error instanceof CheckSetupError) throw error;
+    throw new CheckSetupError(`The authorization of ${what} could not be read from its payload (${(error as Error).message}).`);
+  }
+  if (decoded.payer !== payer) {
+    throw new CheckSetupError(`The authorization of ${what} is signed by another address than this run's payer.`);
+  }
+  return decoded;
+}
+
+/** A lifetime X402-11 signs for: at least 30 s, and at most the 300 s it waits out. */
+function withinRejectLifetime(value: unknown): boolean {
+  const lifetime = Number(value);
+  return lifetime >= REJECTED_REQUEST_MIN_LIFETIME_SECONDS && lifetime <= REJECTED_REQUEST_MAX_LIFETIME_SECONDS;
+}
+
+/** Thrown before signing when the challenge X402-11 is paid from advertises a lifetime it does not sign for. */
+class RejectLifetimeOutside extends Error {
+  public constructor(public readonly lifetime: unknown) {
+    super("the advertised lifetime is outside what X402-11 signs for");
+  }
+}
+
+/**
+ * X402-11 (negative, spec B7 as D-032 changed it): a valid payment sent with a
+ * request the service must refuse must not settle. See `rejected-request.ts`
+ * for the rules and the verdict.
+ *
+ * Nothing is signed when the check could not reach a verdict anyway: no
+ * reject case, X402-06 not shown settled (its nonce is the control), a chain
+ * whose authorizations Wasit cannot read, a service that refuses the request
+ * before asking for payment, an advertised lifetime above 300 s, or a control
+ * the chain does not return. The payment then goes through `preparePayment`
+ * like every other: the pin, the plan, the $1 and run caps, the advertised
+ * terms exactly.
+ */
+async function checkRejectedRequestNotSettled(
+  options: X402PaymentCheckOptions,
+  honest: HonestPayment,
+): Promise<CheckResult> {
+  const id = REJECTED_REQUEST_ID;
+  const name = REJECTED_REQUEST_NAME;
+  const reject = options.reject;
+  if (reject === undefined) {
+    return skipped(
+      id,
+      name,
+      "no request the service must refuse is configured (endpoints[].reject in wasit.config.json, read by " +
+        "wasit run), so there is nothing to send. Nothing was signed.",
+      "not-applicable",
+    );
+  }
+  const chain = chainFor(options.network);
+  const watch = chain.authorizations;
+  if (watch === undefined) {
+    return skipped(
+      id,
+      name,
+      `Wasit cannot read on ${chain.name} whether a payment's authorization was used, which this check needs, ` +
+        `so nothing was signed.`,
+      "not-applicable",
+    );
+  }
+  if (honest.result.pass !== true || honest.result.error !== undefined || honest.result.skipped === true) {
+    return skipped(
+      id,
+      name,
+      "X402-06's payment was not shown settled on chain, so its authorization cannot be the control that shows a " +
+        "chain read is complete. Nothing was signed.",
+      "dependency",
+    );
+  }
+
+  // The reject request is the endpoint's request with the reject case over it.
+  const { method: _method, headers: _headers, body: _body, ...rest } = options;
+  const shape = rejectRequestShape(options, reject);
+  const rejectOptions: X402PaymentCheckOptions = { ...rest, ...shape };
+
+  // Without payment first: a service that refuses it before asking for payment
+  // gives this check nothing to watch.
+  const { response: unpaid } = await fetchPaymentChallenge(options.target, buildInit(shape));
+  if (unpaid.status !== 402) {
+    await unpaid.body?.cancel().catch(() => undefined);
+    const status = unpaid.status;
+    return skipped(
+      id,
+      name,
+      status >= 400 && status < 500
+        ? `the service refuses this request before any payment is asked (HTTP ${status}), so there is no payment ` +
+            `to watch. Nothing was signed.`
+        : `the service answered this request with HTTP ${status} without asking for payment, so there is no ` +
+            `payment to watch. Nothing was signed.`,
+      "not-applicable",
+    );
+  }
+  const { selected: advertised } = await paymentTerms(unpaid, options.network);
+  const outside = (value: unknown, again: boolean): CheckResult =>
+    skipped(
+      id,
+      name,
+      `the service's payments stay valid for ${sanitizeText(String(value))} seconds (maxTimeoutSeconds)` +
+        (again ? ", as it said when asked for payment again" : "") +
+        (Number(value) > REJECTED_REQUEST_MAX_LIFETIME_SECONDS
+          ? `, longer than the ${REJECTED_REQUEST_MAX_LIFETIME_SECONDS} seconds Wasit waits for one to expire on a ` +
+            `test network, so this check could not show that the payment never settled.`
+          : `, shorter than the ${REJECTED_REQUEST_MIN_LIFETIME_SECONDS} seconds this check needs: such a payment can ` +
+            `expire before a service that settles it has it on chain, so its unused authorization would show nothing.`) +
+        ` Nothing was signed.`,
+    );
+  if (!withinRejectLifetime(advertised.maxTimeoutSeconds)) return outside(advertised.maxTimeoutSeconds, false);
+
+  const network = options.network;
+  const rpcUrl = chain.resolveRpcUrl(network, options.rpcUrl);
+  const payer = chain.payerAddress(options.payerSecretKey);
+  const control = authorizationOf(chain, honest.payload, payer, "X402-06's payment");
+
+  // Before signing: the chain must return X402-06's used authorization, and the
+  // payer's balance must be readable. Otherwise no verdict could be reached, and
+  // nothing is signed.
+  let balanceBefore = 0n;
+  let prepared;
+  try {
+    prepared = await preparePayment(rejectOptions, id, undefined, async (selected) => {
+      // The challenge is read again for the signature, and the service may
+      // answer it with another lifetime: the one signed is held to 300 s too.
+      if (!withinRejectLifetime(selected.maxTimeoutSeconds)) throw new RejectLifetimeOutside(selected.maxTimeoutSeconds);
+      let read;
+      try {
+        read = await watch.read(network, rpcUrl, [control]);
+      } catch (error) {
+        throw new CheckSetupError(`The chain could not be read before signing (${(error as Error).message}). Nothing was signed.`);
+      }
+      if (read.used[0] === undefined) {
+        throw new CheckSetupError(
+          "The chain's answer leaves out X402-06's authorization, which was used, so a later read could not show " +
+            "that this payment's was not. Nothing was signed.",
+        );
+      }
+      let balance: bigint | undefined;
+      try {
+        balance = await chain.payerBalance(network, rpcUrl, payer, advertised.asset);
+      } catch {
+        balance = undefined;
+      }
+      if (balance === undefined) {
+        throw new CheckSetupError(
+          "The payer's balance could not be read, and this check needs it as a second reading. Nothing was signed.",
+        );
+      }
+      balanceBefore = balance;
+    });
+  } catch (error) {
+    if (error instanceof RejectLifetimeOutside) return outside(error.lifetime, true);
+    throw error;
+  }
+  const { httpClient, paymentPayload, selected, payUrl } = prepared;
+  const amount = BigInt(selected.amount);
+  const ours = authorizationOf(chain, paymentPayload.payload, payer, "this payment");
+  if (ours.nonce === control.nonce) {
+    throw new CheckSetupError("This payment's authorization carries X402-06's nonce, so it could not be told apart. It was not sent.");
+  }
+
+  // Right before sending: ours unused, the control found. This read's ledger
+  // starts the range the transfers are read over.
+  const before = await watch.read(network, rpcUrl, [ours, control]);
+  if (before.used[1] === undefined) {
+    throw new CheckSetupError("The chain's answer leaves out X402-06's authorization, so this payment was not sent.");
+  }
+  if (before.used[0] !== undefined) {
+    throw new CheckSetupError("The chain records this payment's authorization as used before it was sent, so it was not sent.");
+  }
+  // What the client signed, not what it was asked: an authorization that stays
+  // valid longer than the 300 s this check waits is not sent (2 units of slack
+  // for the ledgers that close while it is built).
+  const longest = Math.ceil(REJECTED_REQUEST_MAX_LIFETIME_SECONDS / watch.unitSeconds) + 2;
+  if (ours.expiresAt - before.latest > longest) {
+    throw new CheckSetupError(
+      `This payment's authorization stays valid until ${watch.unit} ${ours.expiresAt}, ` +
+        `${ours.expiresAt - before.latest} ${watch.unit}s after the latest (${before.latest}), longer than the ` +
+        `${REJECTED_REQUEST_MAX_LIFETIME_SECONDS} seconds this check waits. It was signed and discarded; it was not sent.`,
+    );
+  }
+  // And long enough that a service which settles it could still get it on chain.
+  if (ours.expiresAt - before.latest < REJECTED_REQUEST_MIN_UNITS_LEFT) {
+    throw new CheckSetupError(
+      `This payment's authorization expires at ${watch.unit} ${ours.expiresAt}, ` +
+        `${ours.expiresAt - before.latest} ${watch.unit}s after the latest (${before.latest}): too soon for an unused ` +
+        `authorization to show anything. It was signed and discarded; it was not sent.`,
+    );
+  }
+
+  const sentAt = Date.now();
+  const response = await fetchTarget(payUrl, withPaymentHeaders(shape, httpClient.encodePaymentSignatureHeader(paymentPayload)));
+  const status = response.status;
+  const reason = await refusalReason(response);
+  options.onProgress?.(
+    `X402-11: the payment was sent with the request the service must refuse (HTTP ${status}); reading the chain ` +
+      `once a ${watch.unit} until its authorization expires at ${watch.unit} ${ours.expiresAt}, for at most ` +
+      `${Math.round(rejectedRequestHardStopMs() / 1000)} s.`,
+  );
+
+  let outcome: WatchOutcome = await watchAuthorization({ watch, network, rpcUrl, ours, control, sentAt });
+  let balance: { before: bigint; after: bigint } | undefined;
+  let transfers: { reference: string; ledger: number }[] | undefined;
+  if (outcome.kind === "used" || outcome.kind === "unused") {
+    try {
+      const after = await chain.payerBalance(network, rpcUrl, payer, selected.asset);
+      if (after === undefined) throw new Error("the payer's balance could not be read after the watch");
+      balance = { before: balanceBefore, after };
+      const recorded = await watch.transfers(network, rpcUrl, {
+        asset: selected.asset,
+        from: payer,
+        to: selected.payTo,
+        fromLedger: before.latest + 1,
+      });
+      // Only what the watch covered: from the ledger after the pre-send read to the last ledger
+      // it read. A later transfer of the same amount (another run with this payer) is not this one.
+      const lastRead = outcome.latest;
+      transfers = recorded.transfers
+        .filter((transfer) => transfer.amount === amount && transfer.ledger <= lastRead)
+        .map((transfer) => ({ reference: transfer.reference, ledger: transfer.ledger }));
+    } catch (error) {
+      outcome = { kind: "unread", why: `the second readings failed: ${sanitizeText((error as Error).message).slice(0, 200)}` };
+      balance = undefined;
+      transfers = undefined;
+    }
+  }
+
+  return rejectedRequestVerdict({
+    status,
+    ...(reason === undefined ? {} : { reason }),
+    amount,
+    expiresAt: ours.expiresAt,
+    unit: watch.unit,
+    watch: outcome,
+    ...(balance === undefined ? {} : { balance }),
+    ...(transfers === undefined ? {} : { transfers }),
+  });
+}
+
 /** The negative checks, in catalogue order, each with how it runs. */
 const NEGATIVE_CHECKS: ReadonlyArray<
   readonly [string, string, (options: X402PaymentCheckOptions, honest: HonestPayment) => Promise<CheckResult>]
@@ -1108,6 +1523,7 @@ const NEGATIVE_CHECKS: ReadonlyArray<
   ["X402-08", "Payment Replay Rejected", checkReplayRejected],
   ["X402-09", "Underpayment Rejected", (options) => checkUnderpaymentRejected(options)],
   ["X402-10", "Expired Authorization Rejected", (options) => checkExpiredRejected(options)],
+  [REJECTED_REQUEST_ID, REJECTED_REQUEST_NAME, checkRejectedRequestNotSettled],
 ];
 
 /**
@@ -1127,8 +1543,11 @@ export const X402_PAYMENT_CHECK_IDS: readonly string[] = [
  * See docs/CHECKS.md.
  */
 export async function runX402PaymentChecks(
-  options: X402PaymentCheckOptions,
+  input: X402PaymentCheckOptions,
 ): Promise<CheckResult[]> {
+  // One budget for every signature these checks make: the run's, when the
+  // caller shares one across endpoints, or this call's own $5.
+  const options: X402PaymentCheckOptions = { ...input, budget: input.budget ?? new RunBudget() };
   try {
     assertHttpUrl(options.target);
     buildInit(options);
@@ -1141,7 +1560,7 @@ export async function runX402PaymentChecks(
     // test network passes; stellar:pubnet waits for the mainnet opt-in, which
     // this version does not have.
     assertPaymentNetworkAllowed("x402", options.network);
-    chain.resolveRpcUrl(options.network, options.rpcUrl);
+    const rpcUrl = chain.resolveRpcUrl(options.network, options.rpcUrl);
     // A key for another chain, or a malformed one, would otherwise surface
     // mid-payment as a harness error. Checked here, it is what it is: the
     // run's configuration. The message never echoes the key.
@@ -1154,6 +1573,9 @@ export async function runX402PaymentChecks(
           `or --payer-key).`,
       );
     }
+    // The RPC signs and settles nothing itself, but the payment is built and
+    // its settlement read through it: it must serve the run's network (D-023).
+    await assertRpcServesNetwork(options.network, rpcUrl);
   } catch (error) {
     // A network no adapter pays on is not a failure of the run: Wasit does not
     // grade it (spec A3). Every payment check is skipped as unsupported, and

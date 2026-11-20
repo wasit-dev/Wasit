@@ -22,6 +22,7 @@ const read = (file) => readFileSync(path.join(ACTION_DIR, file), "utf-8");
 
 const action = parse(read("action.yml"));
 const steps = action.runs.steps;
+const KEY_NAMES = ["STELLAR_PRIVATE_KEY", "EVM_PRIVATE_KEY", "SVM_PRIVATE_KEY", "MPP_PAYER_SECRET", "COMMITMENT_SECRET_HEX", "WASIT_MAINNET_PAYER_SECRET"];
 const stepByName = (name) => {
   const step = steps.find((candidate) => candidate.name === name);
   assert.ok(step !== undefined, `a step named ${name}`);
@@ -30,19 +31,34 @@ const stepByName = (name) => {
 const index = (name) => steps.indexOf(stepByName(name));
 
 describe("action.yml", () => {
-  it("is a composite action with a name, a description and the four inputs", () => {
+  it("is a composite action with a name, a description and the five inputs", () => {
     assert.equal(action.runs.using, "composite");
     assert.ok(typeof action.name === "string" && action.name.length > 0);
     assert.ok(typeof action.description === "string" && action.description.length > 0);
-    assert.deepEqual(Object.keys(action.inputs).sort(), ["config", "endpoints", "environment", "tier"]);
+    assert.deepEqual(Object.keys(action.inputs).sort(), ["config", "endpoints", "environment", "mainnet", "tier"]);
     assert.equal(action.inputs.config.default, "wasit.config.json");
     assert.equal(action.inputs.tier.default, "read-only");
     for (const [name, input] of Object.entries(action.inputs)) assert.ok(typeof input.description === "string" && input.description.length > 0, name);
-    assert.match(action.inputs.tier.description, /payment.*not available in this version/i);
+    assert.match(action.inputs.tier.description, /payment/);
+    assert.match(action.inputs.tier.description, /pull request/);
+    assert.match(action.inputs.tier.description, /env: of this step/);
   });
 
-  it("offers no input that pays, signs or opts into mainnet", () => {
-    assert.ok(!Object.keys(action.inputs).some((name) => /key|secret|mainnet|dry|destructive|payer/i.test(name)));
+  it("offers no input that carries a key or enables a destructive check", () => {
+    assert.ok(!Object.keys(action.inputs).some((name) => /key|secret|dry|destructive|payer/i.test(name)));
+  });
+
+  it("has one input about mainnet, mainnet, off by default and refused in this version (B12)", () => {
+    assert.deepEqual(Object.keys(action.inputs).filter((name) => /mainnet|pubnet|optin/i.test(name)), ["mainnet"]);
+    assert.equal(action.inputs.mainnet.default, "false");
+    assert.match(action.inputs.mainnet.description, /^Refused in this version: the mainnet opt-in is not part of it\./);
+    assert.match(action.inputs.mainnet.description, /exit 2/);
+  });
+
+  it("hands the mainnet input to the step that checks the inputs and to the run step, and to no other", () => {
+    const withIt = steps.filter((step) => step.env?.INPUT_MAINNET !== undefined).map((step) => step.name);
+    assert.deepEqual(withIt, ["Check the inputs", "Run Wasit"]);
+    for (const name of withIt) assert.equal(stepByName(name).env.INPUT_MAINNET, "${{ inputs.mainnet }}");
   });
 
   it("gives every step a name, and a shell to every step that runs a command", () => {
@@ -94,7 +110,12 @@ describe("action.yml", () => {
 
     it("is passed as GH_TOKEN, as github.token, to the steps that call gh and to no other", () => {
       const withToken = steps.filter((step) => step.env !== undefined && Object.keys(step.env).some((key) => /token/i.test(key)));
-      assert.deepEqual(withToken.map((step) => step.name).sort(), ["Comment on the pull request", "Find the baseline"]);
+      assert.deepEqual(withToken.map((step) => step.name).sort(), [
+        "Announce the run",
+        "Comment on the pull request",
+        "Find the baseline",
+        "Finish the check run",
+      ]);
       for (const step of withToken) {
         assert.deepEqual(Object.keys(step.env).filter((key) => /token/i.test(key)), ["GH_TOKEN"], step.name);
         assert.equal(step.env.GH_TOKEN, "${{ github.token }}", step.name);
@@ -104,14 +125,54 @@ describe("action.yml", () => {
     it("never reaches the step that runs the service, nor the install, the report or the checks", () => {
       for (const name of ["Check the runner", "Check the inputs", "Install Wasit", "Run Wasit", "Write the report"]) {
         const step = stepByName(name);
-        assert.ok(!JSON.stringify(step).match(/token|secret|password/i), name);
+        // The payer key variables these steps blank (below) carry no value.
+        const env = Object.fromEntries(Object.entries(step.env ?? {}).filter(([key, value]) => !(KEY_NAMES.includes(key) && value === "")));
+        assert.ok(!JSON.stringify({ ...step, env }).match(/token|secret|password/i), name);
       }
     });
 
     it("refers to no secret and no token by any other name", () => {
       assert.ok(!/secrets\./i.test(text));
       assert.ok(!/GITHUB_TOKEN/.test(text));
-      assert.equal((text.match(/github\.token/g) ?? []).length, 2);
+      assert.equal((text.match(/github\.token/g) ?? []).length, 4);
+    });
+  });
+
+  describe("NODE_OPTIONS (2026-11-20 screening, class B-A10)", () => {
+    it("is set empty in every step, so a --require in the workflow's env does not run with the token or the key", () => {
+      for (const step of steps) assert.equal(step.env?.NODE_OPTIONS, "", step.name);
+    });
+  });
+
+  describe("the running comment is always replaced (2026-11-20 screening)", () => {
+    it("writes the report and the comment whenever the announcement ran, even if Run Wasit was skipped", () => {
+      for (const name of ["Write the report", "Comment on the pull request"]) {
+        const condition = stepByName(name).if ?? "";
+        assert.match(condition, /always\(\)/, name);
+        assert.match(condition, /steps\.announce\.outcome == 'success'/, `${name}: a skipped run would leave "Wasit is running" on the pull request`);
+      }
+    });
+  });
+
+  describe("the payer key (screening S-4)", () => {
+    it("is blanked in every step but the run step, the steps that use another action too (week 2 check F-1)", () => {
+      const others = steps.filter((step) => step.name !== "Run Wasit");
+      assert.equal(others.length, steps.length - 1, "the run step is missing");
+      assert.ok(others.some((step) => step.uses !== undefined), "no step that uses another action was checked");
+      for (const step of others) {
+        for (const name of KEY_NAMES) assert.equal(step.env?.[name], "", `${step.name}: ${name}`);
+      }
+    });
+
+    it("reaches the run step as the workflow gives it", () => {
+      const run = stepByName("Run Wasit");
+      for (const name of KEY_NAMES) assert.equal(run.env?.[name], undefined, name);
+    });
+
+    it("names exactly the key variables core keeps from the service", () => {
+      const source = readFileSync(path.join(ACTION_DIR, "..", "packages", "core", "src", "denied-env.ts"), "utf-8");
+      const list = source.slice(source.indexOf("DENIED_ENV_NAMES"), source.indexOf("];", source.indexOf("DENIED_ENV_NAMES")));
+      assert.deepEqual([...list.matchAll(/"([A-Z0-9_]+)"/g)].map((match) => match[1]), KEY_NAMES);
     });
   });
 
@@ -179,11 +240,20 @@ describe("action.yml", () => {
       assert.equal(stepByName("Write the report").env.BASELINE_PATH, "${{ steps.baseline.outputs.path }}");
     });
 
-    it("uploads the baseline only on a push to the default branch", () => {
+    it("uploads the baseline on a push or a dispatch on the default branch, and on a schedule, never on a pull request", () => {
       const upload = stepByName("Upload the baseline");
       assert.match(upload.if, /github\.event_name == 'push'/);
+      assert.match(upload.if, /github\.event_name == 'workflow_dispatch'/);
+      assert.match(upload.if, /github\.event_name == 'schedule'/);
       assert.match(upload.if, /github\.ref == format\('refs\/heads\/\{0\}', github\.event\.repository\.default_branch\)/);
+      assert.ok(!/pull_request/.test(upload.if));
       assert.equal(upload.with.name, "wasit-baseline");
+    });
+
+    it("hands the report step the history and the run it compares with (D-022b)", () => {
+      const report = stepByName("Write the report").env;
+      assert.equal(report.HISTORY_PATH, "${{ steps.baseline.outputs.history }}");
+      assert.equal(report.BASELINE_RUN, "${{ steps.baseline.outputs.run }}");
     });
 
     it("comments only on a pull request", () => {
@@ -214,8 +284,17 @@ describe("the template workflow for builders", () => {
   const text = read("examples/wasit.yml");
   const workflow = parse(text);
 
-  it("asks for contents: read, pull-requests: write and actions: read, and nothing else", () => {
-    assert.deepEqual(workflow.permissions, { contents: "read", "pull-requests": "write", actions: "read" });
+  it("asks for contents: read, pull-requests: write, actions: read and the optional checks: write, and nothing else", () => {
+    assert.deepEqual(workflow.permissions, { contents: "read", "pull-requests": "write", actions: "read", checks: "write" });
+  });
+
+  it("runs one Wasit job per pull request, a newer push cancelling the older run, and never queues or cancels a run on main (2026-11-20)", () => {
+    assert.equal(
+      workflow.concurrency?.group,
+      "${{ github.event_name == 'pull_request' && format('wasit-pr-{0}', github.event.pull_request.number) || format('wasit-run-{0}', github.run_id) }}",
+      "a run that is not on a pull request has a group of its own, so nothing waits for it and nothing cancels it",
+    );
+    assert.equal(workflow.concurrency?.["cancel-in-progress"], "${{ github.event_name == 'pull_request' }}");
   });
 
   it("never uses pull_request_target, not even in a comment that could be copied", () => {

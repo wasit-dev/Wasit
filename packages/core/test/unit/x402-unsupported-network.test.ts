@@ -18,7 +18,7 @@ import { checkStatus } from "../../src/check.js";
 import { ConfigurationError, classifyCheckError } from "../../src/errors.js";
 import { runX402PaymentChecks } from "../../src/x402/simulator.js";
 
-const PAYMENT_IDS = ["X402-06", "X402-07", "X402-08", "X402-09", "X402-10"];
+const PAYMENT_IDS = ["X402-06", "X402-07", "X402-08", "X402-09", "X402-10", "X402-11"];
 
 /** A target that counts every request it gets, and answers 402 with an empty challenge. */
 async function countingTarget(): Promise<{ url: string; requests: () => number; close: () => Promise<void> }> {

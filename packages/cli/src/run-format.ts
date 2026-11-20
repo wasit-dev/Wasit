@@ -33,7 +33,9 @@ function blocks(endpoint: EndpointReport): Array<{ ids: string[]; first: Endpoin
  * passes them through the sanitiser (they hold text a service sent).
  */
 export function formatRun(resolved: ResolvedRun, report: RunReport, verdict: RunVerdict): string[] {
-  const lines: string[] = [describeRun(resolved), "Tier: read-only. No payment is made and nothing is signed.", ""];
+  // The first note is the tier: what the run paid, or why it did not.
+  const tier = report.notes[0];
+  const lines: string[] = [describeRun(resolved), ...(tier === undefined ? [] : [tier]), ""];
 
   for (const endpoint of report.endpoints) {
     lines.push(`${endpoint.name}  ${endpoint.protocol}  ${endpoint.method} ${endpoint.path}: ${endpoint.outcome}`);
@@ -50,7 +52,7 @@ export function formatRun(resolved: ResolvedRun, report: RunReport, verdict: Run
   }
 
   lines.push(`Summary: ${describeTotals(report.totals)}.`);
-  for (const note of report.notes) lines.push(`Note: ${note}`);
+  for (const note of report.notes.slice(1)) lines.push(`Note: ${note}`);
   lines.push(`Result: ${verdict.reason} (exit ${verdict.code}).`);
   if (verdict.code === 2) {
     lines.push("No verdict is neither a pass nor a failure of the service: see the endpoints that were not graded.");

@@ -14,6 +14,9 @@ import {
   type ProtocolId,
 } from "@wasit-dev/core";
 
+import { countsLine, resultLines } from "./live.js";
+import { lineWidth, type Styler } from "./style.js";
+
 /**
  * Prints an advisory/status line meant for a human watching the terminal,
  * never part of the run's actual result. Routed to stderr when --json is
@@ -40,6 +43,41 @@ export interface ReportOptions {
   readonly emit?: (line: string) => void;
   /** Values no output may carry. Default: the keys and header values in the environment. */
   readonly secrets?: readonly string[];
+  /** Colours for a person at a terminal (`colorEnabled`). Absent or off: the plain text, unchanged. */
+  readonly style?: Styler;
+  /** The width coloured lines are laid out to. Default 80. */
+  readonly width?: number;
+}
+
+/** The exit code of a run, by the same rule `report` uses. */
+export function exitCodeFor(results: CheckResult[], protocol?: ProtocolId): number {
+  return protocol === undefined ? summarize(results).exitCode : exitCodeForEndpoint(results, protocol);
+}
+
+/** The notes that close a run's text output, when it has no verdict. */
+export function verdictNotes(results: CheckResult[], protocol?: ProtocolId): string[] {
+  const counts = summarize(results);
+  const exitCode = exitCodeFor(results, protocol);
+  if (counts.errored > 0 && counts.failed === 0) {
+    return [
+      "No verdict: some checks never reached the target or the run is " +
+        "misconfigured. This is not a statement about the target's conformance.",
+    ];
+  }
+  if (protocol !== undefined && exitCode === 2 && paymentGroupUnsupported(results, protocol)) {
+    return [
+      "No verdict: the payment checks were asked for and Wasit cannot pay on this network " +
+        "(unsupported; the skipped checks say why), so nothing was signed. This is not a failure " +
+        "of the service, and not a pass.",
+    ];
+  }
+  if (protocol !== undefined && exitCode === 2 && endpointOutcome(results, protocol) === "unsupported") {
+    return [
+      "No verdict: Wasit could not grade this service (unsupported; the skipped checks say why). " +
+        "This is not a failure of the service, and not a pass.",
+    ];
+  }
+  return [];
 }
 
 /**
@@ -62,11 +100,29 @@ export function report(results: CheckResult[], json: boolean, options: ReportOpt
   const secrets = options.secrets ?? deniedEnvValues(process.env);
   const clean = (text: string): string => sanitizeText(text, { redact: secrets });
   const counts = summarize(results);
-  const exitCode = options.protocol === undefined ? counts.exitCode : exitCodeForEndpoint(results, options.protocol);
+  const exitCode = exitCodeFor(results, options.protocol);
 
   if (json) {
     const run = options.protocol === undefined ? toStructuredRun(results) : toGradedRun(results, options.protocol);
     emit(JSON.stringify(redactValue(run, secrets), null, 2));
+    return exitCode;
+  }
+
+  // Coloured, for a person at a terminal: the same checks, details, fixes and
+  // notes, laid out like a test runner.
+  const style = options.style;
+  if (style !== undefined && style.enabled) {
+    const width = options.width ?? lineWidth({});
+    let lastSkip: string | undefined;
+    for (const result of results) {
+      const skip = checkStatus(result) === "SKIP";
+      const repeated = skip && lastSkip === result.detail;
+      lastSkip = skip ? result.detail : undefined;
+      for (const line of resultLines(result, style, width, clean, undefined, !repeated)) emit(line);
+    }
+    emit("");
+    emit(` ${countsLine(results, style)}`);
+    for (const message of verdictNotes(results, options.protocol)) emit(`\n   ${style.paint("note", "bold", "warning")}  ${clean(message)}`);
     return exitCode;
   }
 
@@ -88,27 +144,7 @@ export function report(results: CheckResult[], json: boolean, options: ReportOpt
   if (counts.skipped > 0) line.push(`${counts.skipped} skipped`);
   emit(`${line.join(", ")}.`);
 
-  if (counts.errored > 0 && counts.failed === 0) {
-    emit(
-      "\nNo verdict: some checks never reached the target or the run is " +
-        "misconfigured. This is not a statement about the target's conformance.",
-    );
-  } else if (options.protocol !== undefined && exitCode === 2 && paymentGroupUnsupported(results, options.protocol)) {
-    emit(
-      "\nNo verdict: the payment checks were asked for and Wasit cannot pay on this network " +
-        "(unsupported; the skipped checks say why), so nothing was signed. This is not a failure " +
-        "of the service, and not a pass.",
-    );
-  } else if (
-    options.protocol !== undefined &&
-    exitCode === 2 &&
-    endpointOutcome(results, options.protocol) === "unsupported"
-  ) {
-    emit(
-      "\nNo verdict: Wasit could not grade this service (unsupported; the skipped checks say why). " +
-        "This is not a failure of the service, and not a pass.",
-    );
-  }
+  for (const message of verdictNotes(results, options.protocol)) emit(`\n${message}`);
 
   return exitCode;
 }

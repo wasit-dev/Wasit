@@ -49,10 +49,9 @@ describe("wasit.mjs check", () => {
     assert.ok(existsSync(path.join(temp, "wasit")));
   });
 
-  it("refuses the payment tier with the sentence the guide will quote, exit 2", async () => {
+  it("accepts the payment tier: whether the event may pay is the CLI's to say", async () => {
     const result = await runMain("check", { ...env(), INPUT_TIER: "payment" });
-    assert.equal(result.code, 2);
-    assert.match(result.stderr, /tier: payment is not available in this version/);
+    assert.equal(result.code, 0, result.stderr);
   });
 
   it("refuses pull_request_target, exit 2", async () => {
@@ -173,11 +172,13 @@ if (process.env.FAKE_WAIT) {
     }
   });
 
-  it("run: refuses the payment tier itself, before it starts the CLI", async () => {
+  it("run: the payment tier calls the CLI without --read-only, and with no key flag", async () => {
     await clearRecord();
-    const result = await runMain("run", env({ INPUT_TIER: "payment" }));
-    assert.equal(result.code, 2);
-    assert.equal((await readFile(record, "utf-8")).trim(), "");
+    await runMain("run", env({ INPUT_TIER: "payment" }));
+    const argv = (await lastCall()).argv;
+    assert.equal(argv[0], "run");
+    assert.ok(!argv.includes("--read-only"));
+    assert.ok(!argv.some((arg) => /key|secret|mainnet/i.test(arg)), argv.join(" "));
   });
 
   it("run: exits 2 when the CLI is not where the action's checkout says (the install did not happen)", async () => {
@@ -190,7 +191,17 @@ if (process.env.FAKE_WAIT) {
     await clearRecord();
     await runMain("report", env());
     const w = (name) => path.join(temp, "wasit", name);
-    assert.deepEqual((await lastCall()).argv, ["ci-report", "--report", w("report.json"), "--comment", w("comment.md"), "--baseline-out", w("baseline-next.json")]);
+    assert.deepEqual((await lastCall()).argv, [
+      "ci-report",
+      "--report",
+      w("report.json"),
+      "--comment",
+      w("comment.md"),
+      "--baseline-out",
+      w("baseline-next.json"),
+      "--check-run",
+      w("check-run.json"),
+    ]);
   });
 
   it("report: adds the baseline when there is one, and gives the CLI no token", async () => {
@@ -201,6 +212,28 @@ if (process.env.FAKE_WAIT) {
     const call = await lastCall();
     assert.deepEqual(call.argv.slice(-2), ["--baseline", baseline]);
     assert.ok(!JSON.stringify(call.env).includes("canary"));
+  });
+
+  it("report: adds the history and the compared run when they are a file under the temp directory and a run id (D-022b)", async () => {
+    await clearRecord();
+    const baseline = path.join(temp, "wasit", "baseline", "baseline.json");
+    await writeFile(baseline, "{}");
+    await mkdir(path.join(temp, "wasit", "history"), { recursive: true });
+    const history = path.join(temp, "wasit", "history", "baseline.json");
+    await writeFile(history, "{}");
+    await runMain("report", env({ BASELINE_PATH: baseline, HISTORY_PATH: history, BASELINE_RUN: "43724229283" }));
+    const argv = (await lastCall()).argv;
+    assert.equal(argv[argv.indexOf("--history") + 1], history);
+    assert.equal(argv[argv.indexOf("--baseline-run") + 1], "43724229283");
+  });
+
+  it("report: leaves out a history outside the temp directory, and a run id that is not one", async () => {
+    for (const [HISTORY_PATH, BASELINE_RUN] of [["/etc/passwd", "12; rm"], [path.join(root, "outside.json"), "-1"], ["", ""]]) {
+      await clearRecord();
+      await runMain("report", env({ HISTORY_PATH, BASELINE_RUN }));
+      const argv = (await lastCall()).argv;
+      assert.ok(!argv.includes("--history") && !argv.includes("--baseline-run"), `${HISTORY_PATH} ${BASELINE_RUN}`);
+    }
   });
 
   it("report: returns the exit code of the CLI", async () => {
@@ -307,6 +340,13 @@ http.createServer((req, res) => {
     return { config: `${name}.config.json`, envFile };
   }
 
+  /** The event file of a push to main, as the runner writes it. */
+  async function pushEvent() {
+    const file = path.join(root, "push-event.json");
+    await writeFile(file, JSON.stringify({ ref: "refs/heads/main", repository: { default_branch: "main" } }));
+    return file;
+  }
+
   const stepEnv = (extra = {}) => ({
     PATH: process.env.PATH,
     HOME: root,
@@ -336,6 +376,9 @@ http.createServer((req, res) => {
     const env = stepEnv({
       INPUT_CONFIG: config,
       GITHUB_EVENT_NAME: "push",
+      // A push the payment gate reads as one to the default branch: a key on any other run is refused (D-022a).
+      GITHUB_REF: "refs/heads/main",
+      GITHUB_EVENT_PATH: await pushEvent(),
       GH_TOKEN: "canary-gh-token",
       GITHUB_TOKEN: "canary-github-token",
       WASIT_HEADER_X_API_KEY: "canary-header-value",
@@ -362,8 +405,8 @@ http.createServer((req, res) => {
     assert.equal(write.code, 0, write.stderr);
     const comment = await readFile(path.join(temp, "wasit", "comment.md"), "utf-8");
     assert.equal(comment.split("\n")[0], COMMENT_MARKER);
-    assert.match(comment, /Wasit: conformant/);
-    assert.match(await readFile(summary, "utf-8"), /Wasit: conformant/, "the job summary was written");
+    assert.match(comment, /Wasit: ✅ conformant/);
+    assert.match(await readFile(summary, "utf-8"), /Wasit: ✅ conformant/, "the job summary was written");
     const next = JSON.parse(await readFile(path.join(temp, "wasit", "baseline-next.json"), "utf-8"));
     assert.equal(next.history.weather["X402-01"], "P");
   });
@@ -384,7 +427,7 @@ http.createServer((req, res) => {
     const write = await runScript("report", env, workspace);
     assert.equal(write.code, 0, write.stderr);
     const comment = await readFile(path.join(temp, "wasit", "comment.md"), "utf-8");
-    assert.match(comment, /Wasit: regression/);
+    assert.match(comment, /Wasit: ❌ regression/);
     assert.match(comment, /Regression: weather was conformant on main and is now unsupported/);
   });
 
@@ -419,13 +462,33 @@ http.createServer((req, res) => {
     assert.equal(write.code, 0, write.stderr);
     const comment = await readFile(path.join(temp, "wasit", "comment.md"), "utf-8");
     assert.equal(comment.split("\n")[0], COMMENT_MARKER, "same marker, so the earlier comment is the one that is replaced");
-    assert.match(comment, /Wasit: no verdict\./);
-    assert.match(await readFile(summary, "utf-8"), /Wasit: no verdict\./, "the job summary says it too");
+    assert.match(comment, /Wasit: ⚠️ no verdict\./);
+    assert.match(await readFile(summary, "utf-8"), /Wasit: ⚠️ no verdict\./, "the job summary says it too");
     assert.equal(existsSync(path.join(temp, "wasit", "baseline-next.json")), false, "a run that graded nothing is never a baseline");
   });
 
-  it("refuses the payment tier and pull_request_target as a process, exit 2", async () => {
-    assert.equal((await runScript("check", stepEnv({ INPUT_CONFIG: "x.json", INPUT_TIER: "payment" }), workspace)).code, 2);
+  it("refuses mainnet: true in the check step, exit 2, and writes the refusal to the job summary (B5: the report says so)", async () => {
+    await writeFile(summary, "");
+    const check = await runScript("check", stepEnv({ INPUT_CONFIG: "x.json", INPUT_MAINNET: "true", GITHUB_EVENT_NAME: "push" }), workspace);
+    assert.equal(check.code, 2, check.stderr);
+    assert.match(check.stderr, /^Wasit: mainnet: true is refused: the mainnet opt-in is not part of this version\./);
+    assert.match(check.stderr, /this run's event is push\./);
+    const written = await readFile(summary, "utf-8");
+    assert.match(written, /^## Wasit: refused\n\nmainnet: true is refused: the mainnet opt-in is not part of this version\./);
+    assert.match(written, /Nothing was installed, started, sent or signed\./);
+  });
+
+  it("refuses mainnet: true in the run step as well, before the CLI runs: no report is written", async () => {
+    await rm(path.join(temp, "wasit", "report.json"), { force: true });
+    const run = await runScript("run", stepEnv({ INPUT_CONFIG: "x.json", INPUT_MAINNET: "true", GITHUB_EVENT_NAME: "workflow_dispatch" }), workspace);
+    assert.equal(run.code, 2, run.stderr);
+    assert.match(run.stderr, /mainnet: true is refused/);
+    assert.equal(existsSync(path.join(temp, "wasit", "report.json")), false, "the CLI ran");
+  });
+
+  it("accepts the payment tier and refuses pull_request_target as a process", async () => {
+    assert.equal((await runScript("check", stepEnv({ INPUT_CONFIG: "x.json", INPUT_TIER: "payment" }), workspace)).code, 0);
     assert.equal((await runScript("check", stepEnv({ INPUT_CONFIG: "x.json", GITHUB_EVENT_NAME: "pull_request_target" }), workspace)).code, 2);
+    assert.equal((await runScript("check", stepEnv({ INPUT_CONFIG: "x.json", INPUT_TIER: "mainnet" }), workspace)).code, 2);
   });
 });

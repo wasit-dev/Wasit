@@ -11,6 +11,14 @@
  * is only registered when a human starts this process with an explicit opt-in.
  * Without it the tool is absent from the tool list entirely — an agent cannot
  * call what it cannot see.
+ *
+ * Mainnet is never a tool argument (spec B5). The start-up settings a later
+ * version would read for its mainnet opt-in, `WASIT_MAINNET_OPT_IN`,
+ * `WASIT_MAINNET_CONFIG` and `--mainnet`, stop this server before it starts:
+ * this version has no opt-in (spec B12). `WASIT_RPC_URL`, read once at start-up,
+ * fixes the RPC of every tool call, and the `rpcUrl` argument is then refused,
+ * so an agent cannot point a run at another RPC (D-023c). A result that reads
+ * the chain names its RPC by origin, and flags one that is not the default.
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -21,11 +29,17 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { SERVER_VERSION } from "./version.js";
 import {
+  RPC_LOCK_VARIABLE,
   checkStatus,
   deniedEnvValues,
+  describeRpcInUse,
   fixFor,
+  mainnetStartupSwitches,
   paymentChainFor,
+  readRpcLock,
   redactValue,
+  refuseMainnetSwitch,
+  rpcInUse,
   runMppChannelSuite,
   runMppChargeSuite,
   runX402PaymentChecks,
@@ -34,14 +48,39 @@ import {
   summarize,
   toGradedRun,
   toStructuredRun,
+  urlOrigin,
   type CheckResult,
   type ProtocolId,
+  type RpcInUse,
 } from "@wasit-dev/core";
 import { z } from "zod";
 
 const DESTRUCTIVE_ENABLED =
   process.env.WASIT_ALLOW_DESTRUCTIVE === "1" ||
   process.argv.includes("--allow-destructive");
+
+/**
+ * Start-up, read once: a setting that asks for mainnet, or an RPC lock that is
+ * not an http(s) URL, stops the server before it registers a tool. Each reason
+ * goes to stderr (stdout is the protocol channel), and the exit code is 2.
+ */
+const startupRefusals: string[] = [];
+for (const name of mainnetStartupSwitches(process.env, process.argv.slice(2))) {
+  try {
+    refuseMainnetSwitch(name);
+  } catch (error) {
+    startupRefusals.push(error instanceof Error ? error.message : String(error));
+  }
+}
+const rpcLock = readRpcLock(process.env);
+if (rpcLock !== undefined && "problem" in rpcLock) startupRefusals.push(`${rpcLock.problem}, so this server does not start.`);
+if (startupRefusals.length > 0) {
+  for (const reason of startupRefusals) process.stderr.write(`wasit MCP server: ${reason}\n`);
+  process.exit(2);
+}
+
+/** The RPC every tool call uses when `WASIT_RPC_URL` was set at start-up; the `rpcUrl` argument is then refused. */
+const LOCKED_RPC: string | undefined = rpcLock !== undefined && "url" in rpcLock ? rpcLock.url : undefined;
 
 /** Locates docs/CHECKS.md by walking up from this file. */
 function locateChecksCatalogue(): string | undefined {
@@ -74,6 +113,8 @@ const resultShape = {
   /** Present only on a FAIL whose check recorded them: what it expected, and what the service sent. */
   expected: z.string().optional(),
   actual: z.string().optional(),
+  /** Present only on a PASS that read its settlement back from the chain (X402-06): the transaction. */
+  reference: z.string().optional(),
   /** Present only on FAIL: what to change. */
   fix: z.string().optional(),
   /** Present only on FAIL: the check's docs page. */
@@ -87,7 +128,65 @@ const runOutputShape = {
   errored: z.number(),
   skipped: z.number(),
   results: z.array(z.object(resultShape)),
+  /**
+   * Present only when the run read the chain: its RPC by origin, where it came
+   * from, and whether it is Wasit's default for the network (D-023c). The one
+   * field this server adds to the CLI's JSON shape.
+   */
+  rpc: z
+    .object({
+      origin: z.string(),
+      source: z.enum(["default", "argument", "start-up"]),
+      isDefault: z.boolean(),
+    })
+    .optional(),
 };
+
+/** What a run reads the chain through, for {@link present}. */
+interface RunRpc {
+  readonly network: string;
+  readonly rpc: RpcInUse;
+}
+
+/**
+ * The RPC a tool call reads through: the lock when the server has one, else the
+ * argument, else the network's default. Undefined when the run reads no chain.
+ */
+function rpcFor(protocol: "x402" | "mpp", network: string, argument: string | undefined): RunRpc | undefined {
+  const given =
+    LOCKED_RPC !== undefined
+      ? { url: LOCKED_RPC, source: "start-up" as const }
+      : argument !== undefined && argument !== ""
+        ? { url: argument, source: "argument" as const }
+        : undefined;
+  const rpc = rpcInUse(protocol, network, given);
+  return rpc === undefined ? undefined : { network, rpc };
+}
+
+/** The RPC the call passes on: the lock, else the argument. */
+function rpcOption(argument: string | undefined): { rpcUrl: string } | Record<string, never> {
+  const url = LOCKED_RPC ?? argument;
+  return url !== undefined && url !== "" ? { rpcUrl: url } : {};
+}
+
+/** With a lock, a call that names an RPC is refused before anything is sent (D-023c). */
+function rpcArgumentRefused(argument: string | undefined): {
+  content: Array<{ type: "text"; text: string }>;
+  isError: true;
+} | undefined {
+  if (LOCKED_RPC === undefined || argument === undefined) return undefined;
+  return {
+    content: [
+      {
+        type: "text",
+        text:
+          `rpcUrl is not taken by this server: its RPC was fixed when it started (${RPC_LOCK_VARIABLE}, ` +
+          `${urlOrigin(LOCKED_RPC)}). Call the tool without rpcUrl. Nothing was sent.`,
+      },
+    ],
+    isError: true,
+  };
+}
 
 /**
  * Renders a run for both the agent's prose channel and its structured channel.
@@ -95,7 +194,7 @@ const runOutputShape = {
  * `outcome` is deliberately named rather than numeric: an exit code means
  * nothing to an agent, and "no-verdict" must never be read as "compliant".
  */
-function present(results: CheckResult[], protocol?: ProtocolId): {
+function present(results: CheckResult[], protocol?: ProtocolId, read?: RunRpc): {
   content: Array<{ type: "text"; text: string }>;
   structuredContent: Record<string, unknown>;
 } {
@@ -137,13 +236,19 @@ function present(results: CheckResult[], protocol?: ProtocolId): {
   // structuredContent is `toStructuredRun()` verbatim — the same reshape
   // the CLI's `--json` output calls — so the two front ends can never
   // report the same run two different ways.
+  // D-023c: every chain read of the run is this RPC's word; it is named, by origin only.
+  const rpcLine = read === undefined ? "" : `\n${describeRpcInUse(read.network, read.rpc)}`;
+
   return {
-    content: [{ type: "text", text: `${lines.join("\n\n")}\n\n${summaryLine}${caveat}` }],
+    content: [{ type: "text", text: `${lines.join("\n\n")}\n\n${summaryLine}${rpcLine}${caveat}` }],
     // toStructuredRun() returns a precisely-typed StructuredRun, which has
     // no index signature and so is not directly assignable to the SDK's
     // looser Record<string, unknown>. It is still a plain JSON-serializable
     // object — this cast widens the type, it does not change the value.
-    structuredContent: redactValue(structured, secrets) as unknown as Record<string, unknown>,
+    structuredContent: redactValue(
+      read === undefined ? structured : { ...structured, rpc: { ...read.rpc } },
+      secrets,
+    ) as unknown as Record<string, unknown>,
   };
 }
 
@@ -193,7 +298,8 @@ server.registerTool(
   {
     title: "Test x402 compliance",
     description:
-      "Runs the x402 conformance checks (X402-01..10) against a running service. " +
+      "Runs the x402 conformance checks (X402-01..10) against a running service; " +
+      "X402-11 needs the reject case of a wasit.config.json endpoint and is skipped by this tool. " +
       "Payment checks are included only when the network's payer key is set in " +
       "this server's environment (STELLAR_PRIVATE_KEY on Stellar, EVM_PRIVATE_KEY " +
       "on Base and Ethereum Sepolia, SVM_PRIVATE_KEY on Solana devnet); otherwise they are " +
@@ -219,12 +325,13 @@ server.registerTool(
       readOnly: z
         .boolean()
         .optional()
-        .describe("Skip the payment checks (X402-06..10) even if a payer key is set"),
+        .describe("Skip the payment checks (X402-06..11) even if a payer key is set"),
       rpcUrl: z
         .string()
         .optional()
         .describe(
-          "Override the RPC endpoint used to verify X402-06's settlement (Soroban RPC on Stellar, JSON-RPC on EVM and Solana)",
+          "Override the RPC endpoint used to verify X402-06's settlement (Soroban RPC on Stellar, JSON-RPC on EVM and Solana). " +
+            "Refused when the server was started with WASIT_RPC_URL, which fixes the RPC of every call.",
         ),
       method: z
         .string()
@@ -258,6 +365,8 @@ server.registerTool(
     },
   },
   async ({ target, network, readOnly, rpcUrl, method, body, headers }) => {
+    const refused = rpcArgumentRefused(rpcUrl);
+    if (refused !== undefined) return refused;
     // Same request shape for every probe, exactly as the CLI's --method,
     // --body and --header build it, so a POST endpoint is tested as a POST.
     const shape = {
@@ -269,19 +378,21 @@ server.registerTool(
     const payNetwork = network ?? "stellar:testnet";
     const payerKey = process.env[paymentChainFor(payNetwork)?.payerKeyEnv ?? "STELLAR_PRIVATE_KEY"];
 
+    let read: RunRpc | undefined;
     if (readOnly !== true && payerKey) {
+      read = rpcFor("x402", payNetwork, rpcUrl);
       results.push(
         ...(await runX402PaymentChecks({
           target,
           network: payNetwork,
           payerSecretKey: payerKey,
-          ...(rpcUrl !== undefined ? { rpcUrl } : {}),
+          ...rpcOption(rpcUrl),
           ...shape,
         })),
       );
     }
 
-    return present(results, "x402");
+    return present(results, "x402", read);
   },
 );
 
@@ -310,7 +421,10 @@ server.registerTool(
       rpcUrl: z
         .string()
         .optional()
-        .describe("Override the Soroban RPC endpoint (https), used for the payment and the settlement read"),
+        .describe(
+          "Override the Soroban RPC endpoint (https), used for the payment and the settlement read. " +
+            "Refused when the server was started with WASIT_RPC_URL, which fixes the RPC of every call.",
+        ),
     },
     outputSchema: runOutputShape,
     annotations: {
@@ -323,16 +437,21 @@ server.registerTool(
     },
   },
   async ({ target, network, rpcUrl }) => {
+    const refused = rpcArgumentRefused(rpcUrl);
+    if (refused !== undefined) return refused;
     const payerSecretKey = process.env.MPP_PAYER_SECRET;
     if (!payerSecretKey) return missingKey("MPP_PAYER_SECRET");
 
+    const runNetwork = network ?? process.env.MPP_STELLAR_NETWORK ?? "stellar:testnet";
     return present(
       await runMppChargeSuite({
         target,
-        network: network ?? process.env.MPP_STELLAR_NETWORK ?? "stellar:testnet",
+        network: runNetwork,
         payerSecretKey,
-        ...(rpcUrl ? { rpcUrl } : {}),
+        ...rpcOption(rpcUrl),
       }),
+      undefined,
+      rpcFor("mpp", runNetwork, rpcUrl),
     );
   },
 );
@@ -346,7 +465,10 @@ const channelInputShape = {
       'CAIP-2 network id, default "stellar:testnet". "stellar:testnet" only: ' +
         "any other network is refused before anything is sent.",
     ),
-  rpcUrl: z.string().optional().describe("Override the Soroban RPC endpoint"),
+  rpcUrl: z
+    .string()
+    .optional()
+    .describe("Override the Soroban RPC endpoint. Refused when the server was started with WASIT_RPC_URL, which fixes the RPC of every call."),
   channel: z
     .string()
     .optional()
@@ -381,12 +503,13 @@ async function runChannel(
   allowDestructive: boolean,
   destructiveChannel?: string,
 ): Promise<ReturnType<typeof present>> {
+  const network = input.network ?? process.env.MPP_STELLAR_NETWORK ?? "stellar:testnet";
   const results = await runMppChannelSuite({
     target: input.target,
     commitmentSecretHex: process.env.COMMITMENT_SECRET_HEX ?? "",
-    network: input.network ?? process.env.MPP_STELLAR_NETWORK ?? "stellar:testnet",
+    network,
     allowDestructive,
-    ...(input.rpcUrl ? { rpcUrl: input.rpcUrl } : {}),
+    ...rpcOption(input.rpcUrl),
     ...(input.channel ? { channelOverride: input.channel } : {}),
     ...(destructiveChannel ? { destructiveChannel } : {}),
     expected: {
@@ -399,7 +522,7 @@ async function runChannel(
     },
   });
 
-  return present(results);
+  return present(results, undefined, rpcFor("mpp", network, input.rpcUrl));
 }
 
 server.registerTool(
@@ -420,6 +543,8 @@ server.registerTool(
     },
   },
   async (input) => {
+    const refused = rpcArgumentRefused(input.rpcUrl);
+    if (refused !== undefined) return refused;
     if (!process.env.COMMITMENT_SECRET_HEX) return missingKey("COMMITMENT_SECRET_HEX");
     return runChannel(input, false);
   },
@@ -452,6 +577,8 @@ if (DESTRUCTIVE_ENABLED) {
       },
     },
     async ({ destructiveChannel, ...input }) => {
+      const refused = rpcArgumentRefused(input.rpcUrl);
+      if (refused !== undefined) return refused;
       if (!process.env.COMMITMENT_SECRET_HEX) return missingKey("COMMITMENT_SECRET_HEX");
       return runChannel(input, true, destructiveChannel);
     },

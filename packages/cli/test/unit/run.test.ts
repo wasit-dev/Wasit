@@ -72,15 +72,14 @@ describe("wasit run", () => {
     paywall = undefined;
   });
 
-  it("refuses the payment tier before it reads a config or sends anything", async () => {
+  it("runs the payment tier without --read-only; with no payer key it signs nothing and exits 2", async () => {
     paywall = await startPaywall();
     const config = await writeConfig(dir, { baseUrl: paywall.base });
     const result = await run({ config, readOnly: false });
     assert.equal(result.code, 2);
-    assert.match(result.stderr, /not available in this version/);
-    assert.match(result.stderr, /--read-only/);
-    assert.equal(paywall.received.length, 0);
-    assert.equal((await run({ config: path.join(dir, "missing.json"), readOnly: false })).code, 2, "even for a missing config");
+    assert.match(result.stdout, /no payer key: set STELLAR_PRIVATE_KEY/);
+    for (const request of paywall.received) assert.equal(request.headers["payment-signature"], undefined, "a payment was sent");
+    assert.equal((await run({ config: path.join(dir, "missing.json"), readOnly: false })).code, 2, "a missing config");
   });
 
   describe("a conformant paywall", () => {
@@ -98,9 +97,9 @@ describe("wasit run", () => {
       const [weather] = report.endpoints;
       assert.equal(weather?.outcome, "conformant");
       assert.equal(weather?.groups.challenge?.passed, 5);
-      assert.equal(weather?.groups.payment?.skipped, 5);
+      assert.equal(weather?.groups.payment?.skipped, 6);
       const payment = weather?.results.filter((check) => check.status === "SKIP") ?? [];
-      assert.deepEqual(payment.map((check) => check.id), ["X402-06", "X402-07", "X402-08", "X402-09", "X402-10"]);
+      assert.deepEqual(payment.map((check) => check.id), ["X402-06", "X402-07", "X402-08", "X402-09", "X402-10", "X402-11"]);
       for (const check of payment) assert.equal(check.skipKind, "read-only", check.id);
       assert.equal(report.totals.graded, 1);
       assert.ok(report.notes.some((note) => /read-only/.test(note)));

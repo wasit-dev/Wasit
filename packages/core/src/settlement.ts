@@ -55,7 +55,7 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
  * form would drop every payment to a muxed address, and report a settlement
  * that happened as one that did not.
  */
-function readTransferData(
+export function readTransferData(
   data: xdr.ScVal,
 ): { amount: bigint; toMuxedId?: string } | undefined {
   const native: unknown = scValToNative(data);

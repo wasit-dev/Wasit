@@ -16,8 +16,16 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, it } from "node:test";
 
-import { type Baseline, updateHistory } from "../../src/baseline.js";
-import { COMMENT_MARKER, renderComment, renderNoReportComment, renderSummary } from "../../src/ci-report.js";
+import { type Baseline, parseRunReport, updateHistory } from "../../src/baseline.js";
+import {
+  COMMENT_MARKER,
+  renderCheckRun,
+  renderComment,
+  renderNoReportCheckRun,
+  renderNoReportComment,
+  renderRunningComment,
+  renderSummary,
+} from "../../src/ci-report.js";
 import { catalogueEntry } from "../../src/catalogue.js";
 import { type CheckResult, errored, skipped } from "../../src/check.js";
 import { ConfigurationError } from "../../src/errors.js";
@@ -122,7 +130,7 @@ describe("the shape of a comment", () => {
     const [first, second] = lines(comment);
     assert.equal(COMMENT_MARKER, "<!-- wasit-report -->");
     assert.equal(first, COMMENT_MARKER);
-    assert.match(second ?? "", /Wasit: conformant/);
+    assert.match(second ?? "", /Wasit: ✅ conformant/);
     assert.match(second ?? "", /Wasit 0\.7\.0/);
     assert.match(second ?? "", /x402 v2/);
     assert.match(second ?? "", /@x402\/core 2\.28\.0/);
@@ -140,10 +148,10 @@ describe("the shape of a comment", () => {
     const comment = renderComment({
       report: report([endpoint("old", v1())], { notes: ["Tier: read-only. Payment checks were not run."] }),
     });
-    assert.match(comment, /Wasit: nothing graded/);
+    assert.match(comment, /Wasit: ⚪ nothing graded/);
     assert.match(comment, /0 graded, 1 unsupported/);
     assert.match(comment, /unsupported/);
-    assert.ok(!/Wasit: conformant/.test(comment));
+    assert.ok(!/Wasit: ✅ conformant/.test(comment));
     assert.match(comment, /PAYMENT-REQUIRED response header/, "the way to get graded is not cut off");
     assert.match(comment, /Tier: read-only/);
     expectSnapshot("v1-only-no-baseline.md", comment);
@@ -154,7 +162,7 @@ describe("the shape of a comment", () => {
       endpoint("weather", [pass("X402-01"), pass("X402-02"), pass("X402-03"), fail("X402-04", "Option 0 is missing payTo, asset.", undefined, { expected: "payTo, asset present", actual: "payTo, asset missing" }), pass("X402-05")]),
     ]);
     const comment = renderComment({ report: now });
-    assert.match(comment, /Wasit: non-conformant/);
+    assert.match(comment, /Wasit: ❌ non-conformant/);
     assert.match(comment, /Option 0 is missing payTo, asset\./);
     assert.match(comment, /Send the challenge in the PAYMENT-REQUIRED header\./);
     assert.match(comment, /https:\/\/usewasit\.dev\/docs\/checks\/x402/);
@@ -231,7 +239,7 @@ describe("the shape of a comment", () => {
     const main = report([endpoint("weather", conformant()), endpoint("summarize", conformant())]);
     const now = report([endpoint("weather", conformant()), endpoint("summarize", v1())]);
     const comment = renderComment({ report: now, baseline: baselineOf([main]) });
-    assert.match(comment, /Wasit: regression/);
+    assert.match(comment, /Wasit: ❌ regression/);
     assert.match(comment, /Regression: summarize was conformant on main and is now unsupported/);
     expectSnapshot("regression-vs-baseline.md", comment);
   });
@@ -261,7 +269,7 @@ describe("the shape of a comment", () => {
     const comment = renderComment({
       report: report([endpoint("weather", [pass("X402-01"), errored("X402-02", "x", new ConfigurationError("could not connect"))])]),
     });
-    assert.match(comment, /Wasit: no verdict/);
+    assert.match(comment, /Wasit: ⚠️ no verdict/);
     assert.match(comment, /1 could not run/);
   });
 
@@ -385,6 +393,15 @@ describe("a hostile service", () => {
     assert.ok(!comment.includes("onerror=alert(1)>"));
   });
 
+  it("holds no HTML tag but its own: the marker, one details block and its summary (2026-11-20)", () => {
+    const tags = comment.match(/<[^>]*>/g) ?? [];
+    assert.deepEqual([...new Set(tags)].sort(), ["<!-- wasit-report -->", "</details>", "</summary>", "<details>", "<summary>"]);
+    assert.equal(tags.filter((tag) => tag === "<details>").length, 1);
+    assert.equal(tags.filter((tag) => tag === "</details>").length, 1);
+    const summary = renderCheckRun({ report: hostileReport(), secrets: [CANARY] }).summary;
+    assert.deepEqual([...new Set(summary.match(/<[^>]*>/g) ?? [])].sort(), ["</details>", "</summary>", "<details>", "<summary>"]);
+  });
+
   it("lets no link, mention, issue reference or mailto of the service stand", () => {
     assert.ok(!comment.includes("evil.example"));
     assert.ok(!/@octocat|@github/.test(comment));
@@ -447,5 +464,172 @@ describe("a hostile service", () => {
     const big = renderComment({ report: report(many) });
     assert.ok(big.length <= 60_000, `comment of ${big.length} characters`);
     assert.match(big, /more failures? not shown/);
+  });
+});
+
+// D-022b option 2 (Najmi, 2026-11-16): "Changed since main" compares with the last
+// green run on main, the history comes from every completed run on main, and the
+// comment names the run it compares with, so a red main does not read as the
+// pull request's fault. Written before the code.
+describe("the run compared with, and the history of every run (D-022b)", () => {
+  const green = report([endpoint("weather", conformant())]);
+  const failing = report([endpoint("weather", [...CHALLENGE.slice(0, 3).map((id) => pass(id)), fail("X402-04", "missing field"), pass("X402-05")])]);
+
+  it("names the green run of main it compares with, by run id and its start time", () => {
+    const comment = renderComment({ report: green, baseline: baselineOf([green]), baselineRun: 43724229283 });
+    assert.match(
+      comment,
+      /Compared with the last green run on main: run 43724229283, started 2026-11-15 10:00 UTC\. Runs on main that failed after it are counted under Recent failures on main, not here\./,
+    );
+  });
+
+  it("names the start time alone when the run id is not known, and nothing when there is no baseline", () => {
+    assert.match(renderComment({ report: green, baseline: baselineOf([green]) }), /Compared with the last green run on main, started 2026-11-15 10:00 UTC\./);
+    assert.doesNotMatch(renderComment({ report: green }), /Compared with the last green run/);
+  });
+
+  it("counts recent failures from the history of every run when one is given, not only the green ones", () => {
+    const everyRun = baselineOf([green, failing, failing]).history;
+    const comment = renderComment({ report: green, baseline: baselineOf([green]), history: everyRun });
+    assert.match(comment, /weather X402-04: failed in 2 of the last 3 runs on main/);
+  });
+
+  it("keeps the baseline's own history when no other is given", () => {
+    const comment = renderComment({ report: green, baseline: baselineOf([failing, green]) });
+    assert.match(comment, /weather X402-04: failed in 1 of the last 2 runs on main/);
+  });
+});
+
+// The detailed comment, the running comment and the check run (Najmi, 2026-11-20).
+// Written before the code. What they add is laid out from the same sanitised
+// report; links are built only from parts Wasit checked.
+describe("the detailed comment", () => {
+  // An obviously made-up hash: no real transaction, nothing a secret scanner should flag.
+  const HASH = "0123456789abcdef".repeat(4);
+  const settled = (reference: string, pass = true): CheckResult => ({
+    id: "X402-06",
+    name: "Signature Resubmit Accepted",
+    pass,
+    detail: pass ? "settled on chain" : "no settlement",
+    ...(pass ? { reference } : {}),
+  });
+  const onNetwork = (network: string, endpoints: ReturnType<typeof endpoint>[]): RunReport =>
+    buildRunReport({ environment: "local", network, startedAt: "2026-11-15T10:00:00.000Z", versions: VERSIONS, endpoints, notes: [] });
+
+  it("shows each endpoint's checks in a table, each with its mark and its status", () => {
+    const comment = renderComment({
+      report: report([endpoint("weather", [pass("X402-01"), fail("X402-02", "no header"), errored("X402-03", "Header Payload Decodable", new ConfigurationError("down"))])]),
+    });
+    assert.match(comment, /^### ❌ weather · x402 · non-conformant$/m);
+    assert.match(comment, /^\| ✅ \| X402-01 402 Response Status \| PASS \|$/m);
+    assert.match(comment, /^\| ❌ \| X402-02 Payment Header Present \| FAIL \|$/m);
+    assert.match(comment, /^\| ⚠️ \| X402-03 Header Payload Decodable \| ERROR \|$/m);
+    assert.match(comment, /\| weather \| x402 \| ❌ non-conformant \|/);
+  });
+
+  it("folds every check's detail away at the end, and gives a skip's repeated reason once", () => {
+    const comment = renderComment({ report: report([endpoint("weather", conformant())]) });
+    const at = comment.indexOf("<details><summary>Details of each check</summary>");
+    assert.ok(at > comment.indexOf("### Changed since main"), "the details come after the report's sections");
+    assert.ok(comment.trimEnd().endsWith("</details>"));
+    assert.match(comment, /- ⚪ X402-07 Invalid Signature Rejected: the same reason as above\./);
+    assert.equal(comment.split("the read-only tier makes no payment").length - 1, 1, "the skip reason is given once");
+  });
+
+  it("links the payment proof only for X402-06 passed on stellar:testnet with a 64-character hex reference", () => {
+    const proof = renderComment({ report: report([endpoint("weather", [pass("X402-01"), settled(HASH)])]) });
+    assert.ok(proof.includes(`[tx 0123…cdef on Stellar Expert](https://stellar.expert/explorer/testnet/tx/${HASH})`));
+    for (const [label, text] of [
+      ["upper-case hash", renderComment({ report: report([endpoint("w", [settled(HASH.toUpperCase())])]) })],
+      ["not hex", renderComment({ report: report([endpoint("w", [settled("z".repeat(64))])]) })],
+      ["a link in the reference", renderComment({ report: report([endpoint("w", [settled(`${HASH.slice(0, 40)}](https://evil.example)`)])]) })],
+      ["a failed X402-06", renderComment({ report: report([endpoint("w", [settled(HASH, false)])]) })],
+      ["another network", renderComment({ report: onNetwork("eip155:84532", [endpoint("w", [settled(HASH)])]) })],
+    ] as const) {
+      assert.ok(!text.includes("Payment proof"), label);
+      assert.ok(!text.includes("stellar.expert"), label);
+      assert.ok(!text.includes("evil.example"), label);
+    }
+  });
+
+  it("keeps a reference in the report only for a PASS, and reads it back from a report file, cut short", () => {
+    const failedWithReference: CheckResult = { ...fail("X402-07", "accepted"), reference: HASH };
+    const built = report([endpoint("weather", [settled(HASH), failedWithReference])]);
+    const results = built.endpoints[0]!.results;
+    assert.equal(results.find((result) => result.id === "X402-06")?.reference, HASH);
+    assert.equal(results.find((result) => result.id === "X402-07")?.reference, undefined, "a FAIL carries no reference");
+    assert.equal(parseRunReport(JSON.parse(JSON.stringify(built))).endpoints[0]!.results[0]!.reference, HASH);
+    const forged = JSON.parse(JSON.stringify(built));
+    forged.endpoints[0].results[0].reference = "a".repeat(500);
+    const read = parseRunReport(forged);
+    assert.equal(read.endpoints[0]!.results[0]!.reference?.length, 120, "a long reference is cut, as every text of a report file");
+    assert.ok(!renderComment({ report: read }).includes("Payment proof"), "and a cut reference is not a hash, so it is never linked");
+  });
+
+  it("shows at most 10 endpoints check by check, and says where the rest are", () => {
+    const many = Array.from({ length: 12 }, (_, index) => endpoint(`endpoint-${index}`, conformant()));
+    const comment = renderComment({ report: report(many) });
+    assert.equal((comment.match(/^### ✅ endpoint-\d+ · x402 · conformant$/gm) ?? []).length, 10);
+    assert.match(comment, /2 more endpoints are not shown check by check here/);
+    assert.match(comment, /the log of the step Run Wasit/, "the pointer names a place a pull request run has");
+    assert.ok(!comment.includes("wasit-report.json"));
+  });
+});
+
+describe("the running comment", () => {
+  const RUN = "https://github.com/acme/shop/actions/runs/123456789";
+
+  it("starts with the marker, says Wasit is running, when it started, and links the run", () => {
+    const body = renderRunningComment({ startedAt: "2026-11-20T08:54:10.000Z", runUrl: RUN, environment: "staging" });
+    const [first, second] = lines(body);
+    assert.equal(first, COMMENT_MARKER);
+    assert.equal(second, `⏳ **Wasit is running** on staging · started 2026-11-20 08:54 UTC · [follow the run](${RUN})`);
+    assert.match(body, /The result replaces this comment when the run ends\./);
+  });
+
+  it("links the run only when the URL has the shape of a GitHub run page", () => {
+    for (const runUrl of [
+      "javascript:alert(1)",
+      "http://github.com/acme/shop/actions/runs/1",
+      "https://github.com/acme/shop/actions/runs/1?x=1",
+      "https://github.com/acme/shop/pull/1",
+      "https://evil.example/acme/shop/actions/runs/1](https://evil.example)",
+      "",
+    ]) {
+      const body = renderRunningComment({ startedAt: "2026-11-20T08:54:10.000Z", runUrl });
+      assert.ok(!body.includes("follow the run"), runUrl);
+    }
+  });
+
+  it("passes the environment's name through the sanitiser, and leaves out a time that is not one", () => {
+    const body = renderRunningComment({
+      startedAt: "not a time",
+      environment: "@octocat [x](https://evil.example) <img src=x> canary-secret",
+      secrets: ["canary-secret"],
+    });
+    assert.ok(!/@octocat/.test(body));
+    assert.ok(!body.includes("evil.example"));
+    assert.ok(!/<img/.test(body));
+    assert.ok(!body.includes("canary-secret"));
+    assert.ok(!body.includes("started"));
+  });
+});
+
+describe("the check run", () => {
+  it("ends as success for a conformant run, failure for a failing one, neutral for no verdict", () => {
+    assert.equal(renderCheckRun({ report: report([endpoint("weather", conformant())]) }).conclusion, "success");
+    assert.equal(renderCheckRun({ report: report([endpoint("weather", [pass("X402-01"), fail("X402-02", "no header")])]) }).conclusion, "failure");
+    const noVerdict = report([endpoint("weather", [pass("X402-01"), errored("X402-02", "x", new ConfigurationError("down"))])]);
+    assert.equal(renderCheckRun({ report: noVerdict }).conclusion, "neutral");
+    assert.equal(renderNoReportCheckRun(VERSIONS).conclusion, "neutral");
+  });
+
+  it("has a title of the verdict and the counts only, within GitHub's 255 characters, and the job summary as its summary", () => {
+    const hostile = report([endpoint("@octocat <img src=x> https://evil.example", [pass("X402-01"), fail("X402-02", "x".repeat(4000))])]);
+    const output = renderCheckRun({ report: hostile, secrets: ["canary"] });
+    assert.equal(output.title, "❌ non-conformant · 1 passed, 1 failed");
+    assert.ok(output.title.length <= 255);
+    assert.equal(output.summary, renderSummary({ report: hostile, secrets: ["canary"] }));
+    assert.ok(!output.summary.includes("evil.example") && !/@octocat|<img/.test(output.summary));
   });
 });

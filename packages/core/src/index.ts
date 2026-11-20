@@ -68,6 +68,7 @@ export {
   redactReport,
   redactValue,
   reportTotals,
+  paymentChecksSkipped,
   skippedPaymentChecks,
   toGradedRun,
 } from "./report.js";
@@ -112,7 +113,17 @@ export { runExitCode } from "./verdict.js";
 export type { RunVerdict } from "./verdict.js";
 
 // The pull request comment and the job summary.
-export { COMMENT_MARKER, renderComment, renderNoReportComment, renderNoReportSummary, renderSummary } from "./ci-report.js";
+export {
+  COMMENT_MARKER,
+  renderCheckRun,
+  renderComment,
+  renderNoReportCheckRun,
+  renderNoReportComment,
+  renderNoReportSummary,
+  renderRunningComment,
+  renderSummary,
+} from "./ci-report.js";
+export type { CheckRunOutput, RunningCommentInput } from "./ci-report.js";
 export type { CiReportInput } from "./ci-report.js";
 
 // Variables kept away from a service Wasit starts, and values kept out of output.
@@ -131,6 +142,36 @@ export {
   networkClass,
 } from "./guard/networks.js";
 export type { NetworkClass, PaymentProtocol } from "./guard/networks.js";
+
+// The mainnet opt-in switches of this version: each one refuses (spec B12).
+export {
+  MAINNET_OPT_IN_ABSENT,
+  MainnetOptInRefusedError,
+  mainnetStartupSwitches,
+  refuseMainnetSwitch,
+} from "./guard/mainnet-optin.js";
+export type { MainnetSwitch } from "./guard/mainnet-optin.js";
+
+// Which RPC a result read the chain through, and the MCP server's start-up RPC lock (D-023c).
+export { RPC_LOCK_VARIABLE, describeRpcInUse, readRpcLock, rpcInUse } from "./guard/rpc-in-use.js";
+export { RpcIdentityError, assertRpcServesNetwork } from "./guard/rpc-identity.js";
+export type { RpcInUse, RpcSource } from "./guard/rpc-in-use.js";
+
+// Which GitHub events may run the payment tier (D-022a), and which key variables are set.
+export { inGithubActions, payerKeyVariables, paymentEventGate, readGithubEvent } from "./guard/ci-event.js";
+export type { PaymentEventGate } from "./guard/ci-event.js";
+
+// L1 and L2: the plan, and the caps every signature is charged against.
+export {
+  PER_PAYMENT_CAP_USD,
+  PER_RUN_CAP_USD,
+  PaymentGuardRefusedError,
+  RunBudget,
+  formatUsd,
+} from "./guard/budget.js";
+export type { GuardRefusal, PinTerms, PlannedSignature } from "./guard/budget.js";
+export { describePlan, planX402Run } from "./x402/plan.js";
+export type { EndpointPlan, EndpointPlanStatus, PlannedOption, RunPlan, X402PlanOptions } from "./x402/plan.js";
 
 export * from "./x402/simulator.js";
 export * from "./mpp/channel.js";

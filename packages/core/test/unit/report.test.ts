@@ -30,14 +30,14 @@ function fail(id: string): CheckResult {
   return { id, name: id, pass: false, detail: "wrong", hint: "fix it" };
 }
 const CHALLENGE = ["X402-01", "X402-02", "X402-03", "X402-04", "X402-05"];
-const PAYMENT = ["X402-06", "X402-07", "X402-08", "X402-09", "X402-10"];
+const PAYMENT = ["X402-06", "X402-07", "X402-08", "X402-09", "X402-10", "X402-11"];
 
 function v1Results(): CheckResult[] {
   return [pass("X402-01"), ...CHALLENGE.slice(1).map((id) => skipped(id, id, "x402 v1", "unsupported"))];
 }
 
 describe("checkGroup", () => {
-  it("puts X402-01..05 in challenge and X402-06..10 in payment", () => {
+  it("puts X402-01..05 in challenge and X402-06..11 in payment", () => {
     for (const id of CHALLENGE) assert.equal(checkGroup(id, "x402"), "challenge", id);
     for (const id of PAYMENT) assert.equal(checkGroup(id, "x402"), "payment", id);
   });
@@ -114,9 +114,9 @@ describe("buildEndpointReport", () => {
     });
     assert.equal(report.outcome, "conformant");
     assert.deepEqual(report.groups["challenge"], { passed: 5, failed: 0, errored: 0, skipped: 0 });
-    assert.deepEqual(report.groups["payment"], { passed: 0, failed: 0, errored: 0, skipped: 5 });
+    assert.deepEqual(report.groups["payment"], { passed: 0, failed: 0, errored: 0, skipped: 6 });
     assert.equal(report.groups["mppCharge"], undefined);
-    assert.equal(report.results.length, 10);
+    assert.equal(report.results.length, 11);
     assert.equal(report.results[5]?.skipKind, "read-only");
   });
 

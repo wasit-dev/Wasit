@@ -45,6 +45,13 @@ describe("selectBaselineRun", () => {
     assert.equal(chosen?.id, 3);
   });
 
+  it("takes a schedule or a workflow_dispatch run on the default branch as well: the payment tier runs there (D-022a)", () => {
+    for (const event of ["schedule", "workflow_dispatch"]) {
+      const chosen = selectBaselineRun([run({ id: 1, created_at: "2026-11-01T00:00:00Z" }), run({ id: 2, event, created_at: "2026-11-12T00:00:00Z" })], CONTEXT);
+      assert.equal(chosen?.id, 2, event);
+    }
+  });
+
   it("breaks a tie in time by the higher run id", () => {
     assert.equal(selectBaselineRun([run({ id: 5 }), run({ id: 6 })], CONTEXT)?.id, 6);
   });
@@ -62,14 +69,14 @@ describe("selectBaselineRun", () => {
       "a pull request run whose head repository is a fork": run({ ...newer, id: 3, event: "pull_request", head_repository: { full_name: "mallory/paywall" } }),
       "a push run whose head repository is another one": run({ ...newer, id: 4, head_repository: { full_name: "mallory/paywall" } }),
       "a run of another repository": run({ ...newer, id: 5, repository: { full_name: "mallory/paywall" } }),
-      "a workflow_dispatch run": run({ ...newer, id: 6, event: "workflow_dispatch" }),
-      "a schedule run": run({ ...newer, id: 7, event: "schedule" }),
       "a run on another branch": run({ ...newer, id: 8, head_branch: "feature" }),
       "a run on a branch whose name only starts with main": run({ ...newer, id: 9, head_branch: "main-evil" }),
       "a failed run": run({ ...newer, id: 10, conclusion: "failure" }),
       "a cancelled run": run({ ...newer, id: 11, conclusion: "cancelled" }),
       "a run that is not finished": run({ ...newer, id: 12, status: "in_progress", conclusion: null }),
       "a run of another workflow": run({ ...newer, id: 13, workflow_id: 7 }),
+      "a merge_group run": run({ ...newer, id: 16, event: "merge_group" }),
+      "a workflow_run run": run({ ...newer, id: 17, event: "workflow_run" }),
       "the run that is running now": run({ ...newer, id: 900 }),
       "a run with no head repository": run({ ...newer, id: 14, head_repository: null }),
       "a run whose id is not a whole number": run({ ...newer, id: "15; rm -rf /" }),
@@ -145,12 +152,12 @@ describe("findBaseline", () => {
     assert.equal(download[download.indexOf("--name") + 1], BASELINE_ARTIFACT);
   });
 
-  it("asks the API for push runs of this workflow on the default branch, that succeeded", async () => {
+  it("asks the API for runs of this workflow on the default branch that succeeded, of any event (it filters the events itself)", async () => {
     const { gh, calls } = fakeGh({ runs: [] });
     await findBaseline({ ...base(), gh, log: () => {} });
     const listing = calls.map((args) => args[1]).find((route) => route?.includes("/workflows/"));
     assert.match(listing, /\/workflows\/4242\/runs\?/);
-    assert.match(listing, /event=push/);
+    assert.doesNotMatch(listing, /event=/);
     assert.match(listing, /branch=main/);
     assert.match(listing, /status=success/);
   });
@@ -289,5 +296,92 @@ describe("main, the step as the workflow runs it", () => {
 
   it("exits 0 even when its own environment is wrong", async () => {
     assert.equal(await main({}, { gh: async () => ({ code: 1, stdout: "", stderr: "" }), log: () => {} }), 0);
+  });
+});
+
+// D-022b option 2 (Najmi, 2026-11-16): the comparison comes from the last green
+// run on main, the history from the newest completed run on main, failed or not.
+// Written before the code.
+describe("two lookups: the green run to compare with, the newest finished run for the history", () => {
+  let dir;
+  before(async () => {
+    dir = await mkdtemp(path.join(tmpdir(), "wasit-history-"));
+  });
+  after(async () => {
+    await rm(dir, { recursive: true, force: true });
+  });
+  const input = () => {
+    const directory = path.join(dir, `d-${Math.random().toString(16).slice(2)}`);
+    return { repository: REPOSITORY, defaultBranch: "main", runId: 900, directory, historyDirectory: `${directory}-history` };
+  };
+
+  it("takes the history from a newer failed run, and the comparison from the older green one, each by run id", async () => {
+    const green = run({ id: 200, created_at: "2026-11-10T10:00:00Z" });
+    const red = run({ id: 300, conclusion: "failure", created_at: "2026-11-12T10:00:00Z" });
+    const { gh, calls } = fakeGh({ runs: [red, green], artifacts: { 200: [artifact(200)], 300: [artifact(300)] } });
+    const result = await findBaseline({ ...input(), gh, log: () => {} });
+    assert.equal(result.run, 200);
+    assert.ok(result.path?.endsWith("baseline.json"));
+    assert.ok(result.history?.endsWith("baseline.json"));
+    assert.notEqual(path.dirname(result.history), path.dirname(result.path));
+    const downloads = calls.filter((args) => args[0] === "run").map((args) => args[2]);
+    assert.deepEqual(downloads.sort(), ["200", "300"]);
+  });
+
+  it("downloads once when the newest finished run is the green one", async () => {
+    const { gh, calls } = fakeGh({ runs: [run({ id: 200 })], artifacts: { 200: [artifact(200)] } });
+    const result = await findBaseline({ ...input(), gh, log: () => {} });
+    assert.equal(result.history, result.path);
+    assert.equal(calls.filter((args) => args[0] === "run").length, 1);
+  });
+
+  it("never takes the history from a cancelled run, a pull request run or a run of a fork", async () => {
+    const green = run({ id: 200, created_at: "2026-11-10T10:00:00Z" });
+    const newer = { created_at: "2026-11-14T10:00:00Z" };
+    for (const forged of [
+      run({ ...newer, id: 301, conclusion: "cancelled" }),
+      run({ ...newer, id: 302, conclusion: "timed_out" }),
+      run({ ...newer, id: 303, event: "pull_request", conclusion: "failure" }),
+      run({ ...newer, id: 304, conclusion: "failure", head_repository: { full_name: "mallory/paywall" } }),
+    ]) {
+      const { gh } = fakeGh({ runs: [forged, green], artifacts: { 200: [artifact(200)], [forged.id]: [artifact(forged.id)] } });
+      const result = await findBaseline({ ...input(), gh, log: () => {} });
+      assert.equal(result.history, result.path, String(forged.id));
+    }
+  });
+
+  it("asks the API for the completed runs as well as the successful ones", async () => {
+    const { gh, calls } = fakeGh({ runs: [] });
+    await findBaseline({ ...input(), gh, log: () => {} });
+    const listings = calls.map((args) => args[1]).filter((route) => route?.includes("/workflows/"));
+    assert.ok(listings.some((route) => /status=success/.test(route)), listings.join("\n"));
+    assert.ok(listings.some((route) => /status=completed/.test(route)), listings.join("\n"));
+  });
+
+  it("has a history and no comparison when main never passed but did fail", async () => {
+    const red = run({ id: 300, conclusion: "failure" });
+    const { gh } = fakeGh({ runs: [red], artifacts: { 300: [artifact(300)] } });
+    const result = await findBaseline({ ...input(), gh, log: () => {} });
+    assert.equal(result.path, undefined);
+    assert.equal(result.run, undefined);
+    assert.ok(result.history?.endsWith("baseline.json"));
+  });
+
+  it("writes path=, run= and history= to the step output", async () => {
+    const temp = await mkdtemp(path.join(dir, "runner-"));
+    const environment = {
+      RUNNER_TEMP: temp,
+      GITHUB_REPOSITORY: REPOSITORY,
+      GITHUB_RUN_ID: "900",
+      GITHUB_OUTPUT: path.join(temp, "output.txt"),
+    };
+    const green = run({ id: 200, created_at: "2026-11-10T10:00:00Z" });
+    const red = run({ id: 300, conclusion: "failure", created_at: "2026-11-12T10:00:00Z" });
+    const { gh } = fakeGh({ runs: [red, green], artifacts: { 200: [artifact(200)], 300: [artifact(300)] } });
+    assert.equal(await main(environment, { gh, log: () => {} }), 0);
+    const output = (await readFile(environment.GITHUB_OUTPUT, "utf-8")).split("\n");
+    assert.ok(output.includes("run=200"), output.join("\n"));
+    const history = output.find((line) => line.startsWith("history="))?.slice("history=".length) ?? "";
+    assert.ok(history.startsWith(path.join(temp, "wasit", "history")), history);
   });
 });

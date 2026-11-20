@@ -131,6 +131,17 @@ export const CHECK_CATALOGUE: readonly CheckCatalogueEntry[] = [
     fix: "Verify each payment with the facilitator before serving: it refuses an authorization past its window (validBefore on EVM, the auth entry's expiration ledger on Stellar).",
   },
   {
+    id: "X402-11",
+    name: "Rejected Request Not Settled",
+    protocol: "x402",
+    specRef: "x402 v2 spec §6.1 (verify, run the resource, settle); Soroban authorization nonces",
+    summary:
+      "A valid payment sent with a request the config declares invalid must not settle: the chain still holds its authorization unused after it expires.",
+    negative: true,
+    costsFunds: true,
+    fix: "Validate a request before its payment is settled, and settle only once the request has been accepted; a refused request must not cost the payer.",
+  },
+  {
     id: "MPP-01",
     name: "Charge Settlement On-Chain",
     protocol: "mpp-charge",

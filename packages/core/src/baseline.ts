@@ -100,6 +100,7 @@ function readResult(raw: unknown, path: string): StructuredCheckResult {
     ...(entry["skipKind"] === undefined ? {} : { skipKind: oneOf<SkipKind>(entry["skipKind"], SKIP_KINDS, at(path, "skipKind")) }),
     ...(entry["expected"] === undefined ? {} : { expected: text(entry["expected"], at(path, "expected"), 500) }),
     ...(entry["actual"] === undefined ? {} : { actual: text(entry["actual"], at(path, "actual"), 500) }),
+    ...(entry["reference"] === undefined ? {} : { reference: text(entry["reference"], at(path, "reference"), 120) }),
     ...(entry["fix"] === undefined ? {} : { fix: text(entry["fix"], at(path, "fix"), 2000) }),
     ...(entry["docs"] === undefined ? {} : { docs: text(entry["docs"], at(path, "docs"), 300) }),
   };
@@ -368,6 +369,15 @@ function statuses(endpoint: EndpointReport): Map<string, CheckStatus> {
   return map;
 }
 
+/** The checks of an endpoint that its run skipped because of the tier: read-only, or no payer key. */
+function notRunByTier(endpoint: EndpointReport): Set<string> {
+  return new Set(
+    endpoint.results
+      .filter((result) => result.status === "SKIP" && (result.skipKind === "read-only" || result.skipKind === "needs-payer"))
+      .map((result) => result.id),
+  );
+}
+
 /**
  * What changed against the baseline, by endpoint name: new and removed
  * endpoints, an endpoint that is no longer graded (a regression) or is now, and
@@ -394,9 +404,14 @@ export function diffReports(report: RunReport, baseline: RunReport): Change[] {
     }
 
     const was = statuses(earlier);
+    const notRunBefore = notRunByTier(earlier);
+    const notRunNow = notRunByTier(endpoint);
     for (const [check, status] of statuses(endpoint)) {
       const from = was.get(check);
       if (from === undefined || from === status) continue;
+      // A check one of the two runs did not run because of its tier (a pull request
+      // runs the read-only checks, main may pay, D-022a) says nothing about the service.
+      if (notRunBefore.has(check) || notRunNow.has(check)) continue;
       const kind: ChangeKind = status === "FAIL" ? "new-failure" : from === "FAIL" && status === "PASS" ? "fixed" : "status-changed";
       changes.push({ kind, endpoint: endpoint.name, check, from, to: status });
     }

@@ -323,6 +323,46 @@ describe("diffReports", () => {
     assert.deepEqual(diffReports(now, report([endpoint("weather", conformant())])), []);
   });
 
+  // main runs the payment tier, a pull request the read-only one (D-022a): a check
+  // the tier did not run says nothing about the service, in either direction.
+  const PAYMENT = ["X402-06", "X402-07", "X402-08", "X402-09", "X402-10"];
+  const paid = (): CheckResult[] => [...CHALLENGE.map(pass), ...PAYMENT.map(pass)];
+  const tierSkip = (reason: string, kind: "read-only" | "needs-payer"): CheckResult[] =>
+    [...CHALLENGE.map(pass), ...PAYMENT.map((id) => skipped(id, id, reason, kind))];
+
+  it("shows no change for payment checks a pull request did not run, against a main that paid", () => {
+    const main = report([endpoint("weather", paid())]);
+    for (const now of [
+      report([endpoint("weather", conformant())]),
+      report([endpoint("weather", tierSkip("payment checks not run: pull request", "read-only"))]),
+      report([endpoint("weather", tierSkip("no payer key", "needs-payer"))]),
+    ]) {
+      assert.deepEqual(diffReports(now, main), []);
+      assert.equal(runExitCode(now, main).code, 0);
+    }
+  });
+
+  it("does not show a FAIL on main as fixed by a pull request that did not run that check", () => {
+    const main = report([endpoint("weather", [...CHALLENGE.map(pass), pass("X402-06"), fail("X402-07"), ...["X402-08", "X402-09", "X402-10"].map(pass)])]);
+    const now = report([endpoint("weather", conformant())]);
+    assert.deepEqual(diffReports(now, main), []);
+  });
+
+  it("still shows a payment check that changed between two runs that both ran it", () => {
+    const main = report([endpoint("weather", paid())]);
+    const now = report([endpoint("weather", [...CHALLENGE.map(pass), pass("X402-06"), fail("X402-07"), ...["X402-08", "X402-09", "X402-10"].map(pass)])]);
+    assert.deepEqual(
+      diffReports(now, main).filter((change) => change.check === "X402-07").map((change) => change.kind),
+      ["new-failure"],
+    );
+  });
+
+  it("shows no change when main did not run a check that the run now passes", () => {
+    const main = report([endpoint("weather", conformant())]);
+    const now = report([endpoint("weather", paid())]);
+    assert.deepEqual(diffReports(now, main), []);
+  });
+
   it("names a new FAIL with the check and what it was", () => {
     const before = report([endpoint("weather", conformant())]);
     const now = report([endpoint("weather", [pass("X402-01"), fail("X402-02")])]);

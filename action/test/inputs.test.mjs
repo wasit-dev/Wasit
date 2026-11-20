@@ -35,13 +35,76 @@ describe("parseInputs", () => {
   });
 
   describe("tier", () => {
-    it("refuses payment: not available in this version", () => {
-      assert.throws(() => parseInputs(env({ INPUT_TIER: "payment" })), (error) => error instanceof InputError && /not available in this version/.test(error.message));
+    it("takes payment, on any event: the CLI decides whether the event may pay (D-022a)", () => {
+      for (const name of ["push", "pull_request", "schedule", "workflow_dispatch"]) {
+        assert.equal(parseInputs(env({ INPUT_TIER: "payment", GITHUB_EVENT_NAME: name })).tier, "payment", name);
+      }
     });
 
-    it("refuses anything that is not read-only, naming the value as data", () => {
-      for (const tier of ["Payment", "full", "read-only; id", "mainnet"]) {
-        assert.throws(() => parseInputs(env({ INPUT_TIER: tier })), InputError, tier);
+    it("refuses anything that is not read-only or payment, without quoting the value", () => {
+      for (const tier of ["Payment", "full", "read-only; id", "mainnet", "payment\n"]) {
+        if (tier.trim() === "payment") continue;
+        assert.throws(
+          () => parseInputs(env({ INPUT_TIER: tier })),
+          (error) => error instanceof InputError && /tier must be read-only or payment/.test(error.message) && !error.message.includes(tier),
+          tier,
+        );
+      }
+    });
+  });
+
+  describe("mainnet (spec B5, B12: an input that is refused in this version)", () => {
+    const SENTENCE = /^mainnet: true is refused: the mainnet opt-in is not part of this version\. Wasit pays on test networks only\./;
+
+    it("is off by default, and takes false", () => {
+      for (const value of [undefined, "", "false", "False", " false "]) {
+        assert.deepEqual(
+          parseInputs(env(value === undefined ? {} : { INPUT_MAINNET: value })),
+          { config: "wasit.config.json", environment: undefined, tier: "read-only", endpoints: [] },
+          String(value),
+        );
+      }
+    });
+
+    it("refuses true on every event and every tier, and says nothing was installed, started, sent or signed", () => {
+      for (const value of ["true", "TRUE", " true "]) {
+        for (const name of ["push", "pull_request", "schedule", "workflow_dispatch"]) {
+          for (const tier of ["read-only", "payment"]) {
+            assert.throws(
+              () => parseInputs(env({ INPUT_MAINNET: value, GITHUB_EVENT_NAME: name, INPUT_TIER: tier })),
+              (error) => error instanceof InputError && SENTENCE.test(error.message) && /Nothing was installed, started, sent or signed\.$/.test(error.message),
+              `${value} ${name} ${tier}`,
+            );
+          }
+        }
+      }
+    });
+
+    it("adds the workflow_dispatch rule on any other event, and names the event", () => {
+      for (const name of ["push", "schedule", "pull_request"]) {
+        assert.throws(
+          () => parseInputs(env({ INPUT_MAINNET: "true", GITHUB_EVENT_NAME: name })),
+          (error) => error.message.includes(`The input is also refused on every event but workflow_dispatch, and this run's event is ${name}.`),
+          name,
+        );
+      }
+      assert.throws(
+        () => parseInputs(env({ INPUT_MAINNET: "true", GITHUB_EVENT_NAME: "workflow_dispatch" })),
+        (error) => SENTENCE.test(error.message) && !/also refused/.test(error.message),
+      );
+      assert.throws(
+        () => parseInputs(env({ INPUT_MAINNET: "true", GITHUB_EVENT_NAME: "push; id" })),
+        (error) => !error.message.includes("push; id") && /this run's event is another event\./.test(error.message),
+      );
+    });
+
+    it("refuses any other value, without quoting it", () => {
+      for (const value of ["yes", "1", "on", "true; id", "mainnet"]) {
+        assert.throws(
+          () => parseInputs(env({ INPUT_MAINNET: value })),
+          (error) => error instanceof InputError && /^mainnet must be true or false\.$/.test(error.message),
+          value,
+        );
       }
     });
   });
@@ -95,9 +158,17 @@ describe("buildRunArgs", () => {
     ]);
   });
 
-  it("offers no flag that pays, signs or opts in", () => {
-    const joined = buildRunArgs(parseInputs(env()), paths).join(" ");
-    assert.ok(!/--dry-run|--mainnet|--payer-key|--commitment-key|--allow-destructive/.test(joined));
+  it("offers no flag that opts in or carries a key, on either tier", () => {
+    for (const tier of ["read-only", "payment"]) {
+      const joined = buildRunArgs(parseInputs(env({ INPUT_TIER: tier })), paths).join(" ");
+      assert.ok(!/--dry-run|--mainnet|--payer-key|--commitment-key|--allow-destructive/.test(joined), tier);
+    }
+  });
+
+  it("drops --read-only for the payment tier, and changes nothing else", () => {
+    const read = buildRunArgs(parseInputs(env()), paths);
+    const pay = buildRunArgs(parseInputs(env({ INPUT_TIER: "payment" })), paths);
+    assert.deepEqual(pay, read.filter((arg) => arg !== "--read-only"));
   });
 
   it("keeps a value that looks like a flag a single argument after its option", () => {
@@ -111,6 +182,13 @@ describe("buildReportArgs", () => {
 
   it("reads the report and writes the comment and the next baseline", () => {
     assert.deepEqual(buildReportArgs(paths), [paths.cli, "ci-report", "--report", paths.report, "--comment", paths.comment, "--baseline-out", paths.baselineOut]);
+  });
+
+  it("adds --history and --baseline-run when there are, after the baseline (D-022b)", () => {
+    const args = buildReportArgs({ ...paths, baseline: "/tmp/w/baseline/baseline.json", history: "/tmp/w/history/baseline.json", baselineRun: "200" });
+    assert.deepEqual(args.slice(-6), ["--baseline", "/tmp/w/baseline/baseline.json", "--history", "/tmp/w/history/baseline.json", "--baseline-run", "200"]);
+    const none = buildReportArgs({ ...paths, history: "", baselineRun: "" });
+    assert.ok(!none.includes("--history") && !none.includes("--baseline-run"));
   });
 
   it("adds --baseline only when there is one", () => {

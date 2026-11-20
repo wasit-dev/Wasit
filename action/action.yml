@@ -1,9 +1,10 @@
 name: Wasit
 description: >-
-  Runs Wasit's read-only x402 challenge checks against your service inside the
-  job, comments the result on the pull request, and compares it with main.
-  Linux runners. Needs Node 22 or later (add actions/setup-node before this
-  step). The payment tier is not available in this version.
+  Runs Wasit's x402 checks against your service inside the job, comments the
+  result on the pull request, and compares it with main. The payment tier pays
+  on test networks only, on push to the default branch, schedule and
+  workflow_dispatch. Linux runners. Needs Node 22 or later (add
+  actions/setup-node before this step).
 
 inputs:
   config:
@@ -17,25 +18,56 @@ inputs:
   tier:
     description: >-
       read-only runs the unpaid challenge checks (X402-01 to X402-05): they send
-      no payment and sign nothing. payment is not available in this version and
-      is refused.
+      no payment and sign nothing. payment also runs the payment checks (X402-06
+      to X402-11; X402-11 for an endpoint with a reject case, which can add up to
+      six minutes) on a test network, at most $1.00 a payment and $5.00 a run, on
+      push to the default branch, schedule and workflow_dispatch only; on a pull
+      request it runs the read-only checks and says so. Give the payer key in the
+      env: of this step only, and only to runs that may pay; a key given to a
+      pull request run is refused before your service starts.
     required: false
     default: read-only
   endpoints:
     description: Names of the endpoints to run, separated by commas or line breaks. Default is every endpoint of the config.
     required: false
     default: ""
+  mainnet:
+    description: >-
+      Refused in this version: the mainnet opt-in is not part of it. true stops
+      the job with exit 2 before Wasit is installed or your service starts, and
+      the job summary says so; nothing is sent or signed. The payment tier pays
+      on test networks only.
+    required: false
+    default: "false"
 
 runs:
   using: composite
   steps:
     # Each step gets only what it needs, as env. No input and no event value is
     # written into a run block: they reach the scripts as environment variables.
-    # The token (GH_TOKEN) is given to the two steps that call gh and to no other,
-    # and never to the step that starts the service.
+    # The token (GH_TOKEN) is given to the steps that call gh (the baseline, the
+    # announcement, the comment and the check run) and to no other, and never to
+    # the step that starts the service. The env a workflow puts on
+    # this action reaches every one of its steps: the payer key variables are set
+    # empty in each step but Run Wasit, the only one that needs a key.
+    # NODE_OPTIONS is set empty in every step. The workflow's own env (on the
+    # workflow, the job, or the step that uses this action) reaches every step
+    # here, and a `--require <file>` in it would have Node load that file in the
+    # steps that hold the token or the key. (The runner refuses NODE_OPTIONS
+    # through GITHUB_ENV: seen on runner 2.338.2, 2026-11-20.) A service Wasit
+    # starts no longer inherits NODE_OPTIONS from the workflow's env: put the
+    # options it needs in its service.start command.
 
     - name: Check the runner
       shell: bash
+      env:
+        STELLAR_PRIVATE_KEY: ""
+        EVM_PRIVATE_KEY: ""
+        SVM_PRIVATE_KEY: ""
+        MPP_PAYER_SECRET: ""
+        COMMITMENT_SECRET_HEX: ""
+        WASIT_MAINNET_PAYER_SECRET: ""
+        NODE_OPTIONS: ""
       run: |
         if [ "$RUNNER_OS" != "Linux" ]; then
           echo "Wasit: this action runs on Linux runners in this version." >&2
@@ -55,10 +87,18 @@ runs:
       shell: bash
       env:
         ACTION_PATH: ${{ github.action_path }}
+        STELLAR_PRIVATE_KEY: ""
+        EVM_PRIVATE_KEY: ""
+        SVM_PRIVATE_KEY: ""
+        MPP_PAYER_SECRET: ""
+        COMMITMENT_SECRET_HEX: ""
+        WASIT_MAINNET_PAYER_SECRET: ""
+        NODE_OPTIONS: ""
         INPUT_CONFIG: ${{ inputs.config }}
         INPUT_ENVIRONMENT: ${{ inputs.environment }}
         INPUT_TIER: ${{ inputs.tier }}
         INPUT_ENDPOINTS: ${{ inputs.endpoints }}
+        INPUT_MAINNET: ${{ inputs.mainnet }}
       run: node "$ACTION_PATH/scripts/wasit.mjs" check
 
     # Wasit is built from the ref this action was fetched at, with the lockfile
@@ -67,6 +107,13 @@ runs:
       shell: bash
       env:
         ACTION_PATH: ${{ github.action_path }}
+        STELLAR_PRIVATE_KEY: ""
+        EVM_PRIVATE_KEY: ""
+        SVM_PRIVATE_KEY: ""
+        MPP_PAYER_SECRET: ""
+        COMMITMENT_SECRET_HEX: ""
+        WASIT_MAINNET_PAYER_SECRET: ""
+        NODE_OPTIONS: ""
       run: |
         cd "$ACTION_PATH/.."
         npm ci --ignore-scripts --no-audit --no-fund
@@ -74,11 +121,39 @@ runs:
         npm run build -w packages/cli
         npm run build -w packages/server
 
+    # The run's status on the pull request: a check run "Wasit conformance", in
+    # progress, and on a pull request from this repository a comment that says
+    # Wasit is running. This step holds the token and never the payer key; Run
+    # Wasit holds the key and never the token, so the check run is completed at
+    # the end and not updated check by check. Nothing here fails the job.
+    - name: Announce the run
+      id: announce
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        STELLAR_PRIVATE_KEY: ""
+        EVM_PRIVATE_KEY: ""
+        SVM_PRIVATE_KEY: ""
+        MPP_PAYER_SECRET: ""
+        COMMITMENT_SECRET_HEX: ""
+        WASIT_MAINNET_PAYER_SECRET: ""
+        NODE_OPTIONS: ""
+        GH_TOKEN: ${{ github.token }}
+        INPUT_ENVIRONMENT: ${{ inputs.environment }}
+      run: node "$ACTION_PATH/scripts/announce.mjs" start
+
     - name: Find the baseline
       id: baseline
       shell: bash
       env:
         ACTION_PATH: ${{ github.action_path }}
+        STELLAR_PRIVATE_KEY: ""
+        EVM_PRIVATE_KEY: ""
+        SVM_PRIVATE_KEY: ""
+        MPP_PAYER_SECRET: ""
+        COMMITMENT_SECRET_HEX: ""
+        WASIT_MAINNET_PAYER_SECRET: ""
+        NODE_OPTIONS: ""
         GH_TOKEN: ${{ github.token }}
       run: node "$ACTION_PATH/scripts/baseline.mjs"
 
@@ -89,36 +164,86 @@ runs:
       shell: bash
       env:
         ACTION_PATH: ${{ github.action_path }}
+        NODE_OPTIONS: ""
         INPUT_CONFIG: ${{ inputs.config }}
         INPUT_ENVIRONMENT: ${{ inputs.environment }}
         INPUT_TIER: ${{ inputs.tier }}
         INPUT_ENDPOINTS: ${{ inputs.endpoints }}
+        INPUT_MAINNET: ${{ inputs.mainnet }}
         BASELINE_PATH: ${{ steps.baseline.outputs.path }}
         WASIT_BUILD_COMMIT: ${{ github.action_ref }}
       run: node "$ACTION_PATH/scripts/wasit.mjs" run
 
+    # Also when Run Wasit was skipped after the announcement (a cancelled job): the
+    # report then says no verdict, so "Wasit is running" never stays on the PR.
     - name: Write the report
-      if: ${{ always() && steps.run.conclusion != 'skipped' }}
+      id: report
+      if: ${{ always() && (steps.run.conclusion != 'skipped' || steps.announce.outcome == 'success') }}
       shell: bash
       env:
         ACTION_PATH: ${{ github.action_path }}
+        STELLAR_PRIVATE_KEY: ""
+        EVM_PRIVATE_KEY: ""
+        SVM_PRIVATE_KEY: ""
+        MPP_PAYER_SECRET: ""
+        COMMITMENT_SECRET_HEX: ""
+        WASIT_MAINNET_PAYER_SECRET: ""
+        NODE_OPTIONS: ""
         BASELINE_PATH: ${{ steps.baseline.outputs.path }}
+        HISTORY_PATH: ${{ steps.baseline.outputs.history }}
+        BASELINE_RUN: ${{ steps.baseline.outputs.run }}
         WASIT_BUILD_COMMIT: ${{ github.action_ref }}
       run: node "$ACTION_PATH/scripts/wasit.mjs" report
 
     - name: Comment on the pull request
-      if: ${{ always() && steps.run.conclusion != 'skipped' && github.event_name == 'pull_request' }}
+      if: ${{ always() && github.event_name == 'pull_request' && (steps.run.conclusion != 'skipped' || steps.announce.outcome == 'success') }}
       shell: bash
       env:
         ACTION_PATH: ${{ github.action_path }}
+        STELLAR_PRIVATE_KEY: ""
+        EVM_PRIVATE_KEY: ""
+        SVM_PRIVATE_KEY: ""
+        MPP_PAYER_SECRET: ""
+        COMMITMENT_SECRET_HEX: ""
+        WASIT_MAINNET_PAYER_SECRET: ""
+        NODE_OPTIONS: ""
         GH_TOKEN: ${{ github.token }}
         WASIT_COMMENT_FILE: ${{ runner.temp }}/wasit/comment.md
       run: node "$ACTION_PATH/scripts/comment.mjs"
 
+    # Completes the check run the announcement started, with what the report step
+    # wrote; a fixed neutral text when that step did not succeed.
+    - name: Finish the check run
+      if: ${{ always() && steps.announce.outputs.check_run_id != '' }}
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        STELLAR_PRIVATE_KEY: ""
+        EVM_PRIVATE_KEY: ""
+        SVM_PRIVATE_KEY: ""
+        MPP_PAYER_SECRET: ""
+        COMMITMENT_SECRET_HEX: ""
+        WASIT_MAINNET_PAYER_SECRET: ""
+        NODE_OPTIONS: ""
+        GH_TOKEN: ${{ github.token }}
+        CHECK_RUN_ID: ${{ steps.announce.outputs.check_run_id }}
+        REPORT_OUTCOME: ${{ steps.report.outcome }}
+        WASIT_CHECK_RUN_FILE: ${{ runner.temp }}/wasit/check-run.json
+      run: node "$ACTION_PATH/scripts/announce.mjs" finish
+
     # Pinned to the commit of v4.6.2 (read from the GitHub API on 2026-11-15).
     - name: Upload the baseline
-      if: ${{ always() && steps.run.conclusion != 'skipped' && github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+      if: ${{ always() && steps.run.conclusion != 'skipped' && (github.event_name == 'schedule' || ((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == format('refs/heads/{0}', github.event.repository.default_branch))) }}
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      # It runs on the events that pay, when the workflow gives the key: blanked here too.
+      env:
+        STELLAR_PRIVATE_KEY: ""
+        EVM_PRIVATE_KEY: ""
+        SVM_PRIVATE_KEY: ""
+        MPP_PAYER_SECRET: ""
+        COMMITMENT_SECRET_HEX: ""
+        WASIT_MAINNET_PAYER_SECRET: ""
+        NODE_OPTIONS: ""
       with:
         name: wasit-baseline
         path: ${{ runner.temp }}/wasit/baseline-next.json

@@ -13,7 +13,7 @@ in every test report.
 | ID | Check Name | Spec Reference | What It Checks | Pass Criteria |
 |---|---|---|---|---|
 | `X402-01` | 402 Response Status | x402 spec, HTTP semantics | An unpaid request must be answered with status code `402` | Response status is exactly `402`, not `401`/`403`/other |
-| `X402-02` | Payment Header Present | x402 built-on-stellar guide | The 402 response must include a payment header | Either `PAYMENT-REQUIRED` or `X-Payment` header is present (both are checked — the spec itself is not yet consistent, see note in README). An x402 v1 challenge in the response body fails this check, and `X402-03`–`05` still inspect it; see the note on v1 below |
+| `X402-02` | Payment Header Present | x402 built-on-stellar guide | The 402 response must include a payment header | Either `PAYMENT-REQUIRED` or `X-Payment` header is present (both are checked — the spec itself is not yet consistent, see note in README). An x402 v1 challenge in the response body is not graded: `X402-02`–`05` are skipped as `unsupported` instead of failing; see the revision note on v1 below |
 | `X402-03` | Header Payload Decodable | x402 spec §payment-required-object | The header value must be valid base64 that decodes to JSON | `atob()` + `JSON.parse()` succeed without error |
 | `X402-04` | Required Fields Present | x402 spec §payment-required-object | The payload must include the core payment terms, under the field names its own advertised version requires | Checked in **every** payment option in `accepts`, each reported by its index when the challenge offers more than one; a challenge with no options fails. In each option, every field the advertised `x402Version` requires is present: for v2 `scheme`, `network`, `amount`, `asset`, `payTo` and `maxTimeoutSeconds` (spec 5.1.2); for v1 `scheme`, `network`, `maxAmountRequired`, `asset`, `payTo`, `resource`, `description` and `maxTimeoutSeconds` (v1 spec 5.1). Each is a non-empty string, except `maxTimeoutSeconds`, a positive number of seconds; a field present with the wrong type is reported as such rather than as missing. The price field follows the version: `maxAmountRequired` for v1, `amount` for v2 (renamed in v2, which also moves the resource out of the option). The version is read from the challenge rather than accepting whichever name happens to appear, because a service advertising `x402Version: 2` while emitting the v1 field name is not conformant to the version it claims — and reporting that as a merely absent price would hide the actual defect. An unrecognised version fails: the field names cannot be checked against a version whose schema is unknown. |
 | `X402-05` | Network Identifier Valid | x402 v2 spec §11.1; CAIP-2 | Every advertised network id is CAIP-2 | Every option's `network` is a CAIP-2 identifier, `namespace:reference` with a 3 to 8 character lowercase namespace and a reference of at most 32 characters, as x402 v2 requires. Where the namespace's own CAIP-2 definition fixes the reference, that is checked too: `stellar` is `testnet` or `pubnet`; `eip155` is the chain id in base 10 (`eip155:84532`, not `eip155:0x14a34`); `solana` is the first 32 characters of the base58 genesis hash. A well-formed id in another namespace passes, and the result says only the format was checked there: x402 v2 asks for CAIP-2 and nothing more, so failing it would report Wasit's own lack of rules as the target's defect. An option without a `network` is left to `X402-04`. |
@@ -22,6 +22,7 @@ in every test report.
 | `X402-08` | Payment Replay Rejected *(negative)* | x402 v2 spec §10.1; `exact` scheme, one-time use | A payment that was already accepted must not be accepted again | The headers `X402-06`'s accepted payment was sent with are sent again, byte for byte, and the target answers with a non-2xx status. Each authorization is single-use: once the payment settles, its EIP-3009 nonce, or its Soroban auth entry's nonce, is spent, or on Solana the transaction has already executed, and the facilitator refuses it, at verify or at settlement: the public facilitator on Base Sepolia lets a replayed EIP-3009 authorization through verify and refuses it at settlement (`settlement failed: invalid_exact_evm_nonce_already_used`, measured 2026-10-06). A 2xx means one payment bought the resource twice. Nothing can settle twice, so this costs nothing. **Skipped** when the challenge advertises the `payment-identifier` extension, under which a server may legitimately answer a repeated payment with its cached response. |
 | `X402-09` | Underpayment Rejected *(negative)* | `exact` scheme verification: amount | A validly signed payment for less than the advertised amount must be rejected | The payment is signed for half the advertised amount, while its `accepted` still claims the advertised terms, so the signature is valid and only the amount is wrong; the target answers with a non-2xx status. On Stellar the facilitator must hold the transfer to `requirements.amount` exactly; on EVM, verification step 3 holds the authorization's value to it; on Solana the scheme forbids a transfer below it (§1.4), and the reference facilitator's static path requires the exact amount (§3.1). **Skipped** when the price is 1 base unit, since nothing smaller can be offered. A target that accepts may settle the lower amount. |
 | `X402-10` | Expired Authorization Rejected *(negative)* | x402 v2 spec §10.1 (time constraints); `exact` scheme verification: validity window | A payment whose authorization has expired must be rejected | The payment is signed with a one-second lifetime, which both SDK clients derive from `maxTimeoutSeconds` (EVM `validBefore`, the Stellar auth entry's expiration ledger), held until that has passed (5 seconds on Base Sepolia, 20 on Stellar, three or more ledgers), and sent claiming the advertised terms. On Solana a payment's lifetime is its recent blockhash, which the SDK client does not take from `maxTimeoutSeconds`: the payment is built, through the client's `extra.recentBlockhash` hint, on a blockhash 300 slots old that the RPC confirms is no longer valid, and sent at once. The target answers with a non-2xx status. An expired authorization cannot settle, so a target that serves it serves for nothing. |
+| `X402-11` | Rejected Request Not Settled *(negative)* | x402 v2 spec §6.1 (verify, run the resource, settle); Soroban authorization nonces | A valid payment sent with a request the service must refuse must not settle | Runs only with a reject case in `wasit.config.json` (`endpoints[].reject`, read by `wasit run`), after `X402-06` passed, on Stellar. The reject request is the endpoint's request with the reject case's method, headers or body over it. It is first sent without payment: a service that refuses it before asking for payment gives the check nothing to watch, and the check is **skipped** with nothing signed. Otherwise a payment for the advertised terms exactly is signed, through the same plan, pin and caps as the other payment checks, and sent with the reject request. Wasit then reads, once a ledger with `getLedgerEntries`, the nonce entry the Soroban host writes when an authorization is used, in the same call as the nonce of `X402-06`'s payment, which was used and must be found: a read that cannot find it cannot show that the other is absent. A 2xx answer to the reject request fails, whatever the chain shows. Refused and the nonce found: fails, the payment was taken, and the transaction is named. Refused, and a read after the authorization's expiration ledger (decoded from the signed entry, never computed) finds it unused: passes. The payer's balance before and after, and the token's `transfer` events from the payer to `payTo` for the amount (`getEvents`), are second readings: when they disagree with the nonce, or cannot be read, there is no verdict. A payment whose advertised lifetime (`maxTimeoutSeconds`) is at most 300 seconds is waited out, with a hard stop 360 seconds after it was sent (a 300-second lifetime is 60 ledgers of 5 seconds); still valid then, the check is **skipped**: "not settled by ledger N; still valid until ledger M". A lifetime above 300 seconds or below 30 seconds (too short for an unused authorization to show anything), on the first read or on the read the payment is signed from, is **skipped** before anything is signed; an authorization the client signs to stay valid longer than 300 seconds, or with fewer than 3 ledgers left when it would be sent, is discarded unsent, with no verdict. On other chains the check is skipped and nothing is signed. A service that settles a refused request takes the payment: at most the price, once. *(New in 0.8.0-beta.1.)* |
 
 **Note on the x402 payment checks' cost (Week 2).** `X402-06` and `X402-07`
 are not free. `X402-06` settles a real payment against the target, and `X402-07`
@@ -72,7 +73,29 @@ any challenge the payment client cannot read. Before 0.5.0 both reported FAIL
 in that case, contradicting the `X402-07` row above, and a v1 challenge left
 `X402-03`–`05` skipped.
 
-**Note on networks (0.7.0).** `X402-01`–`05` read the challenge only, so they
+**Revision note, `X402-02` (0.8.0-beta.1).** The note above describes
+0.5.0 to 0.7.0. A challenge in the response body is no longer an `X402-02` FAIL.
+Wasit grades x402 v2, so a v1 service is reported as **unsupported**, which is
+neither a failure nor a pass: `X402-01` keeps its verdict, and `X402-02`–`05`
+are SKIP results with the reason and `skipKind: "unsupported"` (the field
+carries the kind in `--json` and MCP output; the four statuses are unchanged).
+What `X402-04` and `X402-05` used to report as verdicts on the v1 terms stays
+visible in the skip's detail, labelled as a note, so an operator still sees
+which terms diverge. The same kind is used for the payment checks when the run
+names a network no payment adapter pays on (for example `eip155:97`):
+`X402-06`–`11` are skipped as `unsupported`, where 0.7.0 stopped with a
+`PREFLIGHT` error. The run still exits 2 ("no verdict"): payment checks were
+asked for and none could be graded, so it is not green. `stellar:pubnet` is not that case: it has an adapter and
+the network guard still refuses it before anything is signed. For the read
+checks (`X402-01`–`05`), a route that redirects to another origin gives `X402-01`
+no verdict (`ERROR (configuration)`) and nothing is sent there; a redirect inside
+the origin is followed once. A paid request (`X402-06`–`11`) and every MPP
+request follow no redirect at all: a 3xx gives that check no verdict, and the
+payment is not sent again.
+
+**Note on networks (0.7.0).** In 0.8.0-beta.1 the payment checks pay on test
+networks only: `stellar:pubnet` and any other network are refused before a key
+is read (see the revision note above). In 0.7.0: `X402-01`–`05` read the challenge only, so they
 apply to an x402 service on any chain. The payment checks pay through the
 `exact` scheme on the network the run names: `stellar:testnet` (the default),
 `stellar:pubnet`, `eip155:84532` (Base Sepolia, with the EIP-3009 or Permit2
@@ -244,9 +267,10 @@ implementation, it links the write-up.
 ### There is no payment header (`X402-02`)
 
 x402 v2 carries the challenge base64-encoded in the `PAYMENT-REQUIRED` response
-header. A service that puts an x402 v1 challenge in the response body fails
-here, and the result says it found one; its terms are still checked. The
-`exact` scheme on Stellar is defined for v2 only. This is the divergence Wasit
+header. A service that puts an x402 v1 challenge in the response body is
+reported as unsupported (not a failure; see the revision note above), and the
+result says it found one; the v1 terms are shown as notes. The `exact` scheme on
+Stellar is defined for v2 only. This is the divergence Wasit
 has met in a real implementation
 ([conformance findings](findings/conformance-findings.md), class 1).
 
@@ -388,7 +412,7 @@ The official x402 client, which Wasit pays through, refuses a price above $1 and
 outside the SDK's defaults (Circle's USDC on Ethereum Sepolia is allowed too). Such a
 target gets `ERROR (setup)` saying which, and nothing is sent: the cap keeps a paywall
 from charging a payer more than it meant to, and Wasit pays automatically, on
-`stellar:pubnet` with real money
+`stellar:pubnet` with real money in 0.7.0 (0.8.0-beta.1 refuses that network)
 ([evidence](evidence/2026-10-06-0.7.0-verification-runs.md#part-2-the-clients-spend-controls)).
 
 On Stellar, the payment checks need a testnet payer holding testnet USDC.

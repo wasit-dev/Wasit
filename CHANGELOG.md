@@ -2,6 +2,129 @@
 
 All notable changes to Wasit are recorded here. Versions follow [Semantic Versioning](https://semver.org/): patch releases are fixes, minor releases add checks or features without breaking existing usage, major releases break something.
 
+## [0.8.0-beta.1] - 2026-11-20
+
+A pre-release for beta testers, on npm under the `beta` tag
+(`npm install -g @wasit-dev/cli@beta`); `latest` stays at 0.7.0. All three
+packages, versioned together. New: a config file for a whole service
+(`wasit.config.json`), `wasit run` with a read-only tier and a payment tier,
+`wasit ci-report`, a GitHub Action that runs them, and a seventeenth check,
+`X402-11`. Payments are made on test networks only, and every payment Wasit
+signs is held to $1.00, to $5.00 a run, and to a plan read before the run. The
+mainnet opt-in is not part of this version: the switches that would ask for it
+refuse. The guides on usewasit.dev still describe 0.7.0; this entry, the
+package READMEs and `wasit run --help` describe the beta.
+
+**Results can change on upgrade.**
+- Payment checks pay on test networks only: `stellar:testnet`, Base Sepolia
+  (`eip155:84532`), Ethereum Sepolia (`eip155:11155111`) and Solana devnet, and
+  the MPP checks on `stellar:testnet` only. Any other network, `stellar:pubnet`
+  included, is refused before a key is read, in
+  `wasit test`, `wasit mpp-charge`, `wasit mpp-channel`, the MCP tools and core.
+- A price above $1.00 is not paid: `X402-06` gets no verdict (`ERROR (setup)`),
+  the other payment checks are skipped, and nothing is signed.
+- A paid request, and every MPP request, no longer follows a redirect: a 3xx
+  gives that check no verdict, and the payment is not sent again.
+- The RPC must serve the run's network (the Stellar network passphrase, the EVM
+  chain id, the Solana genesis hash) before anything is signed; another network,
+  or no answer, stops the payment checks with no verdict.
+- An x402 v1 challenge is reported as unsupported, not as a failure, and a run
+  that could grade nothing exits 2.
+
+**Fixed: two MPP defects of 0.7.0.** In 0.7.0 `MPP-01` paid on `stellar:pubnet`
+when the run named it (`--network`, or the MCP tool's `network` argument), with
+no cap (read from the code, not run: it would need mainnet funds). And a channel commitment
+was signed without checking the bytes the RPC returned for it, so a run on the
+test network pointed at a mainnet RPC signed a commitment valid on mainnet
+(shown offline, against a stand-in RPC). Both are fixed: every network but the
+test networks is refused before a key is read, and a commitment is signed only
+when it names the run's channel, amount and network. See the advisory
+[GHSA-7c36-rg54-r3v8](https://github.com/wasit-dev/wasit/security/advisories/GHSA-7c36-rg54-r3v8).
+
+**Added: `wasit.config.json`, `wasit run` and `wasit ci-report`.** The config
+(version 1) holds a service's endpoints, methods, request bodies and
+environments. The loader is strict: an unknown key is an error, and secrets,
+the mainnet opt-in and per-payment caps have no place in the file. `wasit run`
+runs every endpoint of it (`--env`, `--endpoint`) and writes one report
+(`--json`, `--out`); it can start the service itself (`--start`,
+`--start-if-local`) and compare with the report of the default branch
+(`--baseline`). `wasit run --read-only` runs `X402-01` to `X402-05`, which send
+no payment. `wasit run --dry-run` prints, without a key, what the payment
+checks would sign. `wasit ci-report` turns a report into the pull request
+comment and the job summary.
+
+**Added: the payment tier.** `wasit run` without `--read-only` pays, on test
+networks only, when the environment has `operatedByMe: true` and the chain's
+key variable is set. Each signature is held to $1.00 and the run to $5.00
+(`maxRunUsd` can only lower it), to the `payTo` and asset the config pins, and
+to the plan read before the run; the x402 client is handed the one option
+checked, and what it signed is compared before it is sent. In GitHub Actions it
+pays only on a push to the default branch, a schedule and `workflow_dispatch`;
+a pull request runs the read-only checks and says "payment checks not run: pull
+request", and a payer key given to a run that may not pay stops it with exit 2
+before the service starts. On a GitHub-hosted runner with a payer key, a
+service Wasit starts (`--start`) runs as a separate user, `wasit-service`. In another CI (`CI` set, not
+GitHub Actions) the payment tier stops with exit 2: use `--read-only` there.
+
+**Added: the GitHub Action** (`action/`, pinned by full commit SHA). A
+composite action for Linux runners with Node 22, which builds Wasit from the
+ref it is pinned to. Inputs: `config`, `environment`, `tier` (`read-only` or
+`payment`), `endpoints`, and `mainnet`, which is refused. It comments on the
+pull request (one comment, updated on each push), compares with the last green
+run on the default branch and names it, and writes the job summary.
+
+**Added: the run on the pull request.** The comment shows a table of each
+endpoint's checks with a mark for each result (✅ PASS, ❌ FAIL, ⚪ SKIP,
+⚠️ ERROR), and every check's detail folded at the end. On `stellar:testnet`,
+when `X402-06` passed, it links that payment's transaction on Stellar Expert, as
+the check read it back from the chain (the new `reference` field of a passing
+result, also in `--json` and the MCP tools' output). While Wasit runs, the
+comment says "⏳ Wasit is running", with a link to the run. With the permission
+`checks: write`, the Action also adds a check run, "Wasit conformance",
+completed at the end with the verdict and the job summary (`wasit ci-report
+--check-run`); without it, that check is left out. A pull request from a fork
+gets neither. `NODE_OPTIONS` is set empty in every step of the Action, so a
+`NODE_OPTIONS` in the workflow's `env` no longer reaches Wasit or a service it
+starts: put the options a service needs in `service.start`. The example workflow (`action/examples/wasit.yml`)
+asks for `checks: write` and runs one Wasit job per pull request, a newer push
+cancelling the older one.
+
+**Added: `X402-11`, "Rejected Request Not Settled".** For an endpoint with a
+`reject` case in the config, on Stellar: a valid payment is sent with the
+request the service must refuse, and the chain is read until that payment's
+authorization has expired. Unused, with no transfer, passes; used, or the
+request served, fails. A lifetime above 300 s, or below 30 s, is skipped before
+anything is signed, and the wait stops 360 s after the payment was sent. See
+`docs/CHECKS.md`.
+
+**Added: the mainnet switches, which refuse.** `wasit run --mainnet`, the
+Action input `mainnet: true`, and the MCP server's `WASIT_MAINNET_OPT_IN`,
+`WASIT_MAINNET_CONFIG` and `--mainnet` stop with exit 2 and "the mainnet opt-in
+is not part of this version". Nothing is started, sent or signed.
+
+**Added: the MCP server's RPC lock.** `WASIT_RPC_URL`, read when the server
+starts, fixes the RPC of every tool call, and the `rpcUrl` argument is then
+refused before anything is sent. A result that reads the chain names its RPC
+by origin, where it came from, and when it is not Wasit's default (in the text
+and in `structuredContent.rpc`).
+
+**Added: coloured, live output at a terminal.** `wasit test` shows its checks
+in two blocks, challenge and payment. Each line has a mark and a badge that
+agree (✓ PASS on green, ✗ FAIL on red, ○ SKIP on yellow, ! ERROR on magenta)
+and its duration. A spinner line says what the check in flight is
+doing, and the verdict, the counts and the run's duration come at the end. The
+colours are Wasit's own, exact on a terminal with 24-bit colour. `wasit
+mpp-charge` and `wasit mpp-channel` mark their results the same way. A pipe, CI,
+`--json` and `NO_COLOR` get the plain text as before; `FORCE_COLOR=1` colours a
+pipe.
+
+**Changed:** `@stellar/stellar-sdk` 16.4.1: the test network is on protocol
+30, and 16.1.0 cannot read its ledger headers.
+
+**Not in this version:** the mainnet opt-in; paying MPP from `wasit run` and
+the Action (an MPP endpoint's payment checks are skipped, with the reason);
+`wasit init`.
+
 ## [0.7.0] — 2026-10-08
 
 All three packages, versioned together as usual. The x402 payment checks now
