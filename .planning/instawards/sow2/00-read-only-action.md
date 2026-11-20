@@ -64,7 +64,32 @@ The comment on pull request 1 reads (copy):
 >
 > **Failures** · quote-of-the-day: X402-05 Network Identifier Valid · Expected: a CAIP-2 id, namespace:reference, such as stellar:testnet · Actual: "stellar-testnet"
 
+## Added for the pre-release (2026-11-20)
+
+The maintainer chose three changes to how a run shows on a pull request, for the
+pre-release. They are in the Action at commit
+[`05f5a19`](https://github.com/wasit-dev/Wasit/commit/05f5a19cc51a7dbb151d25f5ccadaaf48b3e1398)
+on branch `sow2/pr-run` (the change itself is
+[`f62a09c`](https://github.com/wasit-dev/Wasit/commit/f62a09cc03edc65907e1d0be9d0072a7fe6fc439)),
+and `main` of the example project uses that commit.
+
+- **A table of each check.** Under each endpoint the comment has one row per check with a mark for its result (✅ pass, ❌ fail, ⚪ skipped, ⚠️ could not run), and every check's detail is folded into one "Details of each check" block at the end. On `stellar:testnet`, when `X402-06` passed, the endpoint links that payment's transaction on Stellar Expert, built only from the settlement the check read back from the chain.
+- **"Wasit is running."** When the run starts, the comment says so, with the start time and a link to the run. The result replaces it when the run ends.
+- **A check of its own, "Wasit conformance".** With the permission `checks: write`, the Action starts a check in progress on the commit under test and completes it at the end with the verdict and the job summary. The step that holds the payer key never holds the token, so the check is completed at the end, not check by check.
+- **A pull request from a fork** gets neither the running comment nor the check: its token is read-only.
+- **`NODE_OPTIONS` from the workflow's own settings** does not reach the Action's steps or the service Wasit starts. GitHub's runner already refuses to set it through `GITHUB_ENV`.
+- **One run per pull request.** The example workflow cancels the older run of a pull request when a new push comes; a run on `main`, which may pay, is never cancelled.
+
+| What | Status | Proof |
+| --- | --- | --- |
+| The check "Wasit conformance" on `main`: in progress, then completed with the verdict, a table of each check and the payment link | ✅ | [Run on `main`](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/44641632605) · [the check run](https://github.com/dzakwannajmi/x402-example-paywall/runs/135973988866) · [copy of its summary](week-2/copies/check-run-main-summary.md) · [copy of the log](week-2/copies/run-main-check-run.log.txt): the check run was in progress about 20 seconds into the run and completed as "✅ conformant · 11 passed"; under the endpoint, X402-06's payment links to [Stellar Expert](https://stellar.expert/explorer/testnet/tx/ec61f2df41306528d08388887556a104d5e18be061d964ea7d9e76f13de02c0d) |
+| On a pull request: "Wasit is running", then the result in the same comment | ✅ | [Pull request 7](https://github.com/dzakwannajmi/x402-example-paywall/pull/7) · [run](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/44644150278) · [first version of the comment](week-2/copies/pr-7-comment-running.md) · [the result](week-2/copies/pr-7-comment.md) · [copy of the log](week-2/copies/run-pr7-running-comment.log.txt): the comment's edit history on GitHub shows "⏳ Wasit is running" with a link to the run at 00:14:18 UTC, replaced by the result six seconds later; GitHub shows the result with two tables and the details folded in one block; the check "Wasit conformance" on the pull request completed as "✅ conformant · 5 passed, 6 skipped" |
+| A pull request from a fork: no running comment and no check run | ✅ | [Pull request 8](https://github.com/dzakwannajmi/x402-example-paywall/pull/8), from a fork made from a second account of the maintainer · [run](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/44647438871) · [copy of the log](week-2/copies/run-pr8-fork-no-check-run.log.txt): "Wasit: this pull request is from a fork, so the token is read-only: no check run and no running comment."; no comment was posted, and the only check on the pull request is the job's own, "Wasit", which passed |
+| `NODE_OPTIONS` in the workflow's settings does not reach the Action's steps or the service | ✅ | [Run of pull request 7](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/44644486275) · [copy of the log](week-2/copies/run-pr7-node-options.log.txt): the pull request (never merged) sets `NODE_OPTIONS` to load a small probe file; a plain step with that setting printed the probe's line, and no step of the Action and not the service printed it. The earlier run of the same pull request ([44644150278](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/44644150278)) shows GitHub's runner refusing to set `NODE_OPTIONS` through `GITHUB_ENV` |
+
 ## Not shown yet
+
+- 🟡 **Cancelling the older run of a pull request on a new push.** Set in the example workflow, not shown in a run.
 
 - 🟡 **Windows.** Not run.
 - 🟡 **The version number.** The comment names the commit a build came from, but the packages declare 0.7.0 until the pre-release, so it reads "Wasit 0.7.0, built from commit ...".
@@ -79,5 +104,7 @@ Partial progress 2026-11-15 (first runs): the green run on `main` and the red ru
 Partial progress 2026-11-15 (second runs): two small defects seen in the first comments were fixed and shown again. The comment names the commit a build came from, and the reason under "Not graded" starts with a capital letter. The Action's own third-party references are pinned to commit SHAs. Pull requests 3 and 4 were re-run on the new Action and their comments were edited in place; pull requests 1 and 2 keep the comments of the first version.
 
 Update 2026-11-15 (later): the example project is public, so the links above open without a login. The text copies stay as an archive.
+
+Update 2026-11-20: the comment now has a table of each check, says "Wasit is running" while a run is in progress, and the Action adds its own check, "Wasit conformance". Shown on `main` of the example project, on pull request 7, and on pull request 8 from a fork, which gets neither the running comment nor the check. See "Added for the pre-release" above.
 
 Update 2026-11-15 (fork): a pull request from a real fork (pull request 5) ran the workflow. The Action made no comment because the token of a fork is read-only, and the check passed. The result is in the job summary. What the log and the summary show is quoted in the proof table.

@@ -1,0 +1,537 @@
+# Copy of the job log of dzakwannajmi/x402-example-paywall run 44641632605 (taken 2026-11-20; the live run is authoritative)
+# https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/44641632605
+
+Wasit	UNKNOWN STEP	﻿2026-11-19T23:55:31.1960485Z Current runner version: '2.338.2'
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.1980491Z ##[group]Runner Image Provisioner
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.1981184Z Hosted Compute Agent
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.1981555Z Version: 20261103.629
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.1981981Z Commit: 15dbd9ccb5dbf34fae002b6ed1a2670f52df37bc
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.1982460Z Build Date: 2026-11-03T17:26:59Z
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.1982872Z Worker ID: {a450dd17-c4f8-433a-86a8-8bf2648f2215}
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.1983340Z Region: southcentralus
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.1983726Z Cloud: Azure
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.1984097Z ##[endgroup]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.1985131Z ##[group]Operating System
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.1985636Z Ubuntu
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.1986016Z 26.04.1
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.1986333Z LTS
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.1986740Z ##[endgroup]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.1987075Z ##[group]Runner Image
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.1987447Z Image: ubuntu-26.04
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.1987838Z Version: 20261111.196.1
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.1988900Z Included Software: https://github.com/actions/runner-images/blob/ubuntu26/20261111.196/images/ubuntu/Ubuntu2604-Readme.md
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.1989881Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu26%2F20261111.196
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.1990505Z ##[endgroup]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.1991363Z ##[group]GITHUB_TOKEN Permissions
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.1992993Z Actions: read
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.1993356Z Checks: write
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.1993701Z Contents: read
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.1994069Z Metadata: read
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.1994433Z PullRequests: write
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.1994833Z ##[endgroup]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.1996731Z Secret source: Actions
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.1997371Z Cache mode: write
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.1997840Z Prepare workflow directory
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.2227005Z Prepare all required actions
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.2261887Z Getting action download info
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.4958373Z Download action repository 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.6008457Z Download action repository 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+Wasit	UNKNOWN STEP	2026-11-19T23:55:31.6641747Z Download action repository 'wasit-dev/wasit@f62a09cc03edc65907e1d0be9d0072a7fe6fc439' (SHA:f62a09cc03edc65907e1d0be9d0072a7fe6fc439)
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.2983573Z Getting action download info
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.3985399Z Download action repository 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.5569604Z Complete job name: Wasit
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.6242373Z ##[group]Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.6243372Z with:
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.6243919Z   persist-credentials: false
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.6244622Z   repository: dzakwannajmi/x402-example-paywall
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.6249824Z   token: ***
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.6250357Z   ssh-strict: true
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.6250900Z   ssh-user: git
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.6251431Z   clean: true
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.6251992Z   sparse-checkout-cone-mode: true
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.6252666Z   fetch-depth: 1
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.6253207Z   fetch-tags: false
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.6253774Z   show-progress: true
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.6254339Z   lfs: false
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.6254862Z   submodules: false
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.6255501Z   set-safe-directory: true
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.6256168Z   allow-unsafe-pr-checkout: false
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.6256903Z ##[endgroup]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8234452Z Syncing repository: dzakwannajmi/x402-example-paywall
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8236734Z ##[group]Getting Git version info
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8237822Z Working directory is '/home/runner/work/x402-example-paywall/x402-example-paywall'
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8239315Z [command]/usr/bin/git version
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8240068Z git version 2.56.1
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8242653Z ##[endgroup]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8248230Z Temporarily overriding HOME='/home/runner/work/_temp/c51e3d50-c77f-44f2-bf74-9eb5ac197557' before making global git config changes
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8251015Z Adding repository directory to the temporary git global config as a safe directory
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8253378Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/x402-example-paywall/x402-example-paywall
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8257153Z Deleting the contents of '/home/runner/work/x402-example-paywall/x402-example-paywall'
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8259426Z ##[group]Initializing the repository
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8262047Z [command]/usr/bin/git init /home/runner/work/x402-example-paywall/x402-example-paywall
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8364676Z hint: Using 'master' as the name for the initial branch. This default branch name
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8366782Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8368486Z hint: to use in all of your new repositories, which will suppress this warning,
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8369904Z hint: call:
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8370666Z hint:
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8371368Z hint: 	git config --global init.defaultBranch <name>
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8372226Z hint:
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8372935Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8374120Z hint: 'development'. The just-created branch can be renamed via this command:
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8375562Z hint:
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8376087Z hint: 	git branch -m <name>
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8376681Z hint:
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8377445Z hint: Disable this message with "git config set advice.defaultBranchName false"
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8378905Z Initialized empty Git repository in /home/runner/work/x402-example-paywall/x402-example-paywall/.git/
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8381750Z [command]/usr/bin/git remote add origin https://github.com/dzakwannajmi/x402-example-paywall
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8432103Z ##[endgroup]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8433067Z ##[group]Disabling automatic garbage collection
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8435595Z [command]/usr/bin/git config --local gc.auto 0
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8468616Z ##[endgroup]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8469531Z ##[group]Setting up auth
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8474694Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8508160Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8865670Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.8895661Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.9126291Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.9157759Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.9391507Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.9490309Z ##[endgroup]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.9491915Z ##[group]Fetching the repository
+Wasit	UNKNOWN STEP	2026-11-19T23:55:32.9499697Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +938346260c7e5b2cb08d6fcd168a88cf48b6aaa1:refs/remotes/origin/main
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.2918693Z From https://github.com/dzakwannajmi/x402-example-paywall
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.2920145Z  * [new ref]         938346260c7e5b2cb08d6fcd168a88cf48b6aaa1 -> origin/main
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.2923228Z ##[endgroup]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.2924482Z ##[group]Determining the checkout info
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.2925702Z ##[endgroup]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.2929124Z [command]/usr/bin/git sparse-checkout disable
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.2977667Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.3007708Z ##[group]Checking out the ref
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.3010687Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.3090867Z Switched to a new branch 'main'
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.3093319Z branch 'main' set up to track 'origin/main'.
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.3099625Z ##[endgroup]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.3140439Z [command]/usr/bin/git log -1 --format=%H
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.3162869Z 938346260c7e5b2cb08d6fcd168a88cf48b6aaa1
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.3171101Z ##[group]Removing auth
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.3173853Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.3202089Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.3438783Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.3459945Z http.https://github.com/.extraheader
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.3466038Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.3494408Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.3724914Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.3753012Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.3977466Z ##[endgroup]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.4238335Z ##[group]Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.4239189Z with:
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.4239659Z   node-version: 22
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.4240172Z   always-auth: false
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.4240695Z   check-latest: false
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.4245378Z   token: ***
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.4245862Z ##[endgroup]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.5356086Z (node:2257) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.5357627Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.5360696Z Found in cache @ /opt/hostedtoolcache/node/22.23.4/x64
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.5362435Z ##[group]Environment details
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.8247932Z node: v22.23.4
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.8249749Z npm: 10.9.9
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.8250420Z yarn: 1.22.22
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.8251722Z ##[endgroup]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.8407390Z ##[group]Run npm ci
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.8407999Z ^[[36;1mnpm ci^[[0m
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.8462492Z shell: /usr/bin/bash -e {0}
+Wasit	UNKNOWN STEP	2026-11-19T23:55:33.8463113Z ##[endgroup]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.6436839Z 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.6443112Z added 132 packages, and audited 133 packages in 4s
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.6443462Z 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.6443695Z 55 packages are looking for funding
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.6444002Z   run `npm fund` for details
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.6519227Z 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.6520011Z 5 high severity vulnerabilities
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.6520271Z 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.6520443Z To address all issues, run:
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.6520711Z   npm audit fix --force
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.6520862Z 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.6520979Z Run `npm audit` for details.
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7183786Z ##[group]Run wasit-dev/wasit/action@f62a09cc03edc65907e1d0be9d0072a7fe6fc439
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7184186Z with:
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7184436Z   config: wasit.config.json
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7184717Z   tier: payment
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7184922Z   mainnet: false
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7185145Z env:
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7185810Z   STELLAR_PRIVATE_KEY: ***
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7186063Z ##[endgroup]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7236624Z ##[start-action display=Check the runner;id=__wasit-dev_wasit.__run]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7260011Z ##[group]Run if [ "$RUNNER_OS" != "Linux" ]; then
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7260427Z ^[[36;1mif [ "$RUNNER_OS" != "Linux" ]; then^[[0m
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7260738Z ^[[36;1m  echo "Wasit: this action runs on Linux runners in this version." >&2^[[0m
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7261254Z ^[[36;1m  exit 2^[[0m
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7261516Z ^[[36;1mfi^[[0m
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7261731Z ^[[36;1mif ! command -v node >/dev/null 2>&1; then^[[0m
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7262305Z ^[[36;1m  echo "Wasit: Node 22 or later is needed and node was not found. Add actions/setup-node with node-version: 22 before this step." >&2^[[0m
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7262707Z ^[[36;1m  exit 2^[[0m
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7262954Z ^[[36;1mfi^[[0m
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7263205Z ^[[36;1mmajor="$(node -p 'process.versions.node.split(".")[0]')"^[[0m
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7263539Z ^[[36;1mif [ "$major" -lt 22 ]; then^[[0m
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7263979Z ^[[36;1m  echo "Wasit: Node 22 or later is needed and this runner has Node $major. Add actions/setup-node with node-version: 22 before this step." >&2^[[0m
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7264374Z ^[[36;1m  exit 2^[[0m
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7264626Z ^[[36;1mfi^[[0m
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7309054Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7309371Z env:
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7309581Z   STELLAR_PRIVATE_KEY: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7309827Z   EVM_PRIVATE_KEY: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7310018Z   SVM_PRIVATE_KEY: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7310262Z   MPP_PAYER_SECRET: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7310470Z   COMMITMENT_SECRET_HEX: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7310693Z   WASIT_MAINNET_PAYER_SECRET: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7310971Z   NODE_OPTIONS: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7311165Z ##[endgroup]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7620652Z ##[end-action id=__wasit-dev_wasit.__run;outcome=success;conclusion=success;duration_ms=38]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7626669Z ##[start-action display=Check the inputs;id=__wasit-dev_wasit.__run_2]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7706171Z ##[group]Run node "$ACTION_PATH/scripts/wasit.mjs" check
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7706577Z ^[[36;1mnode "$ACTION_PATH/scripts/wasit.mjs" check^[[0m
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7754210Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7754452Z env:
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7754589Z   STELLAR_PRIVATE_KEY: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7754868Z   ACTION_PATH: /home/runner/work/_actions/wasit-dev/wasit/f62a09cc03edc65907e1d0be9d0072a7fe6fc439/action
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7755167Z   EVM_PRIVATE_KEY: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7755433Z   SVM_PRIVATE_KEY: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7755566Z   MPP_PAYER_SECRET: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7755713Z   COMMITMENT_SECRET_HEX: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7755860Z   WASIT_MAINNET_PAYER_SECRET: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7756007Z   NODE_OPTIONS: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7756136Z   INPUT_CONFIG: wasit.config.json
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7756287Z   INPUT_ENVIRONMENT: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7756426Z   INPUT_TIER: payment
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7756580Z   INPUT_ENDPOINTS: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7756703Z   INPUT_MAINNET: false
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.7756834Z ##[endgroup]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.8134361Z ##[end-action id=__wasit-dev_wasit.__run_2;outcome=success;conclusion=success;duration_ms=50]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.8139279Z ##[start-action display=Install Wasit;id=__wasit-dev_wasit.__run_3]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.8157627Z ##[group]Run cd "$ACTION_PATH/.."
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.8157939Z ^[[36;1mcd "$ACTION_PATH/.."^[[0m
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.8158254Z ^[[36;1mnpm ci --ignore-scripts --no-audit --no-fund^[[0m
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.8158575Z ^[[36;1mnpm run build -w packages/core^[[0m
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.8158845Z ^[[36;1mnpm run build -w packages/cli^[[0m
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.8159302Z ^[[36;1mnpm run build -w packages/server^[[0m
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.8212320Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.8212643Z env:
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.8212839Z   STELLAR_PRIVATE_KEY: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.8213263Z   ACTION_PATH: /home/runner/work/_actions/wasit-dev/wasit/f62a09cc03edc65907e1d0be9d0072a7fe6fc439/action
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.8213744Z   EVM_PRIVATE_KEY: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.8214011Z   SVM_PRIVATE_KEY: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.8214207Z   MPP_PAYER_SECRET: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.8214418Z   COMMITMENT_SECRET_HEX: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.8214644Z   WASIT_MAINNET_PAYER_SECRET: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.8214871Z   NODE_OPTIONS: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:37.8215064Z ##[endgroup]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:43.7591298Z 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:43.7592153Z added 364 packages in 6s
+Wasit	UNKNOWN STEP	2026-11-19T23:55:43.8648991Z 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:43.8649694Z > @wasit-dev/core@0.7.0 build
+Wasit	UNKNOWN STEP	2026-11-19T23:55:43.8650092Z > tsc -p tsconfig.json
+Wasit	UNKNOWN STEP	2026-11-19T23:55:43.8650427Z 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:44.5602312Z 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:44.5603002Z > @wasit-dev/cli@0.7.0 build
+Wasit	UNKNOWN STEP	2026-11-19T23:55:44.5603426Z > tsc -p tsconfig.json
+Wasit	UNKNOWN STEP	2026-11-19T23:55:44.5603580Z 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:45.1370582Z 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:45.1371243Z > @wasit-dev/server@0.7.0 build
+Wasit	UNKNOWN STEP	2026-11-19T23:55:45.1374810Z > tsc -p tsconfig.json
+Wasit	UNKNOWN STEP	2026-11-19T23:55:45.1375039Z 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:45.5581952Z ##[end-action id=__wasit-dev_wasit.__run_3;outcome=success;conclusion=success;duration_ms=7744]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:45.5588165Z ##[start-action display=Announce the run;id=__wasit-dev_wasit.announce]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:45.5609861Z ##[group]Run node "$ACTION_PATH/scripts/announce.mjs" start
+Wasit	UNKNOWN STEP	2026-11-19T23:55:45.5610142Z ^[[36;1mnode "$ACTION_PATH/scripts/announce.mjs" start^[[0m
+Wasit	UNKNOWN STEP	2026-11-19T23:55:45.5652967Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+Wasit	UNKNOWN STEP	2026-11-19T23:55:45.5653182Z env:
+Wasit	UNKNOWN STEP	2026-11-19T23:55:45.5653309Z   STELLAR_PRIVATE_KEY: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:45.5653580Z   ACTION_PATH: /home/runner/work/_actions/wasit-dev/wasit/f62a09cc03edc65907e1d0be9d0072a7fe6fc439/action
+Wasit	UNKNOWN STEP	2026-11-19T23:55:45.5653873Z   EVM_PRIVATE_KEY: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:45.5653995Z   SVM_PRIVATE_KEY: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:45.5654121Z   MPP_PAYER_SECRET: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:45.5654253Z   COMMITMENT_SECRET_HEX: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:45.5654394Z   WASIT_MAINNET_PAYER_SECRET: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:45.5654533Z   NODE_OPTIONS: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:45.5656424Z   GH_TOKEN: ***
+Wasit	UNKNOWN STEP	2026-11-19T23:55:45.5656553Z   INPUT_ENVIRONMENT: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:45.5656686Z ##[endgroup]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:46.2280569Z Wasit: check run "Wasit conformance" started.
+Wasit	UNKNOWN STEP	2026-11-19T23:55:46.2344280Z ##[end-action id=__wasit-dev_wasit.announce;outcome=success;conclusion=success;duration_ms=675]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:46.2349852Z ##[start-action display=Find the baseline;id=__wasit-dev_wasit.baseline]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:46.2363552Z ##[group]Run node "$ACTION_PATH/scripts/baseline.mjs"
+Wasit	UNKNOWN STEP	2026-11-19T23:55:46.2363797Z ^[[36;1mnode "$ACTION_PATH/scripts/baseline.mjs"^[[0m
+Wasit	UNKNOWN STEP	2026-11-19T23:55:46.2405461Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+Wasit	UNKNOWN STEP	2026-11-19T23:55:46.2405661Z env:
+Wasit	UNKNOWN STEP	2026-11-19T23:55:46.2405794Z   STELLAR_PRIVATE_KEY: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:46.2406057Z   ACTION_PATH: /home/runner/work/_actions/wasit-dev/wasit/f62a09cc03edc65907e1d0be9d0072a7fe6fc439/action
+Wasit	UNKNOWN STEP	2026-11-19T23:55:46.2406331Z   EVM_PRIVATE_KEY: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:46.2406457Z   SVM_PRIVATE_KEY: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:46.2406584Z   MPP_PAYER_SECRET: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:46.2406720Z   COMMITMENT_SECRET_HEX: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:46.2406863Z   WASIT_MAINNET_PAYER_SECRET: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:46.2407004Z   NODE_OPTIONS: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:46.2408528Z   GH_TOKEN: ***
+Wasit	UNKNOWN STEP	2026-11-19T23:55:46.2408653Z ##[endgroup]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:48.3610646Z Wasit: baseline from run 44270967444 on main, the last green run there.
+Wasit	UNKNOWN STEP	2026-11-19T23:55:48.8609366Z ##[end-action id=__wasit-dev_wasit.baseline;outcome=success;conclusion=success;duration_ms=2625]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:48.8614050Z ##[start-action display=Run Wasit;id=__wasit-dev_wasit.run]
+Wasit	UNKNOWN STEP	2026-11-19T23:55:48.8802238Z ##[group]Run node "$ACTION_PATH/scripts/wasit.mjs" run
+Wasit	UNKNOWN STEP	2026-11-19T23:55:48.8802917Z ^[[36;1mnode "$ACTION_PATH/scripts/wasit.mjs" run^[[0m
+Wasit	UNKNOWN STEP	2026-11-19T23:55:48.8847210Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+Wasit	UNKNOWN STEP	2026-11-19T23:55:48.8847513Z env:
+Wasit	UNKNOWN STEP	2026-11-19T23:55:48.8848034Z   STELLAR_PRIVATE_KEY: ***
+Wasit	UNKNOWN STEP	2026-11-19T23:55:48.8848440Z   ACTION_PATH: /home/runner/work/_actions/wasit-dev/wasit/f62a09cc03edc65907e1d0be9d0072a7fe6fc439/action
+Wasit	UNKNOWN STEP	2026-11-19T23:55:48.8848870Z   NODE_OPTIONS: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:48.8849138Z   INPUT_CONFIG: wasit.config.json
+Wasit	UNKNOWN STEP	2026-11-19T23:55:48.8849369Z   INPUT_ENVIRONMENT: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:48.8849566Z   INPUT_TIER: payment
+Wasit	UNKNOWN STEP	2026-11-19T23:55:48.8849762Z   INPUT_ENDPOINTS: 
+Wasit	UNKNOWN STEP	2026-11-19T23:55:48.8849907Z   INPUT_MAINNET: false
+Wasit	UNKNOWN STEP	2026-11-19T23:55:48.8850101Z   BASELINE_PATH: /home/runner/work/_temp/wasit/baseline/baseline-next.json
+Wasit	UNKNOWN STEP	2026-11-19T23:55:48.8850579Z   WASIT_BUILD_COMMIT: f62a09cc03edc65907e1d0be9d0072a7fe6fc439
+Wasit	UNKNOWN STEP	2026-11-19T23:55:48.8850774Z ##[endgroup]
+Wasit	UNKNOWN STEP	2026-11-19T23:56:19.1747664Z [wasit] the service runs as the user wasit-service, not as the user that holds the payer key
+Wasit	UNKNOWN STEP	2026-11-19T23:56:19.2725648Z [service] 
+Wasit	UNKNOWN STEP	2026-11-19T23:56:19.2726395Z [service] > x402-example-paywall@0.1.0 start
+Wasit	UNKNOWN STEP	2026-11-19T23:56:19.2726982Z [service] > node server.mjs
+Wasit	UNKNOWN STEP	2026-11-19T23:56:19.2727354Z [service] 
+Wasit	UNKNOWN STEP	2026-11-19T23:56:19.4540322Z [service] seller ready on http://127.0.0.1:4402/paid (GET, price $0.005, stellar:testnet)
+Wasit	UNKNOWN STEP	2026-11-19T23:56:19.8247593Z Payment tier on stellar:testnet (test network): test funds. Payer GCW2GJL3Y7HIJ56S5AOT3OLDXTB24WGE5W5LWTWYF6BXEU4SOFNPIPMM; at most $1.00 per payment; this run could spend up to $0.0225 of the $5.00 cap.
+Wasit	UNKNOWN STEP	2026-11-19T23:56:19.8248589Z Caps: $1.00 a payment, $5.00 this run.
+Wasit	UNKNOWN STEP	2026-11-19T23:56:19.8249538Z   quote-of-the-day: pays "GDPAPDZWAKBXUPCNMI4YHAZ7DS7UOUTPGXAFDSWZG4URRMWHFSQTDQBM" in "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA", up to $0.0225
+Wasit	UNKNOWN STEP	2026-11-19T23:56:19.8250429Z     X402-06 50000, X402-07 50000, X402-09 25000, X402-10 50000, X402-11 50000 (base units)
+Wasit	UNKNOWN STEP	2026-11-19T23:56:19.8250822Z Worst case: $0.0225 of $5.00.
+Wasit	UNKNOWN STEP	2026-11-19T23:56:49.7056422Z X402-11: the payment was sent with the request the service must refuse (HTTP 400); reading the chain once a ledger until its authorization expires at ledger 5821853, for at most 360 s.
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8084635Z {
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8084896Z   "schema": 1,
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8085078Z   "wasit": {
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8085337Z     "cli": "0.7.0",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8085530Z     "core": "0.7.0",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8085744Z     "build": "f62a09c"
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8085933Z   },
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8086111Z   "sdk": {
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8086601Z     "x402Version": 2,
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8086817Z     "@x402/core": "2.28.0",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8087070Z     "@x402/stellar": "2.28.0",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8087301Z     "@stellar/mpp": "0.7.1",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8087553Z     "mppx": "0.8.14",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8087789Z     "@stellar/stellar-sdk": "16.4.1"
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8088024Z   },
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8088202Z   "environment": "local",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8088441Z   "network": "stellar:testnet",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8088683Z   "networkClass": "test",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8088938Z   "startedAt": "2026-11-19T23:56:19.800Z",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8089185Z   "endpoints": [
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8089336Z     {
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8089472Z       "name": "quote-of-the-day",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8089634Z       "protocol": "x402",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8089772Z       "method": "GET",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8089903Z       "path": "/paid",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8090049Z       "outcome": "conformant",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8090192Z       "groups": {
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8090321Z         "challenge": {
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8090451Z           "passed": 5,
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8090578Z           "failed": 0,
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8090704Z           "errored": 0,
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8090840Z           "skipped": 0
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8090965Z         },
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8091082Z         "payment": {
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8091309Z Result: 1 graded (exit 0).
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8091460Z           "passed": 6,
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8091837Z           "failed": 0,
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8091965Z           "errored": 0,
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8092091Z           "skipped": 0
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8092215Z         }
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8092323Z       },
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8092432Z       "results": [
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8092548Z         {
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8092664Z           "id": "X402-01",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8092824Z           "name": "402 Response Status",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8092984Z           "status": "PASS",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8093181Z           "detail": "Server responded with 402 as required.",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8093383Z           "destructive": false
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8093529Z         },
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8093637Z         {
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8093752Z           "id": "X402-02",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8094072Z           "name": "Payment Header Present",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8094239Z           "status": "PASS",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8094407Z           "detail": "Payment header found.",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8094578Z           "destructive": false
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8094715Z         },
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8094820Z         {
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8094942Z           "id": "X402-03",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8095099Z           "name": "Header Payload Decodable",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8095420Z           "status": "PASS",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8095679Z           "detail": "Header decoded to valid JSON.",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8095869Z           "destructive": false
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8096003Z         },
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8096113Z         {
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8096223Z           "id": "X402-04",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8096376Z           "name": "Required Fields Present",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8096540Z           "status": "PASS",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8096714Z           "detail": "All required v2 fields present.",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8096905Z           "destructive": false
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8097041Z         },
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8097156Z         {
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8097267Z           "id": "X402-05",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8097427Z           "name": "Network Identifier Valid",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8097589Z           "status": "PASS",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8097790Z           "detail": "Network identifier \"stellar:testnet\" is valid.",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8098006Z           "destructive": false
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8098140Z         },
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8098245Z         {
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8098356Z           "id": "X402-06",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8098524Z           "name": "Signature Resubmit Accepted",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8098687Z           "status": "PASS",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8099491Z           "detail": "Valid payment accepted (HTTP 200) and settled on-chain for exactly the advertised 50000 base units of CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA to GDPAPDZWAKBXUPCNMI4YHAZ7DS7UOUTPGXAFDSWZG4URRMWHFSQTDQBM, verified from the transfer event (tx ec61f2df41306528d08388887556a104d5e18be061d964ea7d9e76f13de02c0d).",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8100235Z           "destructive": false,
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8100489Z           "reference": "ec61f2df41306528d08388887556a104d5e18be061d964ea7d9e76f13de02c0d"
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8100717Z         },
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8100823Z         {
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8100940Z           "id": "X402-07",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8101098Z           "name": "Invalid Signature Rejected",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8101265Z           "status": "PASS",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8101632Z           "detail": "Payment with a corrupted authorization signature correctly rejected (HTTP 402: invalid_exact_stellar_payload_simulation_failed).",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8101990Z           "destructive": false
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8102126Z         },
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8102230Z         {
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8102338Z           "id": "X402-08",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8102497Z           "name": "Payment Replay Rejected",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8102660Z           "status": "PASS",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8102960Z           "detail": "The same payment, sent again, was refused (HTTP 402: invalid_exact_stellar_payload_simulation_failed).",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8103253Z           "destructive": false
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8103511Z         },
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8103620Z         {
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8103731Z           "id": "X402-09",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8103883Z           "name": "Underpayment Rejected",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8104050Z           "status": "PASS",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8104417Z           "detail": "A validly signed payment for 25000 of the advertised 50000 base units was refused (HTTP 402: invalid_exact_stellar_payload_wrong_amount).",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8104771Z           "destructive": false
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8104904Z         },
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8105015Z         {
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8105126Z           "id": "X402-10",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8105446Z           "name": "Expired Authorization Rejected",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8105618Z           "status": "PASS",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8106025Z           "detail": "A payment whose authorization had expired was refused (HTTP 402: invalid_exact_stellar_payload_simulation_failed).",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8106346Z           "destructive": false
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8106486Z         },
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8106593Z         {
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8106708Z           "id": "X402-11",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8106874Z           "name": "Rejected Request Not Settled",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8107044Z           "status": "PASS",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8107800Z           "detail": "The request the config declares invalid was refused (HTTP 400: unsupported language), and the payment was not taken: its authorization expired at ledger 5821853 unused (read at ledger 5821854, in the same read that found X402-06's used authorization); no transfer of it to payTo was recorded, and the payer's balance did not fall by it.",
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8108943Z           "destructive": false
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8109151Z         }
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8109327Z       ]
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8109494Z     }
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8109664Z   ],
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8109828Z   "totals": {
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8110012Z     "endpoints": 1,
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8110200Z     "graded": 1,
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8110390Z     "conformant": 1,
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8110600Z     "nonConformant": 0,
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8110803Z     "noVerdict": 0,
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8111072Z     "unsupported": 0
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8111258Z   },
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8111415Z   "notes": [
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8111907Z     "Tier: payment on stellar:testnet. The run charged $0.0225 of the $5.00 cap, at most $1.00 a payment; every signature is counted as if it settled."
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8112382Z   ]
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8112535Z }
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8721104Z ##[end-action id=__wasit-dev_wasit.run;outcome=success;conclusion=success;duration_ms=367010]
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8724747Z ##[start-action display=Write the report;id=__wasit-dev_wasit.report]
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8743224Z ##[group]Run node "$ACTION_PATH/scripts/wasit.mjs" report
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8743484Z ^[[36;1mnode "$ACTION_PATH/scripts/wasit.mjs" report^[[0m
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8784818Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8785010Z env:
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8785137Z   STELLAR_PRIVATE_KEY: 
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8785590Z   ACTION_PATH: /home/runner/work/_actions/wasit-dev/wasit/f62a09cc03edc65907e1d0be9d0072a7fe6fc439/action
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8785859Z   EVM_PRIVATE_KEY: 
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8785976Z   SVM_PRIVATE_KEY: 
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8786090Z   MPP_PAYER_SECRET: 
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8786221Z   COMMITMENT_SECRET_HEX: 
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8786360Z   WASIT_MAINNET_PAYER_SECRET: 
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8786501Z   NODE_OPTIONS: 
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8786679Z   BASELINE_PATH: /home/runner/work/_temp/wasit/baseline/baseline-next.json
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8786946Z   HISTORY_PATH: /home/runner/work/_temp/wasit/baseline/baseline-next.json
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8787151Z   BASELINE_RUN: 44270967444
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8787338Z   WASIT_BUILD_COMMIT: f62a09cc03edc65907e1d0be9d0072a7fe6fc439
+Wasit	UNKNOWN STEP	2026-11-20T00:01:55.8787527Z ##[endgroup]
+Wasit	UNKNOWN STEP	2026-11-20T00:01:56.6446189Z Wrote /home/runner/work/_temp/wasit/comment.md
+Wasit	UNKNOWN STEP	2026-11-20T00:01:56.6457434Z Appended the summary to /home/runner/work/_temp/_runner_file_commands/step_summary_b13ff291-1c59-4ce2-9d6c-468069f53caf
+Wasit	UNKNOWN STEP	2026-11-20T00:01:56.6458359Z Wrote /home/runner/work/_temp/wasit/baseline-next.json
+Wasit	UNKNOWN STEP	2026-11-20T00:01:56.6459732Z Wrote /home/runner/work/_temp/wasit/check-run.json
+Wasit	UNKNOWN STEP	2026-11-20T00:01:56.6714707Z ##[end-action id=__wasit-dev_wasit.report;outcome=success;conclusion=success;duration_ms=798]
+Wasit	UNKNOWN STEP	2026-11-20T00:01:56.6732623Z ##[start-action display=Comment on the pull request;id=__wasit-dev_wasit.__run_4]
+Wasit	UNKNOWN STEP	2026-11-20T00:01:56.6736879Z ##[end-action id=__wasit-dev_wasit.__run_4;outcome=skipped;conclusion=skipped;duration_ms=0]
+Wasit	UNKNOWN STEP	2026-11-20T00:01:56.6739116Z ##[start-action display=Finish the check run;id=__wasit-dev_wasit.__run_5]
+Wasit	UNKNOWN STEP	2026-11-20T00:01:56.6752321Z ##[group]Run node "$ACTION_PATH/scripts/announce.mjs" finish
+Wasit	UNKNOWN STEP	2026-11-20T00:01:56.6752730Z ^[[36;1mnode "$ACTION_PATH/scripts/announce.mjs" finish^[[0m
+Wasit	UNKNOWN STEP	2026-11-20T00:01:56.6794298Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+Wasit	UNKNOWN STEP	2026-11-20T00:01:56.6794493Z env:
+Wasit	UNKNOWN STEP	2026-11-20T00:01:56.6794627Z   STELLAR_PRIVATE_KEY: 
+Wasit	UNKNOWN STEP	2026-11-20T00:01:56.6794891Z   ACTION_PATH: /home/runner/work/_actions/wasit-dev/wasit/f62a09cc03edc65907e1d0be9d0072a7fe6fc439/action
+Wasit	UNKNOWN STEP	2026-11-20T00:01:56.6795161Z   EVM_PRIVATE_KEY: 
+Wasit	UNKNOWN STEP	2026-11-20T00:01:56.6795427Z   SVM_PRIVATE_KEY: 
+Wasit	UNKNOWN STEP	2026-11-20T00:01:56.6795553Z   MPP_PAYER_SECRET: 
+Wasit	UNKNOWN STEP	2026-11-20T00:01:56.6795684Z   COMMITMENT_SECRET_HEX: 
+Wasit	UNKNOWN STEP	2026-11-20T00:01:56.6795826Z   WASIT_MAINNET_PAYER_SECRET: 
+Wasit	UNKNOWN STEP	2026-11-20T00:01:56.6795968Z   NODE_OPTIONS: 
+Wasit	UNKNOWN STEP	2026-11-20T00:01:56.6797498Z   GH_TOKEN: ***
+Wasit	UNKNOWN STEP	2026-11-20T00:01:56.6797627Z   CHECK_RUN_ID: 135973988866
+Wasit	UNKNOWN STEP	2026-11-20T00:01:56.6797771Z   REPORT_OUTCOME: success
+Wasit	UNKNOWN STEP	2026-11-20T00:01:56.6797960Z   WASIT_CHECK_RUN_FILE: /home/runner/work/_temp/wasit/check-run.json
+Wasit	UNKNOWN STEP	2026-11-20T00:01:56.6798163Z ##[endgroup]
+Wasit	UNKNOWN STEP	2026-11-20T00:01:57.1650649Z Wasit: check run "Wasit conformance" completed (success).
+Wasit	UNKNOWN STEP	2026-11-20T00:01:57.1698033Z ##[end-action id=__wasit-dev_wasit.__run_5;outcome=success;conclusion=success;duration_ms=495]
+Wasit	UNKNOWN STEP	2026-11-20T00:01:57.1700568Z ##[start-action display=Upload the baseline;id=__wasit-dev_wasit.__actions_upload-artifact]
+Wasit	UNKNOWN STEP	2026-11-20T00:01:57.1730625Z ##[group]Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+Wasit	UNKNOWN STEP	2026-11-20T00:01:57.1730854Z with:
+Wasit	UNKNOWN STEP	2026-11-20T00:01:57.1730972Z   name: wasit-baseline
+Wasit	UNKNOWN STEP	2026-11-20T00:01:57.1731132Z   path: /home/runner/work/_temp/wasit/baseline-next.json
+Wasit	UNKNOWN STEP	2026-11-20T00:01:57.1731322Z   if-no-files-found: warn
+Wasit	UNKNOWN STEP	2026-11-20T00:01:57.1731461Z   compression-level: 6
+Wasit	UNKNOWN STEP	2026-11-20T00:01:57.1731589Z   overwrite: false
+Wasit	UNKNOWN STEP	2026-11-20T00:01:57.1731720Z   include-hidden-files: false
+Wasit	UNKNOWN STEP	2026-11-20T00:01:57.1731860Z env:
+Wasit	UNKNOWN STEP	2026-11-20T00:01:57.1731972Z   STELLAR_PRIVATE_KEY: 
+Wasit	UNKNOWN STEP	2026-11-20T00:01:57.1732101Z   EVM_PRIVATE_KEY: 
+Wasit	UNKNOWN STEP	2026-11-20T00:01:57.1732220Z   SVM_PRIVATE_KEY: 
+Wasit	UNKNOWN STEP	2026-11-20T00:01:57.1732353Z   MPP_PAYER_SECRET: 
+Wasit	UNKNOWN STEP	2026-11-20T00:01:57.1732480Z   COMMITMENT_SECRET_HEX: 
+Wasit	UNKNOWN STEP	2026-11-20T00:01:57.1732620Z   WASIT_MAINNET_PAYER_SECRET: 
+Wasit	UNKNOWN STEP	2026-11-20T00:01:57.1732757Z   NODE_OPTIONS: 
+Wasit	UNKNOWN STEP	2026-11-20T00:01:57.1732875Z ##[endgroup]
+Wasit	UNKNOWN STEP	2026-11-20T00:01:57.2864180Z (node:2738) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Wasit	UNKNOWN STEP	2026-11-20T00:01:57.2864951Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Wasit	UNKNOWN STEP	2026-11-20T00:01:57.2916128Z With the provided path, there will be 1 file uploaded
+Wasit	UNKNOWN STEP	2026-11-20T00:01:57.2916986Z Artifact name is valid!
+Wasit	UNKNOWN STEP	2026-11-20T00:01:57.2917354Z Root directory input is valid!
+Wasit	UNKNOWN STEP	2026-11-20T00:01:57.5596786Z Beginning upload of artifact content to blob storage
+Wasit	UNKNOWN STEP	2026-11-20T00:01:57.5731692Z (node:2738) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+Wasit	UNKNOWN STEP	2026-11-20T00:01:57.7058380Z Uploaded bytes 1614
+Wasit	UNKNOWN STEP	2026-11-20T00:01:57.7456734Z Finished uploading artifact content to blob storage!
+Wasit	UNKNOWN STEP	2026-11-20T00:01:57.7457915Z SHA256 digest of uploaded artifact zip is f8bc7a296c4639bbd690753c642f28895e0087e69bea916a0124e6ce2a583574
+Wasit	UNKNOWN STEP	2026-11-20T00:01:57.7458397Z Finalizing artifact upload
+Wasit	UNKNOWN STEP	2026-11-20T00:01:58.1176299Z Artifact wasit-baseline.zip successfully finalized. Artifact ID 14587361236
+Wasit	UNKNOWN STEP	2026-11-20T00:01:58.1177040Z Artifact wasit-baseline has been successfully uploaded! Final size is 1614 bytes. Artifact ID is 14587361236
+Wasit	UNKNOWN STEP	2026-11-20T00:01:58.1177571Z Artifact download URL: https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/44641632605/artifacts/14587361236
+Wasit	UNKNOWN STEP	2026-11-20T00:01:58.1295524Z ##[end-action id=__wasit-dev_wasit.__actions_upload-artifact;outcome=success;conclusion=success;duration_ms=959]
+Wasit	UNKNOWN STEP	2026-11-20T00:01:58.1351297Z Post job cleanup.
+Wasit	UNKNOWN STEP	2026-11-20T00:01:58.2151180Z (node:2751) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Wasit	UNKNOWN STEP	2026-11-20T00:01:58.2152355Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Wasit	UNKNOWN STEP	2026-11-20T00:01:58.2324652Z Post job cleanup.
+Wasit	UNKNOWN STEP	2026-11-20T00:01:58.2896155Z [command]/usr/bin/git version
+Wasit	UNKNOWN STEP	2026-11-20T00:01:58.2924870Z git version 2.56.1
+Wasit	UNKNOWN STEP	2026-11-20T00:01:58.2948467Z Temporarily overriding HOME='/home/runner/work/_temp/e2c008e5-95c4-4cc7-b53a-485e80d4b9dd' before making global git config changes
+Wasit	UNKNOWN STEP	2026-11-20T00:01:58.2949280Z Adding repository directory to the temporary git global config as a safe directory
+Wasit	UNKNOWN STEP	2026-11-20T00:01:58.2951997Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/x402-example-paywall/x402-example-paywall
+Wasit	UNKNOWN STEP	2026-11-20T00:01:58.2986943Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Wasit	UNKNOWN STEP	2026-11-20T00:01:58.3023651Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Wasit	UNKNOWN STEP	2026-11-20T00:01:58.3276880Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Wasit	UNKNOWN STEP	2026-11-20T00:01:58.3337803Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Wasit	UNKNOWN STEP	2026-11-20T00:01:58.3644123Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Wasit	UNKNOWN STEP	2026-11-20T00:01:58.3677699Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Wasit	UNKNOWN STEP	2026-11-20T00:01:58.4043131Z Cleaning up orphan processes
+Wasit	UNKNOWN STEP	2026-11-20T00:01:58.4301144Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@11d5960a326750d5838078e36cf38b85af677262, actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020, actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
