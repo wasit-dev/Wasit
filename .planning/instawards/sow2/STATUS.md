@@ -1,0 +1,121 @@
+# Wasit Instawards SOW 2 — Master Status
+
+> **READ THIS FIRST** for anything about SOW 2. Single source of truth for the
+> engagement. Updated at the end of every working session.
+
+Last updated: 2026-11-20 (evening): the pre-release `0.8.0-beta.1` is out, without
+the mainnet opt-in: [the release on GitHub](https://github.com/wasit-dev/Wasit/releases/tag/v0.8.0-beta.1) and the three packages on npm
+under the `beta` tag (`latest` stays at 0.7.0). The Action on `main` of the
+example project builds Wasit from the release commit and its report names
+0.8.0-beta.1. Earlier the same day: the comment's table of each check, "Wasit is
+running", and the Action's own check, "Wasit conformance", shown on `main`, on a
+pull request and on a pull request from a fork. Week 1 is done (job 00 and job
+01). The independent review of the payment code is the next work. The example
+project is public, so every link in the review table opens without a login.
+
+---
+
+## What this is
+
+Instawards is a Stellar Community Fund (SCF) program. SOW 2 is the second
+statement of work for Wasit, an open-source x402/MPP protocol-compliance tester
+for Stellar. It is **accepted** (acceptance message of 2026-11-11). The sprint
+started on 2026-11-14 and runs four weeks, with the last two days for the final
+report.
+
+SOW 2 puts Wasit into the builder's own workflow:
+
+1. **D1:** a GitHub Action that runs the read-only checks on every pull request.
+2. **D2:** the payment checks and MPP in the same Action, a new check, and a
+   network guard that keeps payments on test networks unless a capped opt-in is
+   switched on.
+3. **D3:** `wasit init`, an example project, and guides.
+
+Working style: **one job = one file** in this folder. At the end of a session,
+write the result into the job file and update the tables below. Every claim that
+a thing is done has a link that opens it (see `07-evidence-submission.md`).
+
+---
+
+## Weekly review: click to check
+
+This table is for screening a week without reading the rest.
+
+| Week | Dates (our calendar) | What the week plans | Status | Click to check |
+| --- | --- | --- | --- | --- |
+| 1 | 14 to 20 Nov | The read-only Action, `wasit.config.json`, "unsupported" results, the workflow in the example project | ✅ **DONE** | [Red check and comment, PR 1](https://github.com/dzakwannajmi/x402-example-paywall/pull/1) · [Red, then green, same comment, PR 2](https://github.com/dzakwannajmi/x402-example-paywall/pull/2) · [Green run on `main`](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43697947796) · [From a fork, no comment, PR 5](https://github.com/dzakwannajmi/x402-example-paywall/pull/5) · [Job 00](00-read-only-action.md) · [Evidence table](07-evidence-submission.md) |
+| 2 | 21 to 27 Nov | Payment checks in CI on test networks, the new check "rejected request does not settle", the network guard and its caps, a pre-release for beta testers | 🟡 **IN PROGRESS** — the payment tier and the new check run on `main` | [Draft pull request with the code](https://github.com/wasit-dev/Wasit/pull/23) · [Payment tier code, PR 30](https://github.com/wasit-dev/Wasit/pull/30) · [Payment tier on `main`, 10 of 10](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43816426654) · [The payment on Stellar Expert](https://stellar.expert/explorer/testnet/tx/beb0a5f94e2c5cb41cad8f5fe1110020dd004c30022b53b853b30ae5ef905a86) · [The new check `X402-11` on `main`, 11 of 11](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43851987068) · [From a fork, payment checks not run, PR 5](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43819805398) · [A payment on `stellar:pubnet` refused before signing](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43882304954) · [The `mainnet` input refused on a push](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43882283916) · [Read-only checks pass on a challenge naming `stellar:pubnet`, PR 6](https://github.com/dzakwannajmi/x402-example-paywall/pull/6) · [The check "Wasit conformance" and the running comment, PR 7](https://github.com/dzakwannajmi/x402-example-paywall/pull/7) · [From a fork, no check and no running comment, PR 8](https://github.com/dzakwannajmi/x402-example-paywall/pull/8) · [The pre-release `0.8.0-beta.1`](https://github.com/wasit-dev/Wasit/releases/tag/v0.8.0-beta.1) · [On npm, tag `beta`](https://www.npmjs.com/package/@wasit-dev/cli/v/0.8.0-beta.1) · [The Action at the pre-release, on `main`](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/44748831548) · [Job 02](02-guard-and-payment-tier.md) |
+| 3 | 28 Nov to 4 Dec | MPP in the Action, `wasit init` and the test-network key setup, recent-failures line, validation of the capped opt-in on our own service | ⬜ **NOT STARTED** | [Job 03](03-mpp-and-validation.md) · [Job 04](04-init.md) |
+| 4 | 5 to 11 Dec | Demo mode, guides, install-time guarantees, SBOM, release, final report | ⬜ **NOT STARTED** | [Job 05](05-guides-and-hygiene.md) · [Job 06](06-release-and-final-report.md) |
+
+Marks: ✅ built and shown in a real run or a public page · 🟡 built and tested,
+or shown only in part · ⬜ planned for a later week.
+
+---
+
+## Key facts & decisions (don't re-derive these)
+
+| Thing | Value |
+| --- | --- |
+| Builder | Muhammad Dzakwan Najmi (contact@usewasit.dev) |
+| Website | <https://usewasit.dev> |
+| Ambassador Chapter | Stellar Chapter Ambassador Indonesia (the Chapter Lead reviews each week) |
+| GitHub repo | <https://github.com/wasit-dev/Wasit> (public) |
+| Published packages | `@wasit-dev/core`, `cli`, `server`: 0.7.0 under `latest`, and the pre-release [0.8.0-beta.1](https://www.npmjs.com/package/@wasit-dev/cli/v/0.8.0-beta.1) under `beta` since 2026-11-20 ([release](https://github.com/wasit-dev/Wasit/releases/tag/v0.8.0-beta.1)). |
+| The Action's code | Directory `action/` on branch `sow2/s1-action`, offered as the draft [pull request 23](https://github.com/wasit-dev/Wasit/pull/23). It is merged with the pre-release, not before. The changes of 2026-11-20 to how a run shows on a pull request are on branch `sow2/pr-run`, at commit `05f5a19`. |
+| Example project | <https://github.com/dzakwannajmi/x402-example-paywall> — **public since 2026-11-15** (MIT License); every link to it opens without a login |
+| Tests | Offline, no keys, no network. At the pre-release candidate on the maintainer's machine (2026-11-20): command line 271, core 828, server 30, Action 190, none failing. CI on the draft pull request passes: [run](https://github.com/wasit-dev/Wasit/actions/runs/43706023137) |
+| Network | Payment checks run on test networks. Any other network is refused (first layer built). The read-only checks only read the service's answer. |
+| Calendar | Week 1: 14 to 20 Nov · week 2: 21 to 27 Nov · week 3: 28 Nov to 4 Dec · week 4: 5 to 11 Dec · 12 and 13 Dec: final report |
+| Where proofs are copied | `week-1/copies/` — text copies of the comments and job logs that the live links show, kept as an archive in case a run or a comment is later changed or removed. The live link is authoritative. |
+
+---
+
+## SOW deliverables (binding), in short
+
+- **D1 — Wasit in CI, read-only tier:** an Action that starts the builder's x402 service in the job, runs X402-01 to X402-05, and shows a check plus one updated comment (what changed since `main`, expected and actual values, a link to the fix). A `wasit.config.json` lists endpoints, methods, bodies and environments. "Unsupported" is not a failure; "nothing could be tested" fails the job. Evidence: the workflow file, one passing and one failing run, and a pull request where the check and the comment can be seen.
+- **D2 — Payment checks in CI, a new check, and MPP:** the payment tier of the same Action on `main` with a payer key in the builder's secrets, never on pull requests from forks; the new check "rejected request does not settle"; MPP charge and channel checks; a network guard (test networks by default) with a capped, explicit opt-in for the x402 payment checks on Stellar mainnet, validated on our own service before it is offered. Evidence: runs with transaction links, the guard refusing, the validation findings.
+- **D3 — `wasit init`, example project, guides:** a setup command that reads the service's 402 answer and writes `wasit.config.json`; the example project; demo mode; guides; install-time guarantees and an SBOM. Evidence: recordings of `init`, the example project, the guides, SECURITY.md, the SBOM.
+- **Overall:** a pre-release tag (end of week 2), the release, green CI with test counts, a short video of the Action on a pull request, and a final report with an evidence link for each deliverable.
+
+---
+
+## Job board
+
+| # | Job | File | Week | Status | Depends on |
+| --- | --- | --- | --- | --- | --- |
+| 0 | Read-only GitHub Action (D1) | `00-read-only-action.md` | 1 | ✅ **DONE** — 2026-11-15, runs and pull requests linked | — |
+| 1 | Example project with the Wasit workflow (D3, and the place where D2 runs are shown) | `01-example-project.md` | 1, 2, 3 | 🟡 **IN PROGRESS** — workflow done in week 1; payment and MPP runs come with weeks 2 and 3 | #0 |
+| 2 | Network guard, payment tier, new check, opt-in, pre-release (D2) | `02-guard-and-payment-tier.md` | 2 | 🟡 **IN PROGRESS** — the payment tier and the new check run on `main` | #0 |
+| 3 | MPP in the Action, recent failures, "resource consumed", own facilitator and RPC, validation of the opt-in (D2) | `03-mpp-and-validation.md` | 3 | ⬜ **NOT STARTED** | #2 |
+| 4 | `wasit init` and the test-network key setup (D3) | `04-init.md` | 3 | ⬜ **NOT STARTED** | #2 |
+| 5 | Demo mode, guides, SECURITY.md, SBOM, pinned MCP examples (D3) | `05-guides-and-hygiene.md` | 4 | ⬜ **NOT STARTED** | #4 |
+| 6 | Release and final report (Overall) | `06-release-and-final-report.md` | 4 | ⬜ **NOT STARTED** | all |
+| 7 | Evidence submission: every SOW evidence row with its proof | `07-evidence-submission.md` | 1 to 4 | 🟡 **IN PROGRESS** — week 1 rows filled | all |
+
+---
+
+## Open items
+
+- **Windows.** Not run. The Action supports Linux runners in this SOW.
+- **Version number.** Solved by the pre-release: the Action's report now reads "Wasit 0.8.0-beta.1, built from commit 38d8a86" ([run](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/44748831548)).
+- **The draft pull requests 23 and 30** hold the code of the pre-release; merging them into `main` is the next step after it.
+- **Links into the code.** The links to the Action's code point at branch `sow2/s1-action`. After the pre-release merge they are moved to `main`.
+
+---
+
+## Session log
+
+| Date | Focus | Outcome |
+| --- | --- | --- |
+| 2026-11-20 | The pre-release `0.8.0-beta.1` | Published without the mainnet opt-in: [the release](https://github.com/wasit-dev/Wasit/releases/tag/v0.8.0-beta.1), tag `v0.8.0-beta.1` on commit `38d8a86`, and `@wasit-dev/core`, `cli` and `server` on npm under the `beta` tag; `latest` stays at 0.7.0. Before publishing, every check of the release ran on the maintainer's machine: the offline tests, the install of the packed packages, and the suites against local fixtures on Stellar testnet, Base Sepolia, Ethereum Sepolia and Solana devnet, with each settlement read back from its chain. The packages on npm have the same shasums as those tested. The package READMEs now describe the beta, and the reason an x402 v1 service is unsupported holds on every chain. [The advisory](https://github.com/wasit-dev/Wasit/security/advisories/GHSA-7c36-rg54-r3v8) for the two MPP defects of 0.7.0, fixed in this version, is published. On `main` of the example project, [the Action at the release commit](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/44748831548) passed all eleven checks and its report names 0.8.0-beta.1. The workshop kit's [v0.1.2](https://github.com/dzakwannajmi/x402-starer-kit/releases/tag/v0.1.2) runs the pre-release. |
+| 2026-11-20 | The run on a pull request | Three changes the maintainer chose for the pre-release, shown in real runs. The comment has a table of each check with a mark for its result and the details folded at the end; under an endpoint whose `X402-06` passed on the test network, it links the payment on Stellar Expert. While Wasit runs, the comment says so, and the result replaces it ([pull request 7](https://github.com/dzakwannajmi/x402-example-paywall/pull/7): the comment's edit history shows both). With `checks: write` the Action adds its own check, "Wasit conformance", completed with the verdict and the job summary ([on `main`](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/44641632605), where it carries the payment link). [Pull request 8](https://github.com/dzakwannajmi/x402-example-paywall/pull/8), from a fork, got neither. A probe on pull request 7 showed that `NODE_OPTIONS` set in the workflow does not reach the Action's steps or the service, and that GitHub's runner refuses it through `GITHUB_ENV`. The copies are in `week-2/copies/`. Code: commit [`05f5a19`](https://github.com/wasit-dev/Wasit/commit/05f5a19cc51a7dbb151d25f5ccadaaf48b3e1398) on branch `sow2/pr-run`. |
+| 2026-11-16 | Mainnet refused | The switches of the mainnet opt-in exist in this version only to refuse it: `wasit run --mainnet`, the Action's `mainnet` input and the MCP server's start-up settings. On a push, [a run with `mainnet: true`](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43882283916) stopped in the step that checks the inputs, before Wasit was installed ([copy of the log](week-2/copies/run-mainnet-input-refused.log.txt)). [A payment-tier run on a config that names `stellar:pubnet`](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43882304954), started by hand on `main` with no payer key, stopped before the service started and before anything was signed ([copy of the log](week-2/copies/run-pubnet-payment-refused.log.txt)). A property test drives random flags, variables, events and config values for a payment on `stellar:pubnet`: nothing is paid or signed. Code: [draft pull request 30](https://github.com/wasit-dev/Wasit/pull/30). |
+| 2026-11-16 | The new check `X402-11` | Built and shown. Wasit sends a valid payment with a request the service must refuse, then reads the Stellar test network until that payment's authorization has expired: unused and no transfer is a pass. On `main` of the example project the seller refuses a quote language it does not have; in [the run](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43851987068) the check waited out the payment's lifetime and all eleven checks passed ([copy of the log](week-2/copies/run-main-x402-11.log.txt)). Against a test fixture on the maintainer's machine, a seller that settles and then refuses and one that serves the request both failed, each naming the transaction that took the payment ([copy](week-2/copies/live-check-x402-11-three-modes.txt)). A first run there found a defect in Wasit's second reading of the chain, fixed before these runs. Code: [draft pull request 30](https://github.com/wasit-dev/Wasit/pull/30). |
+| 2026-11-16 | A pull request from a fork, payment tier | [Pull request 5](https://github.com/dzakwannajmi/x402-example-paywall/pull/5), from a fork, was brought up to date with `main`, so it runs the workflow that asks for `tier: payment`. In [its run](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43819805398) the job had no secrets and a read-only token; X402-01 to X402-05 passed, X402-06 to X402-10 were skipped with "payment checks not run: pull request", the run notes that nothing was signed, and no comment was posted ([copy of the log](week-2/copies/run-pr5-fork-payment-tier.log.txt)). |
+| 2026-11-16 | The payment tier on `main` | The example project's workflow now runs the payment tier on a push to `main` and on a run started by hand, with a dedicated testnet payer in the repository secret `WASIT_TESTNET_PAYER`, given to the Wasit step only and not on pull requests. In [the run on `main`](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43816426654) the seller ran as its own user, the plan and the caps were printed before anything was signed, X402-01 to X402-10 passed, and X402-06's payment settled on the Stellar test network ([Stellar Expert](https://stellar.expert/explorer/testnet/tx/beb0a5f94e2c5cb41cad8f5fe1110020dd004c30022b53b853b30ae5ef905a86); [copy of the log](week-2/copies/run-main-payment-tier.log.txt)). A first attempt failed: the runner's sudo ignored the option that passes the environment to the seller's user, and the example's payee did not exist on the test network. Both were fixed before this run. Code: [draft pull request 30](https://github.com/wasit-dev/Wasit/pull/30). |
+| 2026-11-15 | Read-only checks on a challenge that names `stellar:pubnet` | A week 2 proof that does not need the payment tier. [Pull request 6](https://github.com/dzakwannajmi/x402-example-paywall/pull/6) makes the local seller name `stellar:pubnet` (its facilitator is a local stand-in that cannot verify or settle). Before the push, the same run was made on the maintainer's machine. In [the Action's run](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43724229283) X402-01 to X402-05 passed, the payment checks were skipped by the read-only tier, and the comment says nothing was signed ([copy](week-2/copies/pr-6-comment.md)). It is a local seller, not a deployed mainnet service. The pull request stays open as proof. |
+| 2026-11-15 | A pull request from a fork | A fork of the example project, made from a second account of the maintainer, opened [pull request 5](https://github.com/dzakwannajmi/x402-example-paywall/pull/5) (one line in `.gitignore`). In [its run](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43722428182) the token had read access only, the Action printed that the pull request is from a fork so no comment is posted, no comment was posted, the check "Wasit" passed, and the job summary shows the verdict ([copy](week-1/copies/pr-5-job-summary.md)). The pull request stays open as proof. |
+| 2026-11-15 | The example project made public | Before the change, the files, the whole history and the four pull requests were searched for keys and for text that does not belong on a public page; none was found, and the repository holds no secret. It was then made public, earlier than planned, so the proof links open without a login. The copyright line of the MIT License now names the project's author. The four evidence pull requests stay open. |
+| 2026-11-15 | Week 1: build, runs and proof | **The read-only Action runs on pull requests in the example project.** Green on a service that conforms ([run on `main`](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43697947796)); red on a deliberately broken one ([pull request 1](https://github.com/dzakwannajmi/x402-example-paywall/pull/1)); the same comment updated red to green after a second push ([pull request 2](https://github.com/dzakwannajmi/x402-example-paywall/pull/2)); "no verdict" when the service never answered ([pull request 3](https://github.com/dzakwannajmi/x402-example-paywall/pull/3)); "unsupported" for an x402 v1 service ([pull request 4](https://github.com/dzakwannajmi/x402-example-paywall/pull/4)). After the first runs, the comment gained the commit a build came from and a capital letter under "Not graded", and the Action's own references were pinned to commit SHAs; pull requests 3 and 4 were re-run on the new Action. The first layer of the network guard and `stellar-sdk` 16.4.1 (the test network is on protocol 30) went into the same draft pull request. |
+| 2026-11-14 | Sprint start: design before code | The design of the three deliverables was written and checked before any code: the configuration file, the Action, the network guard and the opt-in, `wasit init`. The example project is rendered from the workshop starter kit and holds the workflow. |
