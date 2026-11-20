@@ -1,0 +1,427 @@
+# Copy of the job log of dzakwannajmi/x402-example-paywall run 43697947796 (taken 2026-11-15; the live run is authoritative)
+# https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43697947796
+
+Wasit	Set up job	﻿2026-11-15T09:10:34.5182581Z Current runner version: '2.338.2'
+Wasit	Set up job	2026-11-15T09:10:34.5213561Z ##[group]Runner Image Provisioner
+Wasit	Set up job	2026-11-15T09:10:34.5214608Z Hosted Compute Agent
+Wasit	Set up job	2026-11-15T09:10:34.5215300Z Version: 20261103.629
+Wasit	Set up job	2026-11-15T09:10:34.5216306Z Commit: 15dbd9ccb5dbf34fae002b6ed1a2670f52df37bc
+Wasit	Set up job	2026-11-15T09:10:34.5217281Z Build Date: 2026-11-03T17:26:59Z
+Wasit	Set up job	2026-11-15T09:10:34.5218207Z Worker ID: {95a0cad2-1a50-441c-8d75-29aec1eccf97}
+Wasit	Set up job	2026-11-15T09:10:34.5219452Z Region: westus2
+Wasit	Set up job	2026-11-15T09:10:34.5220126Z Cloud: Azure
+Wasit	Set up job	2026-11-15T09:10:34.5220881Z ##[endgroup]
+Wasit	Set up job	2026-11-15T09:10:34.5222627Z ##[group]Operating System
+Wasit	Set up job	2026-11-15T09:10:34.5223466Z Ubuntu
+Wasit	Set up job	2026-11-15T09:10:34.5224108Z 26.04.1
+Wasit	Set up job	2026-11-15T09:10:34.5224713Z LTS
+Wasit	Set up job	2026-11-15T09:10:34.5225437Z ##[endgroup]
+Wasit	Set up job	2026-11-15T09:10:34.5226126Z ##[group]Runner Image
+Wasit	Set up job	2026-11-15T09:10:34.5226901Z Image: ubuntu-26.04
+Wasit	Set up job	2026-11-15T09:10:34.5227784Z Version: 20261111.196.1
+Wasit	Set up job	2026-11-15T09:10:34.5229302Z Included Software: https://github.com/actions/runner-images/blob/ubuntu26/20261111.196/images/ubuntu/Ubuntu2604-Readme.md
+Wasit	Set up job	2026-11-15T09:10:34.5231716Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu26%2F20261111.196
+Wasit	Set up job	2026-11-15T09:10:34.5233051Z ##[endgroup]
+Wasit	Set up job	2026-11-15T09:10:34.5234846Z ##[group]GITHUB_TOKEN Permissions
+Wasit	Set up job	2026-11-15T09:10:34.5237514Z Actions: read
+Wasit	Set up job	2026-11-15T09:10:34.5238407Z Contents: read
+Wasit	Set up job	2026-11-15T09:10:34.5239473Z Metadata: read
+Wasit	Set up job	2026-11-15T09:10:34.5240693Z PullRequests: write
+Wasit	Set up job	2026-11-15T09:10:34.5241407Z ##[endgroup]
+Wasit	Set up job	2026-11-15T09:10:34.5243865Z Secret source: Actions
+Wasit	Set up job	2026-11-15T09:10:34.5245170Z Cache mode: write
+Wasit	Set up job	2026-11-15T09:10:34.5246021Z Prepare workflow directory
+Wasit	Set up job	2026-11-15T09:10:34.5798014Z Prepare all required actions
+Wasit	Set up job	2026-11-15T09:10:34.5856437Z Getting action download info
+Wasit	Set up job	2026-11-15T09:10:34.9452669Z Download action repository 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+Wasit	Set up job	2026-11-15T09:10:35.0895662Z Download action repository 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+Wasit	Set up job	2026-11-15T09:10:35.2637420Z Download action repository 'wasit-dev/wasit@11728b4c94b75affdb4987da2a0fb745b31ab6a4' (SHA:11728b4c94b75affdb4987da2a0fb745b31ab6a4)
+Wasit	Set up job	2026-11-15T09:10:35.8846249Z Getting action download info
+Wasit	Set up job	2026-11-15T09:10:36.0139998Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+Wasit	Set up job	2026-11-15T09:10:36.2574196Z Complete job name: Wasit
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	﻿2026-11-15T09:10:36.3400260Z ##[group]Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.3402025Z with:
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.3402956Z   persist-credentials: false
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.3404043Z   repository: dzakwannajmi/x402-example-paywall
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.3412079Z   token: ***
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.3413043Z   ssh-strict: true
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.3413888Z   ssh-user: git
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.3414797Z   clean: true
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.3415668Z   sparse-checkout-cone-mode: true
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.3416784Z   fetch-depth: 1
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.3417719Z   fetch-tags: false
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.3418931Z   show-progress: true
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.3419963Z   lfs: false
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.3420933Z   submodules: false
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.3421842Z   set-safe-directory: true
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.3422861Z   allow-unsafe-pr-checkout: false
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.3424197Z ##[endgroup]
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.6881841Z Syncing repository: dzakwannajmi/x402-example-paywall
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.6884492Z ##[group]Getting Git version info
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.6886086Z Working directory is '/home/runner/work/x402-example-paywall/x402-example-paywall'
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.6888175Z [command]/usr/bin/git version
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.6940198Z git version 2.56.1
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.7010602Z ##[endgroup]
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.7036236Z Temporarily overriding HOME='/home/runner/work/_temp/a212c8d8-ee7e-411b-afef-e71c5cbc7b9a' before making global git config changes
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.7039797Z Adding repository directory to the temporary git global config as a safe directory
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.7043669Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/x402-example-paywall/x402-example-paywall
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.7103645Z Deleting the contents of '/home/runner/work/x402-example-paywall/x402-example-paywall'
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.7114513Z ##[group]Initializing the repository
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.7122624Z [command]/usr/bin/git init /home/runner/work/x402-example-paywall/x402-example-paywall
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.7153868Z hint: Using 'master' as the name for the initial branch. This default branch name
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.7160494Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.7163698Z hint: to use in all of your new repositories, which will suppress this warning,
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.7166233Z hint: call:
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.7167761Z hint:
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.7183341Z hint: 	git config --global init.defaultBranch <name>
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.7196588Z hint:
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.7198699Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.7201548Z hint: 'development'. The just-created branch can be renamed via this command:
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.7203861Z hint:
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.7205272Z hint: 	git branch -m <name>
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.7302776Z hint:
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.7311304Z hint: Disable this message with "git config set advice.defaultBranchName false"
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.7346372Z Initialized empty Git repository in /home/runner/work/x402-example-paywall/x402-example-paywall/.git/
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.7373820Z [command]/usr/bin/git remote add origin https://github.com/dzakwannajmi/x402-example-paywall
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.7381905Z ##[endgroup]
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.7384045Z ##[group]Disabling automatic garbage collection
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.7385891Z [command]/usr/bin/git config --local gc.auto 0
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.7390352Z ##[endgroup]
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.7392183Z ##[group]Setting up auth
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.7401804Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.7467304Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.7975161Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.8013972Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.8280523Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.8317184Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.8624918Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.8667066Z ##[endgroup]
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.8669567Z ##[group]Fetching the repository
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:36.8678151Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +4cf38265d754fe2d30cade24f155b2d984afba98:refs/remotes/origin/main
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:37.1286391Z From https://github.com/dzakwannajmi/x402-example-paywall
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:37.1289065Z  * [new ref]         4cf38265d754fe2d30cade24f155b2d984afba98 -> origin/main
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:37.1294099Z ##[endgroup]
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:37.1296340Z ##[group]Determining the checkout info
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:37.1298684Z ##[endgroup]
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:37.1301175Z [command]/usr/bin/git sparse-checkout disable
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:37.1358875Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:37.1382683Z ##[group]Checking out the ref
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:37.1385168Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:37.1453331Z Switched to a new branch 'main'
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:37.1465660Z branch 'main' set up to track 'origin/main'.
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:37.1475841Z ##[endgroup]
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:37.1508265Z [command]/usr/bin/git log -1 --format=%H
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:37.1532692Z 4cf38265d754fe2d30cade24f155b2d984afba98
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:37.1540237Z ##[group]Removing auth
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:37.1544249Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:37.1575494Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:37.1827919Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:37.1850649Z http.https://github.com/.extraheader
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:37.1859019Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:37.1890918Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:37.2137663Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:37.2167151Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Wasit	Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:10:37.2407158Z ##[endgroup]
+Wasit	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	﻿2026-11-15T09:10:37.2703734Z ##[group]Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+Wasit	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-15T09:10:37.2704928Z with:
+Wasit	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-15T09:10:37.2705578Z   node-version: 22
+Wasit	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-15T09:10:37.2706294Z   always-auth: false
+Wasit	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-15T09:10:37.2707026Z   check-latest: false
+Wasit	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-15T09:10:37.2713949Z   token: ***
+Wasit	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-15T09:10:37.2714623Z ##[endgroup]
+Wasit	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-15T09:10:37.3990297Z (node:2187) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Wasit	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-15T09:10:37.3995296Z Found in cache @ /opt/hostedtoolcache/node/22.23.4/x64
+Wasit	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-15T09:10:37.3997532Z ##[group]Environment details
+Wasit	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-15T09:10:37.4005712Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Wasit	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-15T09:10:42.7331033Z node: v22.23.4
+Wasit	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-15T09:10:42.7332177Z npm: 10.9.9
+Wasit	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-15T09:10:42.7332883Z yarn: 1.22.22
+Wasit	Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-15T09:10:42.7334381Z ##[endgroup]
+Wasit	Install the service	﻿2026-11-15T09:10:42.7476673Z ##[group]Run npm ci
+Wasit	Install the service	2026-11-15T09:10:42.7477009Z ^[[36;1mnpm ci^[[0m
+Wasit	Install the service	2026-11-15T09:10:42.7532201Z shell: /usr/bin/bash -e {0}
+Wasit	Install the service	2026-11-15T09:10:42.7532537Z ##[endgroup]
+Wasit	Install the service	2026-11-15T09:10:49.3598204Z 
+Wasit	Install the service	2026-11-15T09:10:49.3609364Z added 132 packages, and audited 133 packages in 7s
+Wasit	Install the service	2026-11-15T09:10:49.3609801Z 
+Wasit	Install the service	2026-11-15T09:10:49.3610095Z 55 packages are looking for funding
+Wasit	Install the service	2026-11-15T09:10:49.3611299Z   run `npm fund` for details
+Wasit	Install the service	2026-11-15T09:10:49.3662874Z 
+Wasit	Install the service	2026-11-15T09:10:49.3663750Z 5 high severity vulnerabilities
+Wasit	Install the service	2026-11-15T09:10:49.3664722Z 
+Wasit	Install the service	2026-11-15T09:10:49.3665326Z To address all issues, run:
+Wasit	Install the service	2026-11-15T09:10:49.3666061Z   npm audit fix --force
+Wasit	Install the service	2026-11-15T09:10:49.3666684Z 
+Wasit	Install the service	2026-11-15T09:10:49.3667089Z Run `npm audit` for details.
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	﻿2026-11-15T09:10:49.4231932Z ##[group]Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.4232298Z with:
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.4232479Z   config: wasit.config.json
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.4232679Z   tier: read-only
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.4232853Z ##[endgroup]
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.4283751Z ##[start-action display=Check the runner;id=__wasit-dev_wasit.__run]
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.4306587Z ##[group]Run if [ "$RUNNER_OS" != "Linux" ]; then
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.4306946Z ^[[36;1mif [ "$RUNNER_OS" != "Linux" ]; then^[[0m
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.4307292Z ^[[36;1m  echo "Wasit: this action runs on Linux runners in this version." >&2^[[0m
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.4307628Z ^[[36;1m  exit 2^[[0m
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.4307831Z ^[[36;1mfi^[[0m
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.4308033Z ^[[36;1mif ! command -v node >/dev/null 2>&1; then^[[0m
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.4308697Z ^[[36;1m  echo "Wasit: Node 22 or later is needed and node was not found. Add actions/setup-node with node-version: 22 before this step." >&2^[[0m
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.4309359Z ^[[36;1m  exit 2^[[0m
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.4309575Z ^[[36;1mfi^[[0m
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.4309852Z ^[[36;1mmajor="$(node -p 'process.versions.node.split(".")[0]')"^[[0m
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.4310148Z ^[[36;1mif [ "$major" -lt 22 ]; then^[[0m
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.4310625Z ^[[36;1m  echo "Wasit: Node 22 or later is needed and this runner has Node $major. Add actions/setup-node with node-version: 22 before this step." >&2^[[0m
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.4311094Z ^[[36;1m  exit 2^[[0m
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.4311263Z ^[[36;1mfi^[[0m
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.4359512Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.4359930Z ##[endgroup]
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.4699015Z ##[end-action id=__wasit-dev_wasit.__run;outcome=success;conclusion=success;duration_ms=41]
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.4709481Z ##[start-action display=Check the inputs;id=__wasit-dev_wasit.__run_2]
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.5126080Z ##[group]Run node "$ACTION_PATH/scripts/wasit.mjs" check
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.5126476Z ^[[36;1mnode "$ACTION_PATH/scripts/wasit.mjs" check^[[0m
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.5172573Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.5172891Z env:
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.5173252Z   ACTION_PATH: /home/runner/work/_actions/wasit-dev/wasit/11728b4c94b75affdb4987da2a0fb745b31ab6a4/action
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.5173654Z   INPUT_CONFIG: wasit.config.json
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.5173878Z   INPUT_ENVIRONMENT: 
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.5174068Z   INPUT_TIER: read-only
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.5174251Z   INPUT_ENDPOINTS: 
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.5174423Z ##[endgroup]
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.5542346Z ##[end-action id=__wasit-dev_wasit.__run_2;outcome=success;conclusion=success;duration_ms=83]
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.5545920Z ##[start-action display=Install Wasit;id=__wasit-dev_wasit.__run_3]
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.5754573Z ##[group]Run cd "$ACTION_PATH/.."
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.5754907Z ^[[36;1mcd "$ACTION_PATH/.."^[[0m
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.5755282Z ^[[36;1mnpm ci --ignore-scripts --no-audit --no-fund^[[0m
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.5755578Z ^[[36;1mnpm run build -w packages/core^[[0m
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.5755815Z ^[[36;1mnpm run build -w packages/cli^[[0m
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.5756061Z ^[[36;1mnpm run build -w packages/server^[[0m
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.5801781Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.5802227Z env:
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.5802736Z   ACTION_PATH: /home/runner/work/_actions/wasit-dev/wasit/11728b4c94b75affdb4987da2a0fb745b31ab6a4/action
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:49.5803134Z ##[endgroup]
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:58.0509613Z 
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:58.0510679Z added 364 packages in 8s
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:58.1769550Z 
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:58.1779948Z > @wasit-dev/core@0.7.0 build
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:58.1780561Z > tsc -p tsconfig.json
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:58.1780883Z 
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:59.5705697Z 
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:59.5706612Z > @wasit-dev/cli@0.7.0 build
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:59.5707329Z > tsc -p tsconfig.json
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:10:59.5707808Z 
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:00.7276214Z 
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:00.7277131Z > @wasit-dev/server@0.7.0 build
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:00.7277758Z > tsc -p tsconfig.json
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:00.7278143Z 
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:01.5842538Z ##[end-action id=__wasit-dev_wasit.__run_3;outcome=success;conclusion=success;duration_ms=12029]
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:01.5848442Z ##[start-action display=Find the baseline;id=__wasit-dev_wasit.baseline]
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:01.5870314Z ##[group]Run node "$ACTION_PATH/scripts/baseline.mjs"
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:01.5870658Z ^[[36;1mnode "$ACTION_PATH/scripts/baseline.mjs"^[[0m
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:01.5915850Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:01.5916152Z env:
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:01.5916495Z   ACTION_PATH: /home/runner/work/_actions/wasit-dev/wasit/11728b4c94b75affdb4987da2a0fb745b31ab6a4/action
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:01.5919115Z   GH_TOKEN: ***
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:01.5919308Z ##[endgroup]
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:05.7538534Z Wasit: no baseline (no successful push run of this workflow on main yet). The comment will say there is nothing to compare with.
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:05.7615630Z ##[end-action id=__wasit-dev_wasit.baseline;outcome=success;conclusion=success;duration_ms=4176]
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:05.7622306Z ##[start-action display=Run Wasit;id=__wasit-dev_wasit.run]
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:05.7638252Z ##[group]Run node "$ACTION_PATH/scripts/wasit.mjs" run
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:05.7638564Z ^[[36;1mnode "$ACTION_PATH/scripts/wasit.mjs" run^[[0m
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:05.7683653Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:05.7683940Z env:
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:05.7684276Z   ACTION_PATH: /home/runner/work/_actions/wasit-dev/wasit/11728b4c94b75affdb4987da2a0fb745b31ab6a4/action
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:05.7684670Z   INPUT_CONFIG: wasit.config.json
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:05.7684877Z   INPUT_ENVIRONMENT: 
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:05.7685076Z   INPUT_TIER: read-only
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:05.7685255Z   INPUT_ENDPOINTS: 
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:05.7685423Z   BASELINE_PATH: 
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:05.7685591Z ##[endgroup]
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.2582094Z [service] seller ready on http://127.0.0.1:4402/paid (GET, price $0.005, stellar:testnet)
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3060850Z Result: 1 graded (exit 0).
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3089614Z {
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3139528Z   "schema": 1,
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3199340Z   "wasit": {
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3199736Z     "cli": "0.7.0",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3279682Z     "core": "0.7.0"
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3299827Z   },
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3365010Z   "sdk": {
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3379462Z     "x402Version": 2,
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3379957Z     "@x402/core": "2.28.0",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3397201Z     "@x402/stellar": "2.28.0",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3397618Z     "@stellar/mpp": "0.7.1",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3419238Z     "mppx": "0.8.14",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3439383Z     "@stellar/stellar-sdk": "16.4.1"
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3439764Z   },
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3440055Z   "environment": "local",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3440468Z   "network": "stellar:testnet",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3440793Z   "networkClass": "test",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3441213Z   "startedAt": "2026-11-15T09:11:07.294Z",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3441624Z   "endpoints": [
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3442021Z     {
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3442382Z       "name": "quote-of-the-day",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3442758Z       "protocol": "x402",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3443057Z       "method": "GET",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3443394Z       "path": "/paid",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3443762Z       "outcome": "conformant",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3444109Z       "groups": {
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3444362Z         "challenge": {
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3444604Z           "passed": 5,
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3444887Z           "failed": 0,
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3445130Z           "errored": 0,
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3445427Z           "skipped": 0
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3445680Z         },
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3446007Z         "payment": {
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3446331Z           "passed": 0,
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3446653Z           "failed": 0,
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3446972Z           "errored": 0,
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3447241Z           "skipped": 5
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3447574Z         }
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3447802Z       },
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3448070Z       "results": [
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3448376Z         {
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3448625Z           "id": "X402-01",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3449495Z           "name": "402 Response Status",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3449860Z           "status": "PASS",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3450338Z           "detail": "Server responded with 402 as required.",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3450804Z           "destructive": false
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3451154Z         },
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3451393Z         {
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3451669Z           "id": "X402-02",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3452019Z           "name": "Payment Header Present",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3452429Z           "status": "PASS",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3452833Z           "detail": "Payment header found.",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3453238Z           "destructive": false
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3453533Z         },
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3453824Z         {
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3454086Z           "id": "X402-03",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3454631Z           "name": "Header Payload Decodable",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3455034Z           "status": "PASS",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3455408Z           "detail": "Header decoded to valid JSON.",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3455713Z           "destructive": false
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3456003Z         },
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3456278Z         {
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3456566Z           "id": "X402-04",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3457124Z           "name": "Required Fields Present",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3457534Z           "status": "PASS",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3457978Z           "detail": "All required v2 fields present.",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3458415Z           "destructive": false
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3469127Z         },
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3469601Z         {
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3469856Z           "id": "X402-05",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3470234Z           "name": "Network Identifier Valid",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3470605Z           "status": "PASS",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3471049Z           "detail": "Network identifier \"stellar:testnet\" is valid.",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3471554Z           "destructive": false
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3471852Z         },
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3472090Z         {
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3472339Z           "id": "X402-06",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3472710Z           "name": "Signature Resubmit Accepted",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3473099Z           "status": "SKIP",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3473850Z           "detail": "Skipped: the read-only tier makes no payment and signs nothing; this check needs a payer key and the payment tier",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3474564Z           "destructive": false,
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3474913Z           "skipKind": "read-only"
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3475208Z         },
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3475430Z         {
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3475662Z           "id": "X402-07",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3476004Z           "name": "Invalid Signature Rejected",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3476362Z           "status": "SKIP",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3477107Z           "detail": "Skipped: the read-only tier makes no payment and signs nothing; this check needs a payer key and the payment tier",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3477869Z           "destructive": false,
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3478220Z           "skipKind": "read-only"
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3478527Z         },
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3478886Z         {
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3479132Z           "id": "X402-08",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3479490Z           "name": "Payment Replay Rejected",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3479875Z           "status": "SKIP",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3480680Z           "detail": "Skipped: the read-only tier makes no payment and signs nothing; this check needs a payer key and the payment tier",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3481472Z           "destructive": false,
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3481833Z           "skipKind": "read-only"
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3482155Z         },
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3482375Z         {
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3482605Z           "id": "X402-09",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3482958Z           "name": "Underpayment Rejected",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3483315Z           "status": "SKIP",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3484089Z           "detail": "Skipped: the read-only tier makes no payment and signs nothing; this check needs a payer key and the payment tier",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3484852Z           "destructive": false,
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3485420Z           "skipKind": "read-only"
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3485725Z         },
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3485945Z         {
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3486189Z           "id": "X402-10",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3486572Z           "name": "Expired Authorization Rejected",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3486956Z           "status": "SKIP",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3487731Z           "detail": "Skipped: the read-only tier makes no payment and signs nothing; this check needs a payer key and the payment tier",
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3488460Z           "destructive": false,
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3488976Z           "skipKind": "read-only"
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3489301Z         }
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3489831Z       ]
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3490073Z     }
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3490305Z   ],
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3490542Z   "totals": {
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3490979Z     "endpoints": 1,
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3491247Z     "graded": 1,
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3491510Z     "conformant": 1,
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3491805Z     "nonConformant": 0,
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3492107Z     "noVerdict": 0,
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3492371Z     "unsupported": 0
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3492628Z   },
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3492856Z   "notes": [
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3493338Z     "Tier: read-only. The payment checks were not run, and nothing was signed."
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3493834Z   ]
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3494060Z }
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3831602Z ##[end-action id=__wasit-dev_wasit.run;outcome=success;conclusion=success;duration_ms=1620]
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3835384Z ##[start-action display=Write the report;id=__wasit-dev_wasit.__run_4]
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3858307Z ##[group]Run node "$ACTION_PATH/scripts/wasit.mjs" report
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3858652Z ^[[36;1mnode "$ACTION_PATH/scripts/wasit.mjs" report^[[0m
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3903940Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3904242Z env:
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3904581Z   ACTION_PATH: /home/runner/work/_actions/wasit-dev/wasit/11728b4c94b75affdb4987da2a0fb745b31ab6a4/action
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3904972Z   BASELINE_PATH: 
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:07.3905161Z ##[endgroup]
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:08.5928576Z Wrote /home/runner/work/_temp/wasit/comment.md
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:08.5947744Z Appended the summary to /home/runner/work/_temp/_runner_file_commands/step_summary_d8db682e-de81-42ef-b162-34452ffdc818
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:08.5967396Z Wrote /home/runner/work/_temp/wasit/baseline-next.json
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:08.6260903Z ##[end-action id=__wasit-dev_wasit.__run_4;outcome=success;conclusion=success;duration_ms=1242]
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:08.6284163Z ##[start-action display=Comment on the pull request;id=__wasit-dev_wasit.__run_5]
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:08.6291838Z ##[end-action id=__wasit-dev_wasit.__run_5;outcome=skipped;conclusion=skipped;duration_ms=0]
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:08.6294107Z ##[start-action display=Upload the baseline;id=__wasit-dev_wasit.__actions_upload-artifact]
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:08.6365003Z ##[group]Run actions/upload-artifact@v4
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:08.6365376Z with:
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:08.6365618Z   name: wasit-baseline
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:08.6365965Z   path: /home/runner/work/_temp/wasit/baseline-next.json
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:08.6366379Z   if-no-files-found: warn
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:08.6366666Z   compression-level: 6
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:08.6366928Z   overwrite: false
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:08.6367190Z   include-hidden-files: false
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:08.6367485Z ##[endgroup]
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:08.7860489Z (node:2400) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:08.7861921Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:08.7939932Z With the provided path, there will be 1 file uploaded
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:08.7959362Z Artifact name is valid!
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:08.7979456Z Root directory input is valid!
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:09.1702648Z Beginning upload of artifact content to blob storage
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:09.1887254Z (node:2400) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:09.5773993Z Uploaded bytes 1069
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:09.6570811Z Finished uploading artifact content to blob storage!
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:09.6572207Z SHA256 digest of uploaded artifact zip is d4ed4ecec9ea5be4b62be11af6b9989d49755704bf248fa67b4f3e4ca5a375d8
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:09.6573203Z Finalizing artifact upload
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:10.0635469Z Artifact wasit-baseline.zip successfully finalized. Artifact ID 14155460894
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:10.0636678Z Artifact wasit-baseline has been successfully uploaded! Final size is 1069 bytes. Artifact ID is 14155460894
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:10.0641129Z Artifact download URL: https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43697947796/artifacts/14155460894
+Wasit	Run wasit-dev/wasit/action@11728b4c94b75affdb4987da2a0fb745b31ab6a4	2026-11-15T09:11:10.0979837Z ##[end-action id=__wasit-dev_wasit.__actions_upload-artifact;outcome=success;conclusion=success;duration_ms=1468]
+Wasit	Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	﻿2026-11-15T09:11:10.1217204Z Post job cleanup.
+Wasit	Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-15T09:11:10.2330607Z (node:2412) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+Wasit	Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020	2026-11-15T09:11:10.2360439Z (Use `node --trace-deprecation ...` to show where the warning was created)
+Wasit	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	﻿2026-11-15T09:11:10.2744565Z Post job cleanup.
+Wasit	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:11:10.3788084Z [command]/usr/bin/git version
+Wasit	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:11:10.3850369Z git version 2.56.1
+Wasit	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:11:10.4527642Z Temporarily overriding HOME='/home/runner/work/_temp/a31c6203-5152-48d4-bae7-ac82de41d3e8' before making global git config changes
+Wasit	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:11:10.4531146Z Adding repository directory to the temporary git global config as a safe directory
+Wasit	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:11:10.4740241Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/x402-example-paywall/x402-example-paywall
+Wasit	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:11:10.4750781Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+Wasit	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:11:10.4753709Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+Wasit	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:11:10.4756294Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+Wasit	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:11:10.4759693Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+Wasit	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:11:10.5271237Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+Wasit	Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262	2026-11-15T09:11:10.5277089Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+Wasit	Complete job	﻿2026-11-15T09:11:10.5524265Z Cleaning up orphan processes
+Wasit	Complete job	2026-11-15T09:11:10.5821099Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@11d5960a326750d5838078e36cf38b85af677262, actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
