@@ -1,6 +1,6 @@
 # Job 02 — Network guard, payment tier, new check, opt-in, pre-release
 
-Status: 🟡 **IN PROGRESS** (payment tier and the new check shown on `main` of the example project; mainnet refused, 2026-11-16) · Deliverable: **D2** · Week: **2** · Depends on: #0
+Status: 🟡 **IN PROGRESS** (payment tier and the new check shown on `main` of the example project; mainnet refused, 2026-11-16; the pre-release `0.8.0-beta.1` published, 2026-11-20) · Deliverable: **D2** · Week: **2** · Depends on: #0
 
 ## Goal
 
@@ -26,7 +26,7 @@ command line, without the opt-in, goes to beta testers at the end of the week.
 - [ ] The opt-in switch: a flag on the run in the command line, an input on a run started by hand in the Action, and a start-up setting (never a tool argument) in the MCP server.
   In the pre-release the three switches exist and always refuse; the switch that allows waits for the validation (job 03).
 - [ ] Independent review of the payment code, in writing.
-- [ ] The pre-release tag, without the opt-in: it refuses every payment on mainnet.
+- [x] The pre-release tag, without the opt-in: it refuses every payment on mainnet.
 
 ## What shipped (first layer)
 
@@ -70,6 +70,9 @@ command line, without the opt-in, goes to beta testers at the end of the week.
 | A pull request from a fork with `tier: payment`: the payment checks are not run | ✅ | [Pull request 5](https://github.com/dzakwannajmi/x402-example-paywall/pull/5) · [run](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43819805398) · [copy of the log](week-2/copies/run-pr5-fork-payment-tier.log.txt): the same workflow as on `main`, on a pull request from a fork; the job had no secrets and a read-only token, X402-01 to X402-05 passed, X402-06 to X402-10 were skipped with "payment checks not run: pull request", the run notes that nothing was signed, and no comment was posted |
 | The new check `X402-11` in the Action on `main`: a valid payment sent with a request the seller must refuse, and the chain read with no transfer | ✅ | [Run on `main`](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43851987068) · [copy of the log](week-2/copies/run-main-x402-11.log.txt): the example's `reject` case asks for a quote language the seller does not have; the seller answered 400; Wasit read the chain once a ledger until the payment's authorization had expired, about five minutes at the default lifetime, found it never used and no transfer of it, and all eleven checks passed. The only payment of the run that settled is `X402-06`'s ([Stellar Expert](https://stellar.expert/explorer/testnet/tx/8dbe4e036ab12e8de436ac0fe7dc72004d584740c9e9cb0e14b1d29f004c1e78)) |
 | `X402-11` fails a seller that takes the payment of a refused request, and one that serves it, and names the transaction | 🟡 (on the maintainer's machine; the transactions are public) | [Copy of the output](week-2/copies/live-check-x402-11-three-modes.txt): Wasit's test fixture with three routes on the Stellar test network. The one that refuses passed; the one that settles and then refuses failed, naming [7463f7c0…](https://stellar.expert/explorer/testnet/tx/7463f7c0a490a7b05b6d12d063a8aa850d54a6e2e2652911921672f6dee9d93f); the one that serves failed, naming [4c34078c…](https://stellar.expert/explorer/testnet/tx/4c34078cf88319df2fb6c0797c0f3d73b2bd7d1ab6a725de52cd5bab443d5106) |
+| The pre-release `0.8.0-beta.1`, without the opt-in: the tag, the release, the three packages on npm under the `beta` tag | ✅ | [Release on GitHub](https://github.com/wasit-dev/Wasit/releases/tag/v0.8.0-beta.1) (tag `v0.8.0-beta.1`, commit `38d8a86`) · npm: [`@wasit-dev/cli`](https://www.npmjs.com/package/@wasit-dev/cli/v/0.8.0-beta.1), [`@wasit-dev/core`](https://www.npmjs.com/package/@wasit-dev/core/v/0.8.0-beta.1), [`@wasit-dev/server`](https://www.npmjs.com/package/@wasit-dev/server/v/0.8.0-beta.1). `latest` stays at 0.7.0. The packages on npm are byte for byte the ones tested on the maintainer's machine (same shasums) |
+| The Action at the pre-release, on `main` of the example project | ✅ | [Run on `main`](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/44748831548) · [copy of the log](week-2/copies/run-main-pre-release.log.txt): the report says "Wasit 0.8.0-beta.1 (core 0.8.0-beta.1), built from commit 38d8a86"; all eleven checks passed, and the check "Wasit conformance" completed as "✅ conformant · 11 passed"; X402-06's payment on [Stellar Expert](https://stellar.expert/explorer/testnet/tx/e9922dbeecfff6945ecdb4e18f1e3712367276582fbb051057be75dd29bcd5f2) |
+| The two MPP defects of 0.7.0, fixed in the pre-release and disclosed | ✅ | [Advisory GHSA-7c36-rg54-r3v8](https://github.com/wasit-dev/Wasit/security/advisories/GHSA-7c36-rg54-r3v8) (published 2026-11-20, severity medium): fixed in `0.8.0-beta.1` of all three packages |
 | The pieces below | ⬜ | Not started |
 
 ## Result
@@ -111,3 +114,5 @@ this version each one only refuses. Two runs in the example project show it: a
 push with the Action's `mainnet` input set stopped before Wasit was installed,
 and a payment-tier run on a config that names `stellar:pubnet` stopped before
 anything was signed. Next: the independent review and the pre-release.
+
+Update 2026-11-20: the pre-release `0.8.0-beta.1` is out, without the opt-in: the tag and the release on GitHub, and the three packages on npm under the `beta` tag (`latest` stays at 0.7.0). The packages on npm match the build tested on the maintainer's machine byte for byte. The advisory for the two MPP defects of 0.7.0, which the pre-release fixes, is published. On `main` of the example project the Action now builds Wasit from the release commit, and its report names 0.8.0-beta.1. Next: the independent review of the payment code.
