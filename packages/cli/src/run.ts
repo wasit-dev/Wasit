@@ -384,8 +384,10 @@ export async function executeRun(options: RunCommandOptions, context: RunContext
         : undefined;
 
   // D-023a+b: a run that will pay checks its RPC before the service starts or
-  // anything is sent to it: the payments are built and their settlements read
-  // through it, so it must serve the run's own network.
+  // anything is sent to it: the settlements are read through it (and, on EVM
+  // and Solana, the payments are built through it), so it must serve the run's
+  // own network. On Stellar the x402 client builds the payment through its own
+  // default RPC for the network; that is changed before the mainnet opt-in.
   if (paying && notPaid === undefined && chain !== undefined && key !== undefined && hasX402) {
     try {
       await assertRpcServesNetwork(resolved.network, chain.resolveRpcUrl(resolved.network, resolved.rpcUrl));

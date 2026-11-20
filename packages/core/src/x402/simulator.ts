@@ -1573,8 +1573,10 @@ export async function runX402PaymentChecks(
           `or --payer-key).`,
       );
     }
-    // The RPC signs and settles nothing itself, but the payment is built and
-    // its settlement read through it: it must serve the run's network (D-023).
+    // The RPC signs and settles nothing itself, but the settlement is read
+    // through it (and, on EVM and Solana, the payment is built through it): it
+    // must serve the run's network (D-023). On Stellar the x402 client builds
+    // the payment through its own default RPC.
     await assertRpcServesNetwork(options.network, rpcUrl);
   } catch (error) {
     // A network no adapter pays on is not a failure of the run: Wasit does not

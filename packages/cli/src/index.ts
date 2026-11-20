@@ -16,18 +16,14 @@ import {
   type ServeMode,
 } from "./serve.js";
 import { executeCiReport } from "./ci-report-command.js";
-import { exitCodeFor, note, report, verdictNotes } from "./output.js";
-import { LiveReport } from "./live.js";
-import { colorDepth, colorEnabled, lineWidth, liveEnabled, styler } from "./style.js";
+import { note, report } from "./output.js";
+import { liveX402Test } from "./test-live.js";
+import { colorDepth, colorEnabled, lineWidth, styler } from "./style.js";
 import { executeRun } from "./run.js";
 import {
   CHECK_CATALOGUE,
   PROTOCOL_IDS,
-  X402_PAYMENT_CHECK_IDS,
-  catalogueEntry,
   deniedEnvValues,
-  endpointOutcome,
-  networkClass,
   paymentChainFor,
   runMppChannelSuite,
   runMppChargeSuite,
@@ -249,7 +245,7 @@ or NO_COLOR gives the plain text; FORCE_COLOR=1 colours a pipe.`,
     // A person at a terminal gets the coloured, live output; a pipe, CI, NO_COLOR
     // and --json get the plain text below, unchanged.
     if (!jsonMode && colorEnabled(process.stdout, process.env)) {
-      process.exit(await liveX402Test(opts, shape));
+      process.exit(await liveX402Test(opts, shape, { stream: process.stdout, env: process.env }));
     }
 
     const results = await runX402ReadChecks({ target: opts.target, ...shape });
@@ -597,81 +593,6 @@ function terminalStyle(jsonMode: boolean): { style: ReturnType<typeof styler>; w
     style: styler(!jsonMode && colorEnabled(process.stdout, process.env), colorDepth(process.env)),
     width: lineWidth(process.stdout),
   };
-}
-
-/**
- * `wasit test` for a person at a terminal: the same checks, notes and exit code
- * as the plain output, drawn live (a RUNNING line with a timer while a check is
- * in flight, each result as it arrives, the counts and the duration at the end).
- */
-async function liveX402Test(
-  opts: Record<string, unknown>,
-  shape: { method?: string; body?: string; headers?: Record<string, string> },
-): Promise<number> {
-  const secrets = deniedEnvValues(process.env);
-  const live = new LiveReport({
-    stream: process.stdout,
-    live: liveEnabled(process.stdout, process.env),
-    depth: colorDepth(process.env),
-    clean: (text) => sanitizeText(text, { redact: secrets }),
-  });
-  const target = opts["target"] as string;
-  const network = opts["network"] as string;
-  live.header(CLI_VERSION, "x402 conformance", [
-    ["target", `${target}${shape.method !== undefined ? `  ${shape.method.toUpperCase()}` : ""}`],
-    ["network", network],
-  ]);
-
-  live.phase("challenge", [["no payment"]]);
-  live.running("X402-01..05", "Challenge checks");
-  const results = await runX402ReadChecks({ target, ...shape, onResult: (result) => live.result(result) });
-  live.gap();
-
-  const keyEnv = paymentChainFor(network)?.payerKeyEnv ?? "STELLAR_PRIVATE_KEY";
-  const payerKey = (opts["payerKey"] as string | undefined) ?? process.env[keyEnv];
-  if (opts["readOnly"] === true) {
-    live.phase("payment", [["not run"]]);
-    live.note("--read-only set: the payment checks were not run.");
-  } else if (!payerKey) {
-    live.phase("payment", [["not run"]]);
-    live.note(`No payer key: set ${keyEnv} in .env or pass --payer-key. The payment checks were not run.`);
-  } else if (networkClass(network) !== "test") {
-    // Not a test network: the guard refuses the payment checks before anything
-    // is signed (the PREFLIGHT line says why), so no money moves.
-    live.phase("payment", [[network], ["not a test network: refused", "danger"]]);
-  } else {
-    live.phase("payment", [[network], ["testnet funds move", "warning"]]);
-    live.note(
-      `When the target offers a ${network} option, X402-06 settles a real payment and X402-07..10 send ` +
-        "payments it must refuse.",
-    );
-  }
-  if (opts["readOnly"] !== true && payerKey) {
-    const order = X402_PAYMENT_CHECK_IDS;
-    const startAt = (index: number): void => {
-      const id = order[index];
-      if (id !== undefined) live.running(id, catalogueEntry(id)?.name ?? id);
-    };
-    startAt(0);
-    results.push(
-      ...(await runX402PaymentChecks({
-        target,
-        network,
-        payerSecretKey: payerKey,
-        ...(opts["rpcUrl"] ? { rpcUrl: opts["rpcUrl"] as string } : {}),
-        ...shape,
-        onResult: (result) => {
-          live.result(result);
-          const index = order.indexOf(result.id);
-          if (index >= 0) startAt(index + 1);
-        },
-        onProgress: (line) => live.progress(line),
-      })),
-    );
-  }
-
-  live.finish(results, endpointOutcome(results, "x402"), verdictNotes(results, "x402"));
-  return exitCodeFor(results, "x402");
 }
 
 program

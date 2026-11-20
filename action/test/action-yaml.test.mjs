@@ -144,6 +144,29 @@ describe("action.yml", () => {
     });
   });
 
+  describe("what changes how a step's shell or programs start (2026-11-21)", () => {
+    it("sets BASH_ENV, ENV, LD_PRELOAD, LD_LIBRARY_PATH and LD_AUDIT empty in every step, the run step and the upload step included", () => {
+      for (const step of steps) {
+        for (const name of ["BASH_ENV", "ENV", "LD_PRELOAD", "LD_LIBRARY_PATH", "LD_AUDIT"]) assert.equal(step.env?.[name], "", `${step.name}: ${name}`);
+      }
+    });
+  });
+
+  describe("the check run is completed only from what the report step wrote (2026-11-20)", () => {
+    it("runs Finish whenever the announcement started a check run, and only then", () => {
+      assert.equal(stepByName("Finish the check run").if, "${{ always() && steps.announce.outputs.check_run_id != '' }}");
+    });
+
+    it("hands Finish the report step's outcome and the announcement's id, so a file the report step did not write is not used", () => {
+      const env = stepByName("Finish the check run").env;
+      assert.equal(env.REPORT_OUTCOME, "${{ steps.report.outcome }}");
+      assert.equal(env.CHECK_RUN_ID, "${{ steps.announce.outputs.check_run_id }}");
+      assert.equal(env.WASIT_CHECK_RUN_FILE, "${{ runner.temp }}/wasit/check-run.json");
+      assert.equal(stepByName("Write the report").id, "report");
+      assert.equal(stepByName("Announce the run").id, "announce");
+    });
+  });
+
   describe("the running comment is always replaced (2026-11-20 screening)", () => {
     it("writes the report and the comment whenever the announcement ran, even if Run Wasit was skipped", () => {
       for (const name of ["Write the report", "Comment on the pull request"]) {

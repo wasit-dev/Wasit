@@ -191,8 +191,19 @@ export function truncate(text: string, max: number): string {
 }
 
 /**
+ * A wrapped line that would start with a workflow command once the runner trims
+ * its indent (`::name::`, `##[name]`), broken the way the sanitiser breaks one
+ * at the start of a text. Wrapping makes new line starts out of words in the
+ * middle of a text, after the sanitiser ran, so each one is checked here.
+ */
+function breakCommandStart(line: string): string {
+  return line.replace(/^(::|##\[)/, (command: string) => (command === "::" ? ": :" : "# #["));
+}
+
+/**
  * Plain text wrapped to `width` columns, every line after `indent`. A word
- * longer than a line (a URL, a hash) is kept whole and runs over.
+ * longer than a line (a URL, a hash) is kept whole and runs over. No line
+ * starts with a workflow command (`breakCommandStart`).
  */
 export function wrap(text: string, width: number, indent: string): string[] {
   const room = Math.max(20, width - [...indent].length);
@@ -207,7 +218,7 @@ export function wrap(text: string, width: number, indent: string): string[] {
     }
   }
   if (current !== "") lines.push(current);
-  return lines.map((line) => `${indent}${line}`);
+  return lines.map((line) => `${indent}${breakCommandStart(line)}`);
 }
 
 /**

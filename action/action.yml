@@ -3,8 +3,9 @@ description: >-
   Runs Wasit's x402 checks against your service inside the job, comments the
   result on the pull request, and compares it with main. The payment tier pays
   on test networks only, on push to the default branch, schedule and
-  workflow_dispatch. Linux runners. Needs Node 22 or later (add
-  actions/setup-node before this step).
+  workflow_dispatch. Runs on pull_request, push, schedule, workflow_dispatch
+  and merge_group, and refuses any other event. Linux runners. Needs Node 22
+  or later (add actions/setup-node before this step).
 
 inputs:
   config:
@@ -57,6 +58,17 @@ runs:
     # through GITHUB_ENV: seen on runner 2.338.2, 2026-11-20.) A service Wasit
     # starts no longer inherits NODE_OPTIONS from the workflow's env: put the
     # options it needs in its service.start command.
+    # For the same reason BASH_ENV and ENV (a file the shell runs before the
+    # step) and LD_PRELOAD, LD_LIBRARY_PATH and LD_AUDIT (libraries loaded into
+    # bash, node and gh) are set empty in every step, so the workflow's env does
+    # not reach them, and neither does an earlier step's GITHUB_ENV: seen for
+    # BASH_ENV on a GitHub-hosted runner, 2026-11-21 (each step of this action
+    # showed it empty, a plain step after the earlier one ran the file). A
+    # service that needs one sets it in its service.start command. None of this
+    # keeps the steps apart from code that ran earlier in the job as the
+    # runner's user: such code can also put a program of its own first on PATH
+    # (GITHUB_PATH), change files on disk, or leave a process running; the
+    # example workflow states that limit.
 
     - name: Check the runner
       shell: bash
@@ -68,6 +80,11 @@ runs:
         COMMITMENT_SECRET_HEX: ""
         WASIT_MAINNET_PAYER_SECRET: ""
         NODE_OPTIONS: ""
+        BASH_ENV: ""
+        ENV: ""
+        LD_PRELOAD: ""
+        LD_LIBRARY_PATH: ""
+        LD_AUDIT: ""
       run: |
         if [ "$RUNNER_OS" != "Linux" ]; then
           echo "Wasit: this action runs on Linux runners in this version." >&2
@@ -94,6 +111,11 @@ runs:
         COMMITMENT_SECRET_HEX: ""
         WASIT_MAINNET_PAYER_SECRET: ""
         NODE_OPTIONS: ""
+        BASH_ENV: ""
+        ENV: ""
+        LD_PRELOAD: ""
+        LD_LIBRARY_PATH: ""
+        LD_AUDIT: ""
         INPUT_CONFIG: ${{ inputs.config }}
         INPUT_ENVIRONMENT: ${{ inputs.environment }}
         INPUT_TIER: ${{ inputs.tier }}
@@ -114,6 +136,11 @@ runs:
         COMMITMENT_SECRET_HEX: ""
         WASIT_MAINNET_PAYER_SECRET: ""
         NODE_OPTIONS: ""
+        BASH_ENV: ""
+        ENV: ""
+        LD_PRELOAD: ""
+        LD_LIBRARY_PATH: ""
+        LD_AUDIT: ""
       run: |
         cd "$ACTION_PATH/.."
         npm ci --ignore-scripts --no-audit --no-fund
@@ -138,6 +165,11 @@ runs:
         COMMITMENT_SECRET_HEX: ""
         WASIT_MAINNET_PAYER_SECRET: ""
         NODE_OPTIONS: ""
+        BASH_ENV: ""
+        ENV: ""
+        LD_PRELOAD: ""
+        LD_LIBRARY_PATH: ""
+        LD_AUDIT: ""
         GH_TOKEN: ${{ github.token }}
         INPUT_ENVIRONMENT: ${{ inputs.environment }}
       run: node "$ACTION_PATH/scripts/announce.mjs" start
@@ -154,6 +186,11 @@ runs:
         COMMITMENT_SECRET_HEX: ""
         WASIT_MAINNET_PAYER_SECRET: ""
         NODE_OPTIONS: ""
+        BASH_ENV: ""
+        ENV: ""
+        LD_PRELOAD: ""
+        LD_LIBRARY_PATH: ""
+        LD_AUDIT: ""
         GH_TOKEN: ${{ github.token }}
       run: node "$ACTION_PATH/scripts/baseline.mjs"
 
@@ -165,6 +202,11 @@ runs:
       env:
         ACTION_PATH: ${{ github.action_path }}
         NODE_OPTIONS: ""
+        BASH_ENV: ""
+        ENV: ""
+        LD_PRELOAD: ""
+        LD_LIBRARY_PATH: ""
+        LD_AUDIT: ""
         INPUT_CONFIG: ${{ inputs.config }}
         INPUT_ENVIRONMENT: ${{ inputs.environment }}
         INPUT_TIER: ${{ inputs.tier }}
@@ -189,6 +231,11 @@ runs:
         COMMITMENT_SECRET_HEX: ""
         WASIT_MAINNET_PAYER_SECRET: ""
         NODE_OPTIONS: ""
+        BASH_ENV: ""
+        ENV: ""
+        LD_PRELOAD: ""
+        LD_LIBRARY_PATH: ""
+        LD_AUDIT: ""
         BASELINE_PATH: ${{ steps.baseline.outputs.path }}
         HISTORY_PATH: ${{ steps.baseline.outputs.history }}
         BASELINE_RUN: ${{ steps.baseline.outputs.run }}
@@ -207,6 +254,11 @@ runs:
         COMMITMENT_SECRET_HEX: ""
         WASIT_MAINNET_PAYER_SECRET: ""
         NODE_OPTIONS: ""
+        BASH_ENV: ""
+        ENV: ""
+        LD_PRELOAD: ""
+        LD_LIBRARY_PATH: ""
+        LD_AUDIT: ""
         GH_TOKEN: ${{ github.token }}
         WASIT_COMMENT_FILE: ${{ runner.temp }}/wasit/comment.md
       run: node "$ACTION_PATH/scripts/comment.mjs"
@@ -225,6 +277,11 @@ runs:
         COMMITMENT_SECRET_HEX: ""
         WASIT_MAINNET_PAYER_SECRET: ""
         NODE_OPTIONS: ""
+        BASH_ENV: ""
+        ENV: ""
+        LD_PRELOAD: ""
+        LD_LIBRARY_PATH: ""
+        LD_AUDIT: ""
         GH_TOKEN: ${{ github.token }}
         CHECK_RUN_ID: ${{ steps.announce.outputs.check_run_id }}
         REPORT_OUTCOME: ${{ steps.report.outcome }}
@@ -244,6 +301,11 @@ runs:
         COMMITMENT_SECRET_HEX: ""
         WASIT_MAINNET_PAYER_SECRET: ""
         NODE_OPTIONS: ""
+        BASH_ENV: ""
+        ENV: ""
+        LD_PRELOAD: ""
+        LD_LIBRARY_PATH: ""
+        LD_AUDIT: ""
       with:
         name: wasit-baseline
         path: ${{ runner.temp }}/wasit/baseline-next.json

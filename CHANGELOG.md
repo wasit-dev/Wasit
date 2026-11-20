@@ -2,6 +2,31 @@
 
 All notable changes to Wasit are recorded here. Versions follow [Semantic Versioning](https://semver.org/): patch releases are fixes, minor releases add checks or features without breaking existing usage, major releases break something.
 
+## [Unreleased]
+
+**Results can change on upgrade.**
+- The GitHub Action runs on `pull_request`, `push`, `schedule`,
+  `workflow_dispatch` and `merge_group` only. Any other event
+  (`pull_request_target` as before, now also `issue_comment`, `workflow_run`
+  and the rest) stops the job with exit 2 in the step that checks the inputs:
+  on those events a workflow can hand a pull request's code the base
+  repository's token, and the service Wasit starts would be that code.
+- Every step of the Action sets `BASH_ENV`, `ENV`, `LD_PRELOAD`,
+  `LD_LIBRARY_PATH` and `LD_AUDIT` empty, as it does `NODE_OPTIONS`: a file the
+  shell runs before a step, or a library loaded into `bash`, `node` or `gh`,
+  no longer comes from the workflow's env into the steps that hold the token or
+  the payer key. A service Wasit starts no longer inherits them from the
+  workflow's env either; set what it needs in `service.start`.
+
+**Fixed.**
+- In the coloured output of `wasit test` (at a terminal, or with
+  `FORCE_COLOR`), a wrapped line of a fix could start with `::name::` or
+  `##[name]` from the middle of the text, which a GitHub job log reads as a
+  workflow command. Every wrapped line is now broken the way the sanitiser
+  breaks the start of a text.
+- `wasit ci-report` keeps a settlement reference from a report file only on a
+  PASS, as `wasit run` writes it; on any other status it is dropped.
+
 ## [0.8.0-beta.1] - 2026-11-20
 
 A pre-release for beta testers, on npm under the `beta` tag

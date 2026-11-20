@@ -36,6 +36,14 @@ export class MainnetRefusedError extends InputError {
 /** An event name as GitHub writes them; anything else is never echoed. */
 const EVENT_NAME = /^[a-z_]{1,64}$/;
 
+/**
+ * The events the action runs on. A pull request runs the read-only checks; the
+ * payment tier pays only on push to the default branch, schedule and
+ * workflow_dispatch (the CLI decides, D-022a); merge_group runs the read-only
+ * checks on the merge queue's commit.
+ */
+export const SUPPORTED_EVENTS = Object.freeze(["pull_request", "push", "schedule", "workflow_dispatch", "merge_group"]);
+
 function trimmed(value) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -74,6 +82,18 @@ export function parseInputs(env) {
 
   // B12: no mainnet opt-in in this version. Refused before anything else is read.
   checkMainnet(env);
+
+  // The events this action is built for. Others (issue_comment, workflow_run, ...) run with the
+  // base repository's write token, and a workflow on them often checks out a pull request's code:
+  // the service Wasit starts would be that code, in the job that holds the token.
+  const event = typeof env["GITHUB_EVENT_NAME"] === "string" ? env["GITHUB_EVENT_NAME"] : "";
+  if (!SUPPORTED_EVENTS.includes(event)) {
+    throw new InputError(
+      `this action runs on ${SUPPORTED_EVENTS.join(", ")} only, and this run's event is ` +
+        `${EVENT_NAME.test(event) ? event : "another event"}. On other events a workflow can hand a pull request's code ` +
+        "the base repository's token, and the service Wasit starts would be that code.",
+    );
+  }
 
   // Whether this event may pay is the CLI's to say (D-022a): on a pull request it runs the
   // read-only checks and says so, and it refuses a payer key given to a run that may not pay.
