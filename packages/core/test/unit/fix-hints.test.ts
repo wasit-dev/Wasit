@@ -206,7 +206,11 @@ describe("X402-01 to X402-03 hints", () => {
     try {
       const results = byId(await runX402ReadChecks({ target: target.url }));
       assert.equal(results["X402-02"]?.skipKind, "unsupported");
-      assert.match(results["X402-02"]?.skipReason ?? "", /move to x402 v2: send the challenge base64-encoded in a PAYMENT-REQUIRED response header/);
+      const reason = results["X402-02"]?.skipReason ?? "";
+      assert.match(reason, /Wasit grades only x402 v2, on every chain: challenge in a PAYMENT-REQUIRED header/);
+      assert.match(reason, /Fix: move it to that header\. Why: docs\/CHECKS\.md\.$/);
+      assert.doesNotMatch(reason, /https?:\/\//, "no URL: the comment's sanitiser would remove it");
+      assert.ok(Array.from(`Skipped: ${reason}`).length <= 300, "fits a pull request comment uncut");
       assert.equal(results["X402-02"]?.hint, undefined);
     } finally {
       await target.close();

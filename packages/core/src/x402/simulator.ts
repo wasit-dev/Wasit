@@ -225,14 +225,16 @@ async function readText(response: Response): Promise<string> {
 
 /**
  * Why an x402 v1 challenge is not graded: the reason on X402-02..05 and on the
- * endpoint. Kept under 300 characters, the longest a value goes into a pull
- * request comment, so the way to get graded is not cut off.
+ * endpoint, on every chain (a v1 service on an EVM chain gets it too). Kept
+ * under 300 characters, the longest a value goes into a pull request comment,
+ * so the way to get graded is not cut off. It names no URL: the comment's
+ * sanitiser removes links from check text, so it points at docs/CHECKS.md,
+ * whose note on x402 v1 links the x402 specification.
  */
 const V1_UNSUPPORTED_REASON =
-  "the service sent an x402 v1 challenge in its response body. Wasit grades x402 v2, and the " +
-  "`exact` scheme on Stellar exists for v2 only, so this endpoint is unsupported, not failed. " +
-  "To have it graded, move to x402 v2: send the challenge base64-encoded in a PAYMENT-REQUIRED " +
-  "response header.";
+  "the service sent an x402 v1 challenge (x402Version 1, in the body). Wasit grades only x402 v2, on " +
+  "every chain: challenge in a PAYMENT-REQUIRED header, CAIP-2 networks, v2 `exact` scheme (Stellar is " +
+  "v2 only). Unsupported, not failed. Fix: move it to that header. Why: docs/CHECKS.md.";
 
 /** What a check found on a challenge Wasit does not grade, to be shown as a note. */
 function noteOf(result: CheckResult): string {
