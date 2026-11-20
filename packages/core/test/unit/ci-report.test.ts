@@ -566,6 +566,20 @@ describe("the detailed comment", () => {
     assert.ok(!renderComment({ report: read }).includes("Payment proof"), "and a cut reference is not a hash, so it is never linked");
   });
 
+  it("links no payment proof for an X402-06 that did not pass, even when a report or a report file carries a hash for it", () => {
+    for (const status of ["FAIL", "ERROR", "SKIP"] as const) {
+      const forged = JSON.parse(JSON.stringify(report([endpoint("weather", [settled(HASH)])]))) as RunReport;
+      (forged.endpoints[0]!.results[0] as { status: string }).status = status;
+      // The renderer holds to a PASS by itself, on a report built in memory...
+      const text = renderComment({ report: forged });
+      assert.ok(!text.includes("Payment proof"), status);
+      assert.ok(!text.includes("stellar.expert"), status);
+      // ...and a report file read back keeps no reference on another status.
+      const read = parseRunReport(JSON.parse(JSON.stringify(forged)));
+      assert.equal(read.endpoints[0]!.results[0]!.reference, undefined, status);
+    }
+  });
+
   it("shows at most 10 endpoints check by check, and says where the rest are", () => {
     const many = Array.from({ length: 12 }, (_, index) => endpoint(`endpoint-${index}`, conformant()));
     const comment = renderComment({ report: report(many) });

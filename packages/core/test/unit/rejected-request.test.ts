@@ -213,6 +213,29 @@ describe("X402-11 signs nothing when it cannot reach a verdict", () => {
     assert.equal(target.invalid.length, 0, "nothing sent with the invalid request");
   });
 
+  it("sends an authorization valid exactly 300 s plus the 2 ledgers of slack, and not one ledger more", async () => {
+    // The stand-in client signs `latest + ceil(60 / 5) + extra`; the read right before
+    // sending closes one more ledger. So `extra` puts the expiration that many ledgers
+    // past the 12 a 60 s lifetime is, less one, after the latest read.
+    const longest = Math.ceil(REJECTED_REQUEST_MAX_LIFETIME_SECONDS / 5) + 2;
+    const atLimit = longest - (Math.ceil(60 / 5) - 1);
+
+    install({ extraExpiryLedgers: atLimit });
+    const sent = await wall("refuse");
+    const inside = byId(await run(sent.url), "X402-11");
+    assert.equal(inside.pass, true, inside.detail);
+    assert.equal(sent.invalid.length, 1, "sent at the limit");
+
+    recorder.signed.length = 0;
+    ledger = fakeLedger();
+    install({ extraExpiryLedgers: atLimit + 1 });
+    const held = await wall("refuse");
+    const over = byId(await run(held.url), "X402-11");
+    assert.ok(over.error !== undefined, `no verdict expected one ledger over: ${over.detail}`);
+    assert.match(over.error.message, /longer than the 300 seconds this check waits\. It was signed and discarded; it was not sent\./);
+    assert.equal(held.invalid.length, 0, "not sent one ledger over the limit");
+  });
+
   it(`SKIP before signing when the advertised lifetime is below ${REJECTED_REQUEST_MIN_LIFETIME_SECONDS} s (screening S-1)`, async () => {
     assert.equal(REJECTED_REQUEST_MIN_LIFETIME_SECONDS, 30);
     const target = await wall("refuse", {}, 29);
