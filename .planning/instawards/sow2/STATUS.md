@@ -3,15 +3,16 @@
 > **READ THIS FIRST** for anything about SOW 2. Single source of truth for the
 > engagement. Updated at the end of every working session.
 
-Last updated: 2026-11-20 (evening): the pre-release `0.8.0-beta.1` is out, without
-the mainnet opt-in: [the release on GitHub](https://github.com/wasit-dev/Wasit/releases/tag/v0.8.0-beta.1) and the three packages on npm
-under the `beta` tag (`latest` stays at 0.7.0). The Action on `main` of the
-example project builds Wasit from the release commit and its report names
-0.8.0-beta.1. Earlier the same day: the comment's table of each check, "Wasit is
-running", and the Action's own check, "Wasit conformance", shown on `main`, on a
-pull request and on a pull request from a fork. Week 1 is done (job 00 and job
-01). The independent review of the payment code is the next work. The example
-project is public, so every link in the review table opens without a login.
+Last updated: 2026-11-21: the code of the pre-release is on `main` of Wasit's
+repository. [Pull request 23](https://github.com/wasit-dev/Wasit/pull/23) and
+[pull request 30](https://github.com/wasit-dev/Wasit/pull/30) were merged after
+green CI, and [CI on `main`](https://github.com/wasit-dev/Wasit/actions/runs/44831312060)
+passes with the test counts below; the links into the code now point at `main`.
+The pre-release `0.8.0-beta.1` came out on 2026-11-20, without the mainnet
+opt-in: [the release on GitHub](https://github.com/wasit-dev/Wasit/releases/tag/v0.8.0-beta.1)
+and the three packages on npm under the `beta` tag (`latest` stays at 0.7.0).
+Week 1 is done (job 00 and job 01). The example project is public, so every
+link in the review table opens without a login.
 
 ---
 
@@ -62,9 +63,9 @@ or shown only in part · ⬜ planned for a later week.
 | Ambassador Chapter | Stellar Chapter Ambassador Indonesia (the Chapter Lead reviews each week) |
 | GitHub repo | <https://github.com/wasit-dev/Wasit> (public) |
 | Published packages | `@wasit-dev/core`, `cli`, `server`: 0.7.0 under `latest`, and the pre-release [0.8.0-beta.1](https://www.npmjs.com/package/@wasit-dev/cli/v/0.8.0-beta.1) under `beta` since 2026-11-20 ([release](https://github.com/wasit-dev/Wasit/releases/tag/v0.8.0-beta.1)). |
-| The Action's code | Directory `action/` on branch `sow2/s1-action`, offered as the draft [pull request 23](https://github.com/wasit-dev/Wasit/pull/23). It is merged with the pre-release, not before. The changes of 2026-11-20 to how a run shows on a pull request are on branch `sow2/pr-run`, at commit `05f5a19`. |
+| The Action's code | Directory [`action/`](https://github.com/wasit-dev/Wasit/tree/main/action) on `main`: [pull request 23](https://github.com/wasit-dev/Wasit/pull/23) (week 1) and [pull request 30](https://github.com/wasit-dev/Wasit/pull/30) (week 2), merged on 2026-11-21 after the pre-release. |
 | Example project | <https://github.com/dzakwannajmi/x402-example-paywall> — **public since 2026-11-15** (MIT License); every link to it opens without a login |
-| Tests | Offline, no keys, no network. At the pre-release candidate on the maintainer's machine (2026-11-20): command line 271, core 828, server 30, Action 190, none failing. CI on the draft pull request passes: [run](https://github.com/wasit-dev/Wasit/actions/runs/43706023137) |
+| Tests | Offline, no keys, no network. [CI on `main`](https://github.com/wasit-dev/Wasit/actions/runs/44831312060) (2026-11-21, Node 22 and 24): command line 275, core 830, server 30, Action 195, none failing (counts from the Node 24 job's log). At the pre-release, on the maintainer's machine (2026-11-20): 271, 828, 30, 190. |
 | Network | Payment checks run on test networks. Any other network is refused (first layer built). The read-only checks only read the service's answer. |
 | Calendar | Week 1: 14 to 20 Nov · week 2: 21 to 27 Nov · week 3: 28 Nov to 4 Dec · week 4: 5 to 11 Dec · 12 and 13 Dec: final report |
 | Where proofs are copied | `week-1/copies/` — text copies of the comments and job logs that the live links show, kept as an archive in case a run or a comment is later changed or removed. The live link is authoritative. |
@@ -99,8 +100,7 @@ or shown only in part · ⬜ planned for a later week.
 
 - **Windows.** Not run. The Action supports Linux runners in this SOW.
 - **Version number.** Solved by the pre-release: the Action's report now reads "Wasit 0.8.0-beta.1, built from commit 38d8a86" ([run](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/44748831548)).
-- **The draft pull requests 23 and 30** hold the code of the pre-release; merging them into `main` is the next step after it.
-- **Links into the code.** The links to the Action's code point at branch `sow2/s1-action`. After the pre-release merge they are moved to `main`.
+- **The pull requests 23 and 30** are merged into `main` (2026-11-21); the links into the code point at `main`.
 
 ---
 
@@ -108,6 +108,7 @@ or shown only in part · ⬜ planned for a later week.
 
 | Date | Focus | Outcome |
 | --- | --- | --- |
+| 2026-11-21 | The code on `main` | [Pull request 23](https://github.com/wasit-dev/Wasit/pull/23) and [pull request 30](https://github.com/wasit-dev/Wasit/pull/30), the code of weeks 1 and 2, were merged into `main` of Wasit's repository, each after its CI passed against the current `main`. [CI on `main`](https://github.com/wasit-dev/Wasit/actions/runs/44831312060) passes: command line 275, core 830, server 30, Action 195. The links into the code on this board now point at `main`. |
 | 2026-11-20 | The pre-release `0.8.0-beta.1` | Published without the mainnet opt-in: [the release](https://github.com/wasit-dev/Wasit/releases/tag/v0.8.0-beta.1), tag `v0.8.0-beta.1` on commit `38d8a86`, and `@wasit-dev/core`, `cli` and `server` on npm under the `beta` tag; `latest` stays at 0.7.0. Before publishing, every check of the release ran on the maintainer's machine: the offline tests, the install of the packed packages, and the suites against local fixtures on Stellar testnet, Base Sepolia, Ethereum Sepolia and Solana devnet, with each settlement read back from its chain. The packages on npm have the same shasums as those tested. The package READMEs now describe the beta, and the reason an x402 v1 service is unsupported holds on every chain. [The advisory](https://github.com/wasit-dev/Wasit/security/advisories/GHSA-7c36-rg54-r3v8) for the two MPP defects of 0.7.0, fixed in this version, is published. On `main` of the example project, [the Action at the release commit](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/44748831548) passed all eleven checks and its report names 0.8.0-beta.1. The workshop kit's [v0.1.2](https://github.com/dzakwannajmi/x402-starer-kit/releases/tag/v0.1.2) runs the pre-release. |
 | 2026-11-20 | The run on a pull request | Three changes the maintainer chose for the pre-release, shown in real runs. The comment has a table of each check with a mark for its result and the details folded at the end; under an endpoint whose `X402-06` passed on the test network, it links the payment on Stellar Expert. While Wasit runs, the comment says so, and the result replaces it ([pull request 7](https://github.com/dzakwannajmi/x402-example-paywall/pull/7): the comment's edit history shows both). With `checks: write` the Action adds its own check, "Wasit conformance", completed with the verdict and the job summary ([on `main`](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/44641632605), where it carries the payment link). [Pull request 8](https://github.com/dzakwannajmi/x402-example-paywall/pull/8), from a fork, got neither. A probe on pull request 7 showed that `NODE_OPTIONS` set in the workflow does not reach the Action's steps or the service, and that GitHub's runner refuses it through `GITHUB_ENV`. The copies are in `week-2/copies/`. Code: commit [`05f5a19`](https://github.com/wasit-dev/Wasit/commit/05f5a19cc51a7dbb151d25f5ccadaaf48b3e1398) on branch `sow2/pr-run`. |
 | 2026-11-16 | Mainnet refused | The switches of the mainnet opt-in exist in this version only to refuse it: `wasit run --mainnet`, the Action's `mainnet` input and the MCP server's start-up settings. On a push, [a run with `mainnet: true`](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43882283916) stopped in the step that checks the inputs, before Wasit was installed ([copy of the log](week-2/copies/run-mainnet-input-refused.log.txt)). [A payment-tier run on a config that names `stellar:pubnet`](https://github.com/dzakwannajmi/x402-example-paywall/actions/runs/43882304954), started by hand on `main` with no payer key, stopped before the service started and before anything was signed ([copy of the log](week-2/copies/run-pubnet-payment-refused.log.txt)). A property test drives random flags, variables, events and config values for a payment on `stellar:pubnet`: nothing is paid or signed. Code: [draft pull request 30](https://github.com/wasit-dev/Wasit/pull/30). |
