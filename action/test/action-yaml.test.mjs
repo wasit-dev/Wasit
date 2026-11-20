@@ -139,7 +139,7 @@ describe("action.yml", () => {
   });
 
   describe("NODE_OPTIONS (2026-11-20 screening, class B-A10)", () => {
-    it("is set empty in every step, so a --require that an earlier step put in GITHUB_ENV does not run with the token or the key", () => {
+    it("is set empty in every step, so a --require in the workflow's env does not run with the token or the key", () => {
       for (const step of steps) assert.equal(step.env?.NODE_OPTIONS, "", step.name);
     });
   });

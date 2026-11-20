@@ -50,10 +50,13 @@ runs:
     # the step that starts the service. The env a workflow puts on
     # this action reaches every one of its steps: the payer key variables are set
     # empty in each step but Run Wasit, the only one that needs a key.
-    # NODE_OPTIONS is set empty in every step: an earlier step of the workflow can
-    # write `--require <file>` into GITHUB_ENV, and Node would then load that file in
-    # the steps that hold the token or the key. A service Wasit starts no longer
-    # inherits options set that way: put them in its service.start command.
+    # NODE_OPTIONS is set empty in every step. The workflow's own env (on the
+    # workflow, the job, or the step that uses this action) reaches every step
+    # here, and a `--require <file>` in it would have Node load that file in the
+    # steps that hold the token or the key. (The runner refuses NODE_OPTIONS
+    # through GITHUB_ENV: seen on runner 2.338.2, 2026-11-20.) A service Wasit
+    # starts no longer inherits NODE_OPTIONS from the workflow's env: put the
+    # options it needs in its service.start command.
 
     - name: Check the runner
       shell: bash
