@@ -116,8 +116,35 @@ describe("parseInputs", () => {
     );
   });
 
-  it("allows push, pull_request, workflow_dispatch and schedule", () => {
-    for (const name of ["push", "pull_request", "workflow_dispatch", "schedule"]) assert.doesNotThrow(() => parseInputs(env({ GITHUB_EVENT_NAME: name })), name);
+  it("allows push, pull_request, workflow_dispatch, schedule and merge_group", () => {
+    for (const name of ["push", "pull_request", "workflow_dispatch", "schedule", "merge_group"]) {
+      assert.doesNotThrow(() => parseInputs(env({ GITHUB_EVENT_NAME: name })), name);
+    }
+  });
+
+  it("refuses every other event, as pull_request_target: they hand a pull request's code the base repository's token", () => {
+    for (const name of ["issue_comment", "workflow_run", "pull_request_review", "pull_request_review_comment", "repository_dispatch", "release"]) {
+      assert.throws(
+        () => parseInputs(env({ GITHUB_EVENT_NAME: name })),
+        (error) =>
+          error instanceof InputError &&
+          /^this action runs on pull_request, push, schedule, workflow_dispatch, merge_group only/.test(error.message) &&
+          error.message.includes(`this run's event is ${name}.`),
+        name,
+      );
+    }
+  });
+
+  it("refuses a run with no event name, and never quotes one that is not an event name", () => {
+    const unset = env();
+    delete unset.GITHUB_EVENT_NAME;
+    for (const given of [unset, env({ GITHUB_EVENT_NAME: "" }), env({ GITHUB_EVENT_NAME: "push; id" })]) {
+      assert.throws(
+        () => parseInputs(given),
+        (error) => error instanceof InputError && /this run's event is another event\./.test(error.message) && !error.message.includes("; id"),
+        JSON.stringify(given.GITHUB_EVENT_NAME),
+      );
+    }
   });
 
   describe("names that would be shell text", () => {
