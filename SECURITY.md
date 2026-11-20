@@ -31,6 +31,15 @@ payer key if that account holds mainnet funds (read from the SDK's source, not
 run). Use a payer key that has never held mainnet funds. The advisory is
 [GHSA-wm3g-w88q-73xx](https://github.com/wasit-dev/wasit/security/advisories/GHSA-wm3g-w88q-73xx).
 
+In 0.7.0, `MPP-01` paid on `stellar:pubnet` when the run named it, with no cap,
+and a channel commitment was signed without checking the bytes the RPC returned
+for it, so a run on the test network pointed at a mainnet RPC signed a
+commitment valid on mainnet. Both are fixed in 0.8.0-beta.1 (npm tag `beta`):
+every network but the test networks is refused before a key is read, and a
+commitment is signed only when it names the run's channel, amount and network.
+The advisory is
+[GHSA-7c36-rg54-r3v8](https://github.com/wasit-dev/wasit/security/advisories/GHSA-7c36-rg54-r3v8).
+
 ## Authorization
 
 **Only run Wasit against a service you own, or one whose operator has given you
@@ -181,6 +190,13 @@ would not appear in that file until it was resolved.
 
 ## Known advisories in a clean install
 
+In 0.8.0-beta.1 (npm tag `beta`), `npm run verify:clean-install` found no
+advisory in a fresh install of all three packages (2026-11-20). During that
+install npm prints two `ERESOLVE overriding peer dependency` warnings:
+`@stellar/mpp` 0.7.1 declares the peer range `@stellar/stellar-sdk ^15.1.0`,
+and Wasit uses 16.4.1, with which its MPP checks passed on the Stellar test
+network (2026-11-16). The rest of this section describes 0.7.0.
+
 `npm audit` on a fresh install of all three packages (0.7.0, measured
 2026-10-08) reports nine packages: eight high, one moderate. Installing
 `@wasit-dev/cli` alone reports eight (seven high, one moderate), since it pulls
@@ -201,8 +217,10 @@ arrive by two routes:
 
 `@stellar/mpp`, `@x402/stellar` and the three `@wasit-dev/*` packages appear in
 that count only because npm marks a package that depends on an affected one.
-There is no advisory against Wasit 0.7.0's own code; versions up to 0.6.0 have
-the `MPP-01` network issue described under [Testnet only](#testnet-only),
+Wasit 0.7.0's own code has the two MPP defects of
+[GHSA-7c36-rg54-r3v8](https://github.com/wasit-dev/wasit/security/advisories/GHSA-7c36-rg54-r3v8),
+fixed in 0.8.0-beta.1; versions up to 0.6.0 have the `MPP-01` network issue
+described under [Testnet only](#testnet-only),
 [GHSA-wm3g-w88q-73xx](https://github.com/wasit-dev/wasit/security/advisories/GHSA-wm3g-w88q-73xx).
 
 There is no downstream fix. The levers are `@stellar/mpp`'s two peer ranges,

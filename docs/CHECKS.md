@@ -347,6 +347,20 @@ The transaction `PAYMENT-RESPONSE` names must have succeeded and moved exactly
 that cites another transaction fails, even a real and successful one
 ([0.6.0 verification run](evidence/2026-09-30-x402-0.6.0-verification-run.md)).
 
+### A Solana settlement is reported as failing although it settled (`X402-06`)
+
+Known limit, reported in [issue #22](https://github.com/wasit-dev/Wasit/issues/22)
+and not yet fixed. On Solana, Wasit reads the settlement transaction with
+`getTransaction(..., { maxSupportedTransactionVersion: 0 })`
+(`packages/core/src/x402/chains/svm.ts`). The report says that an RPC answers
+that call with error -32015 when the settlement was sent as a version 1
+transaction, so a compliant settlement would be reported as failing. The cap is
+in the code (two calls, lines 255 and 307 in 0.7.0 and in 0.8.0-beta.1); the RPC
+behaviour is the reporter's, and we have not yet reproduced it. If a Solana run
+fails at the settlement read and the RPC's answer mentions the transaction
+version, read the transaction on an explorer before taking the FAIL as the
+target's defect.
+
 ### A forged signature is accepted (`X402-07`)
 
 The target served a payment whose authorization signature was corrupted: it
@@ -372,6 +386,18 @@ signed amount to the advertised one before serving: on Stellar it must be exact.
 An authorization past its window (`validBefore` on EVM, the auth entry's expiration
 ledger on Stellar, the recent blockhash on Solana) can never settle, so a target that serves it serves for nothing.
 Verify with the facilitator before serving; it refuses expired authorizations.
+
+### No verdict on `X402-11` where ledgers close in 4 seconds or less
+
+`X402-11` does not send an authorization that stays valid more than 62 ledgers
+past the latest one: 300 seconds at 5 seconds a ledger, plus 2 ledgers of slack
+(0.8.0-beta.1). The x402 Stellar client turns the advertised lifetime into
+ledgers with its own estimate of the ledger time, the recent ledgers' average
+rounded up (`@x402/stellar` 2.28.0; 5 seconds when it cannot read them). On the
+test network the recent ledgers averaged 5.00 seconds on 2026-11-17, so a
+300-second lifetime is 60 ledgers. If they average 4 seconds or less, the same
+lifetime becomes 75 ledgers or more, and `X402-11` discards the payment unsent,
+with no verdict. It never passes because of it.
 
 ### A charge to a muxed recipient is refused (`MPP-01`)
 
