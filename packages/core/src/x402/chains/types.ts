@@ -11,6 +11,7 @@
 import type { PaymentRequirements } from "@x402/core/types";
 import type { x402Client } from "@x402/fetch";
 
+import type { SigningGate } from "../../guard/signed-terms.js";
 import type { ExpectedSettlement, SettlementVerdict } from "../../settlement.js";
 
 /**
@@ -98,6 +99,25 @@ export interface AuthorizationWatch {
   ): Promise<{ readonly latest: number; readonly transfers: readonly RecordedTransfer[] }>;
 }
 
+/**
+ * The signed-terms gate of an adapter whose client signs what an RPC returns
+ * (spec B17.2, `guard/signed-terms.ts`). An adapter with one signs only
+ * through the `SigningGate` that `preparePayment` arms; every network that can
+ * be opted into belongs to such an adapter (a test pins it).
+ */
+export interface SignedTermsBinding {
+  /** The shortest a unit (a ledger) takes, in seconds: the bound counts with it. */
+  readonly unitSeconds: number;
+  /** The chain's latest unit on `rpcUrl`: read once per run, as the anchor of every expiration bound. */
+  latestUnit(network: string, rpcUrl: string): Promise<number>;
+  /**
+   * Throws `PaymentGuardRefusedError` unless the payment payload's inner
+   * `payload` carries exactly the one authorization `gate` let the key sign,
+   * with that signature: the payload is then discarded unsent.
+   */
+  bind(payload: Record<string, unknown>, gate: SigningGate): void;
+}
+
 export interface PaymentChain {
   /** The chain family's name, for reports. */
   readonly name: string;
@@ -116,14 +136,23 @@ export interface PaymentChain {
    * Registers this chain's `exact` client scheme, signing with `payerKey`.
    * `rpcUrl` is for client schemes that read the chain while building a
    * payment (EVM Permit2 checks the token allowance, Solana fetches the mint
-   * and a blockhash); others ignore it.
+   * and a blockhash); others ignore it. An adapter with `signedTerms` signs
+   * only through `gate`; the others ignore it.
    */
   registerPayer(
     client: x402Client,
     network: string,
     payerKey: string,
     rpcUrl: string,
+    gate: SigningGate,
   ): void | Promise<void>;
+  /**
+   * The client builds the payment through the run's RPC and accepts only an
+   * https one: an http RPC is refused before anything is asked or sent.
+   */
+  readonly httpsRpcOnly?: boolean;
+  /** Present when the payer's signer is gated (see {@link SignedTermsBinding}); `gate` is then the one to sign through. */
+  readonly signedTerms?: SignedTermsBinding;
   /**
    * How X402-10 makes a payment that has expired when it arrives, for the
    * option `selected`. Where the client derives the lifetime from

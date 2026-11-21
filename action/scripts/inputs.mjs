@@ -58,9 +58,14 @@ function checkMainnet(env) {
     event === "workflow_dispatch"
       ? ""
       : ` The input is also refused on every event but workflow_dispatch, and this run's event is ${EVENT_NAME.test(event) ? event : "another event"}.`;
+  // Spec B17.4: a self-hosted runner keeps files and processes between jobs.
+  const runnerRule =
+    env["RUNNER_ENVIRONMENT"] === "github-hosted"
+      ? ""
+      : " The input is also refused on a runner that is not GitHub-hosted: a self-hosted runner keeps files and processes between jobs.";
   throw new MainnetRefusedError(
     "mainnet: true is refused: the mainnet opt-in is not part of this version. Wasit pays on test networks only." +
-      `${eventRule} Nothing was installed, started, sent or signed.`,
+      `${eventRule}${runnerRule} Nothing was installed, started, sent or signed.`,
   );
 }
 

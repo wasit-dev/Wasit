@@ -76,7 +76,7 @@ import {
   MainnetOptInRefusedError,
   RpcIdentityError,
   UnsupportedPaymentNetworkError,
-  assertRpcServesNetwork,
+  assertX402PaymentRpc,
 } from "@wasit-dev/core";
 
 import { formatRun } from "./run-format.js";
@@ -309,7 +309,12 @@ export async function executeRun(options: RunCommandOptions, context: RunContext
   // B12: the switch exists only to refuse. First, so nothing is read, started, sent or signed.
   if (options.mainnet === true) {
     try {
-      refuseMainnetSwitch("--mainnet", inGithubActions(context.env) ? { event: context.env["GITHUB_EVENT_NAME"] ?? "" } : {});
+      refuseMainnetSwitch(
+        "--mainnet",
+        inGithubActions(context.env)
+          ? { event: context.env["GITHUB_EVENT_NAME"] ?? "", runner: context.env["RUNNER_ENVIRONMENT"] ?? "" }
+          : {},
+      );
     } catch (error) {
       if (error instanceof MainnetOptInRefusedError) return fail(`wasit run ${error.message}`);
       throw error;
@@ -384,13 +389,12 @@ export async function executeRun(options: RunCommandOptions, context: RunContext
         : undefined;
 
   // D-023a+b: a run that will pay checks its RPC before the service starts or
-  // anything is sent to it: the settlements are read through it (and, on EVM
-  // and Solana, the payments are built through it), so it must serve the run's
-  // own network. On Stellar the x402 client builds the payment through its own
-  // default RPC for the network; that is changed before the mainnet opt-in.
+  // anything is sent to it: the payments are built and the settlements read
+  // through it, so it must be one the x402 client accepts (https on Stellar)
+  // and serve the run's own network.
   if (paying && notPaid === undefined && chain !== undefined && key !== undefined && hasX402) {
     try {
-      await assertRpcServesNetwork(resolved.network, chain.resolveRpcUrl(resolved.network, resolved.rpcUrl));
+      await assertX402PaymentRpc(resolved.network, chain.resolveRpcUrl(resolved.network, resolved.rpcUrl));
     } catch (error) {
       if (error instanceof RpcIdentityError) return fail(`wasit run: ${error.message} The service was not started.`);
       throw error;

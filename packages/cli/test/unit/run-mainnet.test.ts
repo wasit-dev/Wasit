@@ -150,15 +150,41 @@ describe("wasit run --mainnet (B12: a switch that always refuses)", () => {
     });
   }
 
-  it("in GitHub Actions on workflow_dispatch: still refused, without the event rule", async () => {
+  it("in GitHub Actions on workflow_dispatch on a hosted runner: still refused, without the event or runner rule", async () => {
     paywall = await multiPaywall({ "/weather": [option("10000")] });
     const result = await run(
       { config: await pubnetConfig(paywall.base) },
-      { GITHUB_ACTIONS: "true", CI: "true", GITHUB_EVENT_NAME: "workflow_dispatch", GITHUB_REF: "refs/heads/main", GITHUB_EVENT_PATH: eventFile },
+      {
+        GITHUB_ACTIONS: "true",
+        CI: "true",
+        GITHUB_EVENT_NAME: "workflow_dispatch",
+        GITHUB_REF: "refs/heads/main",
+        GITHUB_EVENT_PATH: eventFile,
+        RUNNER_ENVIRONMENT: "github-hosted",
+      },
     );
     assert.equal(result.code, 2);
     assert.ok(result.stderr.startsWith(SENTENCE), result.stderr);
     assert.doesNotMatch(result.stderr, /also refused/);
+    assert.equal(paywall.requests, 0);
+  });
+
+  it("in GitHub Actions on a self-hosted runner: refused, and says the runner rule", async () => {
+    paywall = await multiPaywall({ "/weather": [option("10000")] });
+    const result = await run(
+      { config: await pubnetConfig(paywall.base) },
+      {
+        GITHUB_ACTIONS: "true",
+        CI: "true",
+        GITHUB_EVENT_NAME: "workflow_dispatch",
+        GITHUB_REF: "refs/heads/main",
+        GITHUB_EVENT_PATH: eventFile,
+        RUNNER_ENVIRONMENT: "self-hosted",
+      },
+    );
+    assert.equal(result.code, 2);
+    assert.ok(result.stderr.startsWith(SENTENCE), result.stderr);
+    assert.match(result.stderr, /--mainnet is also refused on a runner that is not GitHub-hosted/);
     assert.equal(paywall.requests, 0);
   });
 

@@ -26,7 +26,7 @@ import { NETWORK_CLASSES } from "../../src/guard/networks.js";
 const SWITCHES: readonly MainnetSwitch[] = ["--mainnet", "WASIT_MAINNET_OPT_IN", "WASIT_MAINNET_CONFIG"];
 const TEST_NETWORKS = [...NETWORK_CLASSES].filter(([, kind]) => kind === "test").map(([network]) => network);
 
-function refusal(name: MainnetSwitch, context?: { event?: string }): MainnetOptInRefusedError {
+function refusal(name: MainnetSwitch, context?: { event?: string; runner?: string }): MainnetOptInRefusedError {
   try {
     refuseMainnetSwitch(name, context);
   } catch (error) {
@@ -49,6 +49,18 @@ describe("the mainnet opt-in switches of this version (B12)", () => {
     for (const network of TEST_NETWORKS) assert.ok(error.message.includes(network), network);
     assert.match(error.message, /The config was not read, and nothing was started, sent or signed\.$/);
     assert.doesNotMatch(error.message, /workflow_dispatch/, "no event rule outside GitHub Actions");
+  });
+
+  it("adds the runner rule in GitHub Actions on a runner that is not GitHub-hosted", () => {
+    for (const runner of ["self-hosted", ""]) {
+      const error = refusal("--mainnet", { event: "workflow_dispatch", runner });
+      assert.ok(
+        error.message.includes("--mainnet is also refused on a runner that is not GitHub-hosted: a self-hosted runner keeps files and processes between jobs."),
+        error.message,
+      );
+    }
+    assert.doesNotMatch(refusal("--mainnet", { event: "workflow_dispatch", runner: "github-hosted" }).message, /GitHub-hosted/);
+    assert.doesNotMatch(refusal("--mainnet").message, /GitHub-hosted/, "no runner rule outside GitHub Actions");
   });
 
   it("adds the event rule on a GitHub event that is not workflow_dispatch, and names the event", () => {

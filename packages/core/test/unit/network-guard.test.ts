@@ -22,6 +22,7 @@ import { describe, it } from "node:test";
 import { Keypair } from "@stellar/stellar-sdk";
 import { charge as chargeClient } from "@stellar/mpp/charge/client";
 
+import { SigningGate } from "../../src/guard/signed-terms.js";
 import { classifyCheckError } from "../../src/errors.js";
 import {
   NETWORK_CLASSES,
@@ -316,13 +317,18 @@ describe("the Stellar x402 payer (B-A01)", () => {
   // The second barrier on pubnet: the SDK's client scheme refuses pubnet
   // without an RPC endpoint of its own. Wasit must not hand it one until the
   // mainnet opt-in exists; the run's endpoint serves Wasit's own reads only.
-  it("builds the SDK scheme without an RPC endpoint, whatever the run passes", () => {
-    for (const network of ["stellar:testnet", "stellar:pubnet"]) {
-      const registered: unknown[] = [];
-      const client = { register: (_network: string, scheme: unknown) => registered.push(scheme) };
-      stellarChain.registerPayer(client as never, network, Keypair.random().secret(), "https://rpc.example.invalid");
-      assert.equal(registered.length, 1, network);
-      assert.equal((registered[0] as { rpcConfig?: unknown }).rpcConfig, undefined, network);
-    }
+  it("builds the SDK scheme for pubnet without an RPC endpoint, whatever the run passes", () => {
+    const registered: unknown[] = [];
+    const client = { register: (_network: string, scheme: unknown) => registered.push(scheme) };
+    stellarChain.registerPayer(client as never, "stellar:pubnet", Keypair.random().secret(), "https://rpc.example.invalid", new SigningGate());
+    assert.equal(registered.length, 1);
+    assert.equal((registered[0] as { rpcConfig?: unknown }).rpcConfig, undefined);
+  });
+
+  it("builds the SDK scheme for testnet through the run's RPC, the one whose network was checked", () => {
+    const registered: unknown[] = [];
+    const client = { register: (_network: string, scheme: unknown) => registered.push(scheme) };
+    stellarChain.registerPayer(client as never, "stellar:testnet", Keypair.random().secret(), "https://rpc.example.invalid", new SigningGate());
+    assert.deepEqual((registered[0] as { rpcConfig?: unknown }).rpcConfig, { url: "https://rpc.example.invalid" });
   });
 });

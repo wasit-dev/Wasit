@@ -248,7 +248,11 @@ describe("the MCP server's RPC lock and the RPC in results (D-023c)", () => {
         result.text,
       );
       assert.deepEqual(result.structured?.rpc, { origin: locked.origin, source: "start-up", isDefault: false });
-      assert.ok(locked.calls() > 0, "the lock was not the RPC the run used");
+      // The stand-in RPC is http, and the x402 Stellar client builds the payment
+      // through the run's RPC and takes only https: the run is refused for the
+      // lock's RPC (the default is https), before that RPC is asked anything.
+      assert.match(result.text, /accepts only an https RPC/);
+      assert.equal(locked.calls(), 0, "an http RPC was asked something before the run was refused");
       assert.ok(!JSON.stringify(result).includes(SECRET_PATH), "the lock's path was printed");
       assert.equal(paywall.paid(), 0);
     } finally {

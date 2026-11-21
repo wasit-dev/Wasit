@@ -16,7 +16,7 @@ import {
   scrubTokens,
 } from "../scripts/inputs.mjs";
 
-const env = (overrides = {}) => ({ INPUT_CONFIG: "wasit.config.json", INPUT_ENVIRONMENT: "", INPUT_TIER: "read-only", INPUT_ENDPOINTS: "", GITHUB_EVENT_NAME: "pull_request", ...overrides });
+const env = (overrides = {}) => ({ INPUT_CONFIG: "wasit.config.json", INPUT_ENVIRONMENT: "", INPUT_TIER: "read-only", INPUT_ENDPOINTS: "", GITHUB_EVENT_NAME: "pull_request", RUNNER_ENVIRONMENT: "github-hosted", ...overrides });
 
 describe("parseInputs", () => {
   it("takes the defaults: the config file in the working directory, read-only, every endpoint", () => {
@@ -78,6 +78,22 @@ describe("parseInputs", () => {
           }
         }
       }
+    });
+
+    it("adds the runner rule on a runner that is not GitHub-hosted", () => {
+      for (const runner of ["self-hosted", undefined]) {
+        assert.throws(
+          () => parseInputs(env({ INPUT_MAINNET: "true", GITHUB_EVENT_NAME: "workflow_dispatch", RUNNER_ENVIRONMENT: runner })),
+          (error) =>
+            SENTENCE.test(error.message) &&
+            error.message.includes("The input is also refused on a runner that is not GitHub-hosted: a self-hosted runner keeps files and processes between jobs."),
+          String(runner),
+        );
+      }
+      assert.throws(
+        () => parseInputs(env({ INPUT_MAINNET: "true", GITHUB_EVENT_NAME: "workflow_dispatch" })),
+        (error) => !/GitHub-hosted/.test(error.message),
+      );
     });
 
     it("adds the workflow_dispatch rule on any other event, and names the event", () => {

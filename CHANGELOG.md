@@ -17,8 +17,39 @@ All notable changes to Wasit are recorded here. Versions follow [Semantic Versio
   no longer comes from the workflow's env into the steps that hold the token or
   the payer key. A service Wasit starts no longer inherits them from the
   workflow's env either; set what it needs in `service.start`.
+- On Stellar, the payer's key signs only the authorization Wasit checked:
+  one `transfer` of the checked amount from the payer to the checked payee,
+  on the checked asset and the run's network, with no further call, one
+  signature per payment, valid no longer than the payment's lifetime allows
+  counted from the first ledger the run reads. The caps were checked on the
+  terms Wasit hands the x402 client; they now hold on what is signed too, so
+  an RPC whose simulation asks for anything else gets no signature. Such a
+  payment check is `ERROR (setup)` with nothing signed, and so is a payment in
+  a testnet token whose `transfer` needs further authorized calls. A payment
+  whose built transaction carries anything but that one signed authorization
+  is discarded unsent.
+- A payment run on Stellar refuses an `http://` RPC (`rpcUrl` in the config,
+  `WASIT_RPC_URL`, `--rpc-url`, the MCP tools' `rpcUrl`) before anything is
+  sent, and `wasit run` refuses it before it starts the service: the x402
+  Stellar client builds the payment through that RPC and accepts only https.
+
+**Added.**
+- `@wasit-dev/core` exports `mainnetJobRefusals` and `assertMainnetJob`: the
+  rules a job in GitHub Actions has to meet for the mainnet opt-in, which this
+  version does not have. The run is started by hand (`workflow_dispatch`), on
+  the default branch, on a GitHub-hosted runner; it tests a deployed service
+  (no `service.start`, no local `baseUrl`); nothing was installed in the job
+  before Wasit (no `node_modules` in the workspace); and
+  `WASIT_MAINNET_PAYER_SECRET` is the only key variable set. Outside GitHub
+  Actions none of them applies. `--mainnet` and the Action's `mainnet: true`
+  still refuse in this version, and now also name the runner rule on a runner
+  that is not GitHub-hosted.
 
 **Fixed.**
+- On Stellar testnet the x402 client builds and simulates the payment through
+  the run's RPC, the one whose network Wasit checks and reads the settlement
+  from. It used `https://soroban-testnet.stellar.org` whatever RPC the run was
+  given.
 - In the coloured output of `wasit test` (at a terminal, or with
   `FORCE_COLOR`), a wrapped line of a fix could start with `::name::` or
   `##[name]` from the middle of the text, which a GitHub job log reads as a

@@ -79,7 +79,7 @@ export function formatUsd(amount: bigint): string {
   return `${sign}$${whole}.${fraction}`;
 }
 
-export type GuardRefusal = "price" | "asset" | "amount" | "pin" | "plan" | "run-cap" | "accepted";
+export type GuardRefusal = "price" | "asset" | "amount" | "pin" | "plan" | "run-cap" | "accepted" | "signed-terms";
 
 /**
  * A payment the guard will not sign, or, with `signed`, a signed payment it
