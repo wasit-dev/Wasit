@@ -16,7 +16,8 @@ import {
   type PinTerms,
 } from "../guard/budget.js";
 import { assertPaymentNetworkAllowed } from "../guard/networks.js";
-import { SigningAnchor, SigningGate, type SigningTerms } from "../guard/signed-terms.js";
+import { SigningAnchor, SigningGate, expirationOfSigned, type SigningTerms } from "../guard/signed-terms.js";
+import type { LedgerEntryHandle, PaymentLedger } from "../guard/run-ledger.js";
 import { RpcIdentityError, assertRpcServesNetwork } from "../guard/rpc-identity.js";
 import type { EndpointPlan } from "./plan.js";
 import {
@@ -437,6 +438,13 @@ export interface X402PaymentCheckOptions extends RequestShape {
   /** The request the service must refuse (`endpoints[].reject`), for X402-11. Absent: X402-11 is skipped. */
   readonly reject?: RejectCase;
   /**
+   * The run ledger of this endpoint (spec B5): each signature's intent is
+   * written before the key is asked to sign, then what became of it. A ledger
+   * that cannot take an intent stops that payment, with nothing signed.
+   * Required on mainnet; optional on a test network.
+   */
+  readonly ledger?: PaymentLedger;
+  /**
    * Called with one line when a check starts a long wait on the chain (X402-11
    * waits up to six minutes), so a log does not look stuck. The line holds no
    * text from the service.
@@ -822,32 +830,115 @@ async function preparePayment(
     amount: signing.amount,
     ...(planned === undefined ? {} : { planned }),
   });
+  // The run ledger (spec B5): the intent is on disk before the key can be asked
+  // to sign. A ledger that cannot take it throws here, and nothing is signed.
+  const entry = options.ledger?.intent({
+    check,
+    network: options.network,
+    asset: signing.asset,
+    payTo: signing.payTo,
+    amount: signing.amount,
+  });
 
-  await beforeSigning?.(selected);
-  // The signed-terms gate (spec B17.2): the key signs only what was checked and
-  // charged above, once, within this payment's lifetime.
-  if (chain.signedTerms !== undefined) {
-    gate.arm(
-      await signingTerms(chain.signedTerms, options.network, rpcUrl, anchorOf(budget), chain.payerAddress(options.payerSecretKey), signing),
+  let asked = false;
+  let signed;
+  try {
+    await beforeSigning?.(selected);
+    // The signed-terms gate (spec B17.2): the key signs only what was checked and
+    // charged above, once, within this payment's lifetime.
+    if (chain.signedTerms !== undefined) {
+      gate.arm(
+        await signingTerms(chain.signedTerms, options.network, rpcUrl, anchorOf(budget), chain.payerAddress(options.payerSecretKey), signing),
+      );
+    }
+    asked = true;
+    signed = await withinSpendControls(options.network, selected, () =>
+      client.createPaymentPayload({ ...paymentRequired, accepts: [signing] }),
     );
+  } catch (error) {
+    recordUnsigned(entry, chain, gate, asked, error);
+    throw error;
   }
-  const signed = await withinSpendControls(options.network, selected, () =>
-    client.createPaymentPayload({ ...paymentRequired, accepts: [signing] }),
-  );
-  // What the SDK says it signed must be the option checked, field by field;
-  // otherwise the payload is discarded here, unsent. It stays charged.
-  if (canonical(signed.accepted) !== canonical(signing)) {
-    throw new PaymentGuardRefusedError(
-      "accepted",
-      `The payment the x402 client built for ${check} names other terms in its accepted field than the ` +
-        `option Wasit checked.`,
-      { signed: true },
-    );
+  // Recorded before the payload can be used: a signature the ledger cannot
+  // take is never sent.
+  entry?.signed(gate.signed === undefined ? undefined : expirationOfSigned(gate.signed));
+  try {
+    // What the SDK says it signed must be the option checked, field by field;
+    // otherwise the payload is discarded here, unsent. It stays charged.
+    if (canonical(signed.accepted) !== canonical(signing)) {
+      throw new PaymentGuardRefusedError(
+        "accepted",
+        `The payment the x402 client built for ${check} names other terms in its accepted field than the ` +
+          `option Wasit checked.`,
+        { signed: true },
+      );
+    }
+    // And what it carries must be the one authorization the gate let the key sign.
+    chain.signedTerms?.bind(signed.payload, gate);
+  } catch (error) {
+    recordDiscarded(entry, error);
+    throw error;
   }
-  // And what it carries must be the one authorization the gate let the key sign.
-  chain.signedTerms?.bind(signed.payload, gate);
   const paymentPayload = alter === undefined ? signed : { ...signed, accepted: selected };
-  return { httpClient, paymentPayload, selected, idempotent, payUrl };
+  return { httpClient, paymentPayload, selected, idempotent, payUrl, entry };
+}
+
+function reasonOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * What became of a payment that failed before its payload was built. With
+ * the gate armed, only a signature the gate recorded was made: the gate is the
+ * only way to the key. Without a gate (EVM and Solana, test networks only),
+ * a client that failed once it was asked may have signed. A ledger that cannot
+ * take the outcome leaves the intent, which reads as signed.
+ */
+function recordUnsigned(
+  entry: LedgerEntryHandle | undefined,
+  chain: PaymentChain,
+  gate: SigningGate,
+  asked: boolean,
+  error: unknown,
+): void {
+  if (entry === undefined) return;
+  try {
+    if (gate.signed !== undefined) entry.signed(expirationOfSigned(gate.signed));
+    else if (!asked || chain.signedTerms !== undefined) entry.notSigned(reasonOf(error));
+    else entry.unknown(reasonOf(error));
+  } catch {
+    // The payment's own error is what the check reports; the intent stays.
+  }
+}
+
+/** A signed payload discarded unsent. A ledger that cannot take it leaves "signed", which reads as sent. */
+function recordDiscarded(entry: LedgerEntryHandle | undefined, error: unknown): void {
+  try {
+    entry?.discarded(reasonOf(error));
+  } catch {
+    // The payment's own error is what the check reports.
+  }
+}
+
+/**
+ * Sends a signed payment and records it in the run ledger: the answer's
+ * status, or that no answer came (the payment may still have reached the
+ * service). The ledger's own text, never the service's.
+ */
+async function sendPayment(entry: LedgerEntryHandle | undefined, url: string, init: RequestInit): Promise<Response> {
+  let response: Response;
+  try {
+    response = await fetchTarget(url, init);
+  } catch (error) {
+    try {
+      entry?.sent({ error: "no answer: the payment may have reached the service" });
+    } catch {
+      // The send's own error is what the check reports.
+    }
+    throw error;
+  }
+  entry?.sent({ status: response.status });
+  return response;
 }
 
 /**
@@ -974,11 +1065,11 @@ async function checkSignatureAccepted(options: X402PaymentCheckOptions): Promise
   const name = "Signature Resubmit Accepted";
   const fail = (detail: string, hint: string): CheckResult => ({ id, name, pass: false, detail, hint });
 
-  const { httpClient, paymentPayload, idempotent, payUrl } = await preparePayment(options, "X402-06", undefined, (selected) =>
+  const { httpClient, paymentPayload, idempotent, payUrl, entry } = await preparePayment(options, "X402-06", undefined, (selected) =>
     assertPayerCanPay(options, selected),
   );
   const paymentHeaders = httpClient.encodePaymentSignatureHeader(paymentPayload);
-  const paid = await fetchTarget(payUrl, withPaymentHeaders(options, paymentHeaders));
+  const paid = await sendPayment(entry, payUrl, withPaymentHeaders(options, paymentHeaders));
   const honest = (result: CheckResult, accepted: boolean): HonestPayment => ({
     result,
     accepted,
@@ -1040,6 +1131,7 @@ async function checkSignatureAccepted(options: X402PaymentCheckOptions): Promise
     recipient: accepted.payTo,
     payer: chain.payerAddress(options.payerSecretKey),
   });
+  entry?.settled(reference, verdict.pass);
 
   return honest(
     verdict.pass
@@ -1077,7 +1169,7 @@ async function checkSignatureAccepted(options: X402PaymentCheckOptions): Promise
 async function checkInvalidSignatureRejected(
   options: X402PaymentCheckOptions,
 ): Promise<CheckResult> {
-  const { httpClient, paymentPayload, payUrl } = await preparePayment(options, "X402-07");
+  const { httpClient, paymentPayload, payUrl, entry } = await preparePayment(options, "X402-07");
 
   const corrupted = {
     ...paymentPayload,
@@ -1085,7 +1177,7 @@ async function checkInvalidSignatureRejected(
   };
 
   const paymentHeaders = httpClient.encodePaymentSignatureHeader(corrupted);
-  const response = await fetchTarget(payUrl, withPaymentHeaders(options, paymentHeaders));
+  const response = await sendPayment(entry, payUrl, withPaymentHeaders(options, paymentHeaders));
 
   return signatureRejectionVerdict(response.status, await refusalReason(response));
 }
@@ -1269,8 +1361,9 @@ async function checkUnderpaymentRejected(options: X402PaymentCheckOptions): Prom
     }
     throw error;
   }
-  const { httpClient, paymentPayload, payUrl } = prepared;
-  const response = await fetchTarget(
+  const { httpClient, paymentPayload, payUrl, entry } = prepared;
+  const response = await sendPayment(
+    entry,
     payUrl,
     withPaymentHeaders(options, httpClient.encodePaymentSignatureHeader(paymentPayload)),
   );
@@ -1321,13 +1414,14 @@ async function checkExpiredRejected(options: X402PaymentCheckOptions): Promise<C
   const chain = chainFor(options.network);
   const rpcUrl = chain.resolveRpcUrl(options.network, options.rpcUrl);
   let holdMs = 0;
-  const { httpClient, paymentPayload, payUrl } = await preparePayment(options, "X402-10", async (selected) => {
+  const { httpClient, paymentPayload, payUrl, entry } = await preparePayment(options, "X402-10", async (selected) => {
     const expired = await chain.expiredSigning(selected, rpcUrl);
     holdMs = expired.holdMs;
     return expired.terms;
   });
   await new Promise<void>((done) => setTimeout(done, holdMs));
-  const response = await fetchTarget(
+  const response = await sendPayment(
+    entry,
     payUrl,
     withPaymentHeaders(options, httpClient.encodePaymentSignatureHeader(paymentPayload)),
   );
@@ -1522,28 +1616,33 @@ async function checkRejectedRequestNotSettled(
     if (error instanceof RejectLifetimeOutside) return outside(error.lifetime, true);
     throw error;
   }
-  const { httpClient, paymentPayload, selected, payUrl } = prepared;
+  const { httpClient, paymentPayload, selected, payUrl, entry } = prepared;
+  // A signed payment this check does not send: recorded as discarded, then the check stops.
+  const discard = (message: string): never => {
+    recordDiscarded(entry, new Error(message));
+    throw new CheckSetupError(message);
+  };
   const amount = BigInt(selected.amount);
   const ours = authorizationOf(chain, paymentPayload.payload, payer, "this payment");
   if (ours.nonce === control.nonce) {
-    throw new CheckSetupError("This payment's authorization carries X402-06's nonce, so it could not be told apart. It was not sent.");
+    discard("This payment's authorization carries X402-06's nonce, so it could not be told apart. It was not sent.");
   }
 
   // Right before sending: ours unused, the control found. This read's ledger
   // starts the range the transfers are read over.
   const before = await watch.read(network, rpcUrl, [ours, control]);
   if (before.used[1] === undefined) {
-    throw new CheckSetupError("The chain's answer leaves out X402-06's authorization, so this payment was not sent.");
+    discard("The chain's answer leaves out X402-06's authorization, so this payment was not sent.");
   }
   if (before.used[0] !== undefined) {
-    throw new CheckSetupError("The chain records this payment's authorization as used before it was sent, so it was not sent.");
+    discard("The chain records this payment's authorization as used before it was sent, so it was not sent.");
   }
   // What the client signed, not what it was asked: an authorization that stays
   // valid longer than the 300 s this check waits is not sent (2 units of slack
   // for the ledgers that close while it is built).
   const longest = Math.ceil(REJECTED_REQUEST_MAX_LIFETIME_SECONDS / watch.unitSeconds) + 2;
   if (ours.expiresAt - before.latest > longest) {
-    throw new CheckSetupError(
+    discard(
       `This payment's authorization stays valid until ${watch.unit} ${ours.expiresAt}, ` +
         `${ours.expiresAt - before.latest} ${watch.unit}s after the latest (${before.latest}), longer than the ` +
         `${REJECTED_REQUEST_MAX_LIFETIME_SECONDS} seconds this check waits. It was signed and discarded; it was not sent.`,
@@ -1551,7 +1650,7 @@ async function checkRejectedRequestNotSettled(
   }
   // And long enough that a service which settles it could still get it on chain.
   if (ours.expiresAt - before.latest < REJECTED_REQUEST_MIN_UNITS_LEFT) {
-    throw new CheckSetupError(
+    discard(
       `This payment's authorization expires at ${watch.unit} ${ours.expiresAt}, ` +
         `${ours.expiresAt - before.latest} ${watch.unit}s after the latest (${before.latest}): too soon for an unused ` +
         `authorization to show anything. It was signed and discarded; it was not sent.`,
@@ -1559,7 +1658,7 @@ async function checkRejectedRequestNotSettled(
   }
 
   const sentAt = Date.now();
-  const response = await fetchTarget(payUrl, withPaymentHeaders(shape, httpClient.encodePaymentSignatureHeader(paymentPayload)));
+  const response = await sendPayment(entry, payUrl, withPaymentHeaders(shape, httpClient.encodePaymentSignatureHeader(paymentPayload)));
   const status = response.status;
   const reason = await refusalReason(response);
   options.onProgress?.(

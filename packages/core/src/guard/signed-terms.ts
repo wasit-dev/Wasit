@@ -101,6 +101,21 @@ export class SigningGate {
 }
 
 /**
+ * The ledger a signature the gate let through expires at, decoded from the
+ * preimage the key signed (spec B5: the expiry is read, never computed);
+ * undefined when it does not decode as the address credential's preimage.
+ */
+export function expirationOfSigned(record: SignedRecord): number | undefined {
+  try {
+    const decoded = xdr.HashIdPreimage.fromXDR(record.preimage, "base64");
+    if (decoded.switch().name !== "envelopeTypeSorobanAuthorization") return undefined;
+    return decoded.sorobanAuthorization().signatureExpirationLedger();
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * The run's first reading of the chain's latest unit (a ledger on Stellar),
  * and when it was read on a monotonic clock. A signature made later may stay
  * valid only for the units that can have closed since, plus its lifetime: so
