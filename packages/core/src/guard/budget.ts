@@ -59,9 +59,14 @@ export function usdAsset(network: string, asset: string): UsdAsset | undefined {
   return USD_ASSETS.find((entry) => entry.network === network && sameAddress(network, entry.asset, asset));
 }
 
+/** `amount` base units of a dollar token with `decimals` decimals, in this module's dollar units. */
+export function usdFromBaseUnits(amount: bigint, decimals: number): bigint {
+  return (amount * DOLLAR) / 10n ** BigInt(decimals);
+}
+
 /** `amount` base units of `asset`, in this module's dollar units. */
 function toUsd(asset: UsdAsset, amount: bigint): bigint {
-  return (amount * DOLLAR) / 10n ** BigInt(asset.decimals);
+  return usdFromBaseUnits(amount, asset.decimals);
 }
 
 /** Whole and fractional dollars, rounded down to a millionth: a cap is never rounded up. */

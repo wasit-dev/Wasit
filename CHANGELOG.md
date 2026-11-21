@@ -44,6 +44,17 @@ All notable changes to Wasit are recorded here. Versions follow [Semantic Versio
   Actions none of them applies. `--mainnet` and the Action's `mainnet: true`
   still refuse in this version, and now also name the runner rule on a runner
   that is not GitHub-hosted.
+- `@wasit-dev/core` exports two more rules of the mainnet opt-in, which this
+  version does not have; nothing calls them yet. `assertMainnetPayerBalance`
+  reads the payer's USDC balance on `stellar:pubnet` and refuses the run when
+  the account holds more than $10 or the balance cannot be read: the $5 cap
+  holds one run, not two at once on one account, so the account is the limit.
+  On a test network it reads nothing. `acquireMainnetRunLock` takes a lock file
+  (`wasit-mainnet.lock`) in the run's ledger folder, and a run that finds
+  anything there does not start: a run still open, one that was stopped
+  (its authorizations may still be open, so a person reads its ledger and
+  deletes the file), or a file that is not a lock. It does not see another
+  machine.
 
 **Fixed.**
 - On Stellar testnet the x402 client builds and simulates the payment through
