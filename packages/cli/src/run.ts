@@ -309,7 +309,12 @@ export async function executeRun(options: RunCommandOptions, context: RunContext
   // B12: the switch exists only to refuse. First, so nothing is read, started, sent or signed.
   if (options.mainnet === true) {
     try {
-      refuseMainnetSwitch("--mainnet", inGithubActions(context.env) ? { event: context.env["GITHUB_EVENT_NAME"] ?? "" } : {});
+      refuseMainnetSwitch(
+        "--mainnet",
+        inGithubActions(context.env)
+          ? { event: context.env["GITHUB_EVENT_NAME"] ?? "", runner: context.env["RUNNER_ENVIRONMENT"] ?? "" }
+          : {},
+      );
     } catch (error) {
       if (error instanceof MainnetOptInRefusedError) return fail(`wasit run ${error.message}`);
       throw error;

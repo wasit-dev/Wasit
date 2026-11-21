@@ -150,6 +150,7 @@ export {
   mainnetStartupSwitches,
   refuseMainnetSwitch,
 } from "./guard/mainnet-optin.js";
+export { MainnetJobRefusedError, assertMainnetJob, isLocalHost, mainnetJobRefusals, type MainnetJob } from "./guard/ci-mainnet.js";
 export type { MainnetSwitch } from "./guard/mainnet-optin.js";
 
 // Which RPC a result read the chain through, and the MCP server's start-up RPC lock (D-023c).

@@ -33,6 +33,18 @@ All notable changes to Wasit are recorded here. Versions follow [Semantic Versio
   sent, and `wasit run` refuses it before it starts the service: the x402
   Stellar client builds the payment through that RPC and accepts only https.
 
+**Added.**
+- `@wasit-dev/core` exports `mainnetJobRefusals` and `assertMainnetJob`: the
+  rules a job in GitHub Actions has to meet for the mainnet opt-in, which this
+  version does not have. The run is started by hand (`workflow_dispatch`), on
+  the default branch, on a GitHub-hosted runner; it tests a deployed service
+  (no `service.start`, no local `baseUrl`); nothing was installed in the job
+  before Wasit (no `node_modules` in the workspace); and
+  `WASIT_MAINNET_PAYER_SECRET` is the only key variable set. Outside GitHub
+  Actions none of them applies. `--mainnet` and the Action's `mainnet: true`
+  still refuse in this version, and now also name the runner rule on a runner
+  that is not GitHub-hosted.
+
 **Fixed.**
 - On Stellar testnet the x402 client builds and simulates the payment through
   the run's RPC, the one whose network Wasit checks and reads the settlement

@@ -62,11 +62,15 @@ function testNetworks(): string {
  * For `--mainnet`, `context.event` is the GitHub event of the run when it runs
  * in GitHub Actions: on any event but `workflow_dispatch` the message says that
  * rule as well, so a push or a schedule with the switch set reads as refused for
- * that reason too.
+ * that reason too. `context.runner` is `RUNNER_ENVIRONMENT` there: on a runner
+ * that is not GitHub-hosted the message says that rule too.
  *
  * @throws {MainnetOptInRefusedError} Always.
  */
-export function refuseMainnetSwitch(switchName: MainnetSwitch, context: { readonly event?: string } = {}): never {
+export function refuseMainnetSwitch(
+  switchName: MainnetSwitch,
+  context: { readonly event?: string; readonly runner?: string } = {},
+): never {
   const networks = `Wasit pays on test networks only (${testNetworks()}).`;
   if (switchName === "--mainnet") {
     const event = context.event;
@@ -75,9 +79,15 @@ export function refuseMainnetSwitch(switchName: MainnetSwitch, context: { readon
         ? ""
         : ` --mainnet is also refused on every GitHub event but workflow_dispatch, and this run's event is ` +
           `${EVENT_NAME.test(event) ? event : "another event"}.`;
+    // Spec B17.4: a self-hosted runner keeps files and processes between jobs.
+    const runnerRule =
+      context.runner === undefined || context.runner === "github-hosted"
+        ? ""
+        : " --mainnet is also refused on a runner that is not GitHub-hosted: a self-hosted runner keeps files and " +
+          "processes between jobs.";
     throw new MainnetOptInRefusedError(
       switchName,
-      `--mainnet is refused: ${MAINNET_OPT_IN_ABSENT}. ${networks}${eventRule} ` +
+      `--mainnet is refused: ${MAINNET_OPT_IN_ABSENT}. ${networks}${eventRule}${runnerRule} ` +
         `The config was not read, and nothing was started, sent or signed.`,
     );
   }
