@@ -21,9 +21,17 @@ import {
 } from "@stellar/stellar-sdk";
 
 import { CheckSetupError } from "../../errors.js";
+import { PaymentGuardRefusedError } from "../../guard/budget.js";
+import { checkStellarPreimage, type SigningGate } from "../../guard/signed-terms.js";
 import { networkPassphrase, resolveRpcUrl } from "../../mpp/network.js";
 import { readTransferData, verifySettlement } from "../../settlement.js";
-import type { AuthorizationWatch, PaymentChain, RecordedTransfer, SignedAuthorization } from "./types.js";
+import type {
+  AuthorizationWatch,
+  PaymentChain,
+  RecordedTransfer,
+  SignedAuthorization,
+  SignedTermsBinding,
+} from "./types.js";
 
 /** A Stellar transaction hash: 64 hex characters. */
 const TRANSACTION_HASH = /^[0-9a-f]{64}$/i;
@@ -288,16 +296,130 @@ const stellarAuthorizations: AuthorizationWatch = {
   },
 };
 
+/**
+ * The payer's signer, gated (spec B17.2): each authorization the x402 client
+ * asks it to sign is checked against the terms `gate` was armed with, and the
+ * key signs only when it authorizes exactly that transfer, once. There is no
+ * `signTransaction`: the scheme has the facilitator pay the fees, so the
+ * client never signs the envelope.
+ */
+function gatedSigner(payerKey: string, network: string, gate: SigningGate) {
+  const base = createEd25519Signer(payerKey, network as `${string}:${string}`);
+  const signAuthEntry: typeof base.signAuthEntry = async (preimage, opts) => {
+    const terms = gate.take();
+    if (opts?.address !== undefined && opts.address !== base.address) {
+      throw new PaymentGuardRefusedError("signed-terms", "The x402 client asked for a signature for another address than the payer's.");
+    }
+    if (terms.payer !== base.address) {
+      throw new PaymentGuardRefusedError("signed-terms", "The payment's terms name another payer than the key Wasit holds.");
+    }
+    checkStellarPreimage(preimage, terms);
+    const result = await base.signAuthEntry(preimage, opts);
+    gate.record({ preimage, signature: Buffer.from(result.signedAuthEntry, "base64") });
+    return result;
+  };
+  return { address: base.address, signAuthEntry };
+}
+
+/** The `signature` bytes of an address credential signed by one ed25519 key, if it is that shape. */
+function credentialSignature(signature: xdr.ScVal): { readonly publicKey: Buffer; readonly signature: Buffer } | undefined {
+  if (signature.switch().name !== "scvVec") return undefined;
+  const items = signature.vec() ?? [];
+  if (items.length !== 1 || items[0]!.switch().name !== "scvMap") return undefined;
+  let publicKey: Buffer | undefined;
+  let bytes: Buffer | undefined;
+  for (const field of items[0]!.map() ?? []) {
+    if (field.key().switch().name !== "scvSymbol" || field.val().switch().name !== "scvBytes") return undefined;
+    const key = field.key().sym().toString();
+    if (key === "public_key") publicKey = Buffer.from(field.val().bytes());
+    else if (key === "signature") bytes = Buffer.from(field.val().bytes());
+    else return undefined;
+  }
+  return publicKey === undefined || bytes === undefined ? undefined : { publicKey, signature: bytes };
+}
+
+function notSent(message: string): PaymentGuardRefusedError {
+  return new PaymentGuardRefusedError("signed-terms", message, { signed: true });
+}
+
+const stellarSignedTerms: SignedTermsBinding = {
+  // The x402 Stellar client's fallback ledger close time (DEFAULT_ESTIMATED_LEDGER_SECONDS in
+  // @x402/stellar 2.28.0), and the shortest it assumes: a faster close only tightens the bound.
+  unitSeconds: 5,
+  async latestUnit(_network, rpcUrl) {
+    return (await rpcServer(rpcUrl).getLatestLedger()).sequence;
+  },
+  bind(payload, gate) {
+    const signed = gate.signed;
+    if (signed === undefined) {
+      throw new PaymentGuardRefusedError("signed-terms", "The x402 client built a payment without the signature Wasit checked.");
+    }
+    const checked = xdr.HashIdPreimage.fromXDR(signed.preimage, "base64").sorobanAuthorization();
+    const transaction = payload["transaction"];
+    let envelope: xdr.TransactionEnvelope;
+    try {
+      if (typeof transaction !== "string") throw new Error("no transaction");
+      envelope = xdr.TransactionEnvelope.fromXDR(transaction, "base64");
+    } catch {
+      throw notSent("The payment the x402 client built carries no transaction that decodes.");
+    }
+    const payer = gate.terms?.payer;
+    const operations = envelope.switch().name === "envelopeTypeTx" ? envelope.v1().tx().operations() : [];
+    const ours: xdr.SorobanAuthorizationEntry[] = [];
+    for (const operation of operations) {
+      if (operation.body().switch().name !== "invokeHostFunction") continue;
+      for (const entry of operation.body().invokeHostFunctionOp().auth()) {
+        const kind = entry.credentials().switch().name;
+        if (kind === "sorobanCredentialsSourceAccount") continue;
+        if (kind !== "sorobanCredentialsAddress") {
+          throw notSent("The payment the x402 client built carries an authorization in a form Wasit did not sign.");
+        }
+        if (Address.fromScAddress(entry.credentials().address().address()).toString() === payer) ours.push(entry);
+      }
+    }
+    if (ours.length !== 1) {
+      throw notSent(`The payment the x402 client built carries ${ours.length} authorizations for the payer; Wasit signed one.`);
+    }
+    const entry = ours[0]!;
+    const credentials = entry.credentials().address();
+    if (entry.rootInvocation().toXDR("base64") !== checked.invocation().toXDR("base64")) {
+      throw notSent("The payment the x402 client built names another invocation than the one Wasit checked and signed.");
+    }
+    if (credentials.signatureExpirationLedger() !== checked.signatureExpirationLedger()) {
+      throw notSent("The payment the x402 client built carries another expiration ledger than the one signed.");
+    }
+    if (credentials.nonce().toString() !== checked.nonce().toString()) {
+      throw notSent("The payment the x402 client built carries another nonce than the one signed.");
+    }
+    const sent = credentialSignature(credentials.signature());
+    if (
+      sent === undefined ||
+      payer === undefined ||
+      !sent.publicKey.equals(Keypair.fromPublicKey(payer).rawPublicKey()) ||
+      !sent.signature.equals(signed.signature)
+    ) {
+      throw notSent("The payment the x402 client built carries another signature than the one Wasit made.");
+    }
+  },
+};
+
 export const stellarChain: PaymentChain = {
   name: "Stellar",
   networks: ["stellar:testnet", "stellar:pubnet"],
   payerKeyEnv: "STELLAR_PRIVATE_KEY",
   referenceKind: "a settled Stellar transaction hash",
   resolveRpcUrl: (network, override) => resolveRpcUrl(network, override),
-  registerPayer(client, network, payerKey, _rpcUrl) {
-    const signer = createEd25519Signer(payerKey, network as `${string}:${string}`);
-    client.register("stellar:*", new ExactStellarClientScheme(signer));
+  // The x402 Stellar client builds its RPC client without `allowHttp`.
+  httpsRpcOnly: true,
+  registerPayer(client, network, payerKey, rpcUrl, gate) {
+    // The payment is built and simulated through the run's RPC: the one whose
+    // network was checked (D-023), the anchor is read from, and the settlement
+    // is read from. Not on stellar:pubnet: the SDK refuses it without an RPC of
+    // its own, and no endpoint is handed to it before the mainnet opt-in.
+    const rpcConfig = network === "stellar:testnet" ? { url: rpcUrl } : undefined;
+    client.register("stellar:*", new ExactStellarClientScheme(gatedSigner(payerKey, network, gate), rpcConfig));
   },
+  signedTerms: stellarSignedTerms,
   // A one-second lifetime is one ledger (ceil(1 / 5)); ledgers close about
   // every 5 to 6 seconds, so 20 seconds is three or more ledgers past it.
   expiredSigning: async () => ({ terms: { maxTimeoutSeconds: 1 }, holdMs: 20_000 }),

@@ -16,7 +16,8 @@ import {
   type PinTerms,
 } from "../guard/budget.js";
 import { assertPaymentNetworkAllowed } from "../guard/networks.js";
-import { assertRpcServesNetwork } from "../guard/rpc-identity.js";
+import { SigningAnchor, SigningGate, type SigningTerms } from "../guard/signed-terms.js";
+import { RpcIdentityError, assertRpcServesNetwork } from "../guard/rpc-identity.js";
 import type { EndpointPlan } from "./plan.js";
 import {
   REJECTED_REQUEST_ID,
@@ -497,13 +498,14 @@ async function buildX402Client(
   payerSecretKey: string,
   rpcUrl: string,
   pin: PinTerms | undefined,
+  gate: SigningGate,
 ) {
   const client = new x402Client();
   // L3 (spec B3): the SDK's own spend controls, set here rather than left to
   // its default, as a second implementation of the $1 cap. An adapter that
   // allows more assets replaces them and states the cap again (`evm.ts`).
   client.setSpendControls({ maxAmountPerPayment: `$${PER_PAYMENT_CAP_USD}` });
-  await chain.registerPayer(client, network, payerSecretKey, rpcUrl);
+  await chain.registerPayer(client, network, payerSecretKey, rpcUrl, gate);
   client
     // A challenge may offer several networks, including both Stellar ones.
     // The client's default pick is the first it supports, which would sign
@@ -685,6 +687,81 @@ function plannedAmount(plan: EndpointPlan | undefined, check: string, selected: 
 }
 
 /**
+ * Refuses an RPC an x402 payment on `network` cannot be built through, then
+ * checks that it serves `network` (D-023). On Stellar the client accepts only
+ * an https RPC. Throws `RpcIdentityError` (a configuration error) before the
+ * target is sent anything; the RPC's address is never echoed (it may carry a
+ * key). The CLI calls it before it starts a service.
+ */
+export async function assertX402PaymentRpc(network: string, rpcUrl: string): Promise<void> {
+  const chain = paymentChainFor(network);
+  if (chain?.httpsRpcOnly === true) {
+    let protocol = "";
+    try {
+      protocol = new URL(rpcUrl).protocol;
+    } catch {
+      protocol = "";
+    }
+    if (protocol !== "https:") {
+      throw new RpcIdentityError(
+        `The x402 ${chain.name} client builds the payment through the run's RPC and accepts only an https RPC, ` +
+          `and this run's RPC is not https. No payment was sent and nothing was signed.`,
+      );
+    }
+  }
+  await assertRpcServesNetwork(network, rpcUrl);
+}
+
+/** The run's anchor for expiration bounds, one per run budget (a run shares one budget across endpoints). */
+const anchors = new WeakMap<RunBudget, SigningAnchor>();
+
+function anchorOf(budget: RunBudget): SigningAnchor {
+  let anchor = anchors.get(budget);
+  if (anchor === undefined) {
+    anchor = new SigningAnchor();
+    anchors.set(budget, anchor);
+  }
+  return anchor;
+}
+
+/**
+ * The terms the gate is armed with: those L2 checked and charged, and the
+ * latest ledger the signature may expire at. The run's first signature reads
+ * the chain's latest ledger as the anchor; nothing is signed when it cannot.
+ */
+async function signingTerms(
+  binding: NonNullable<PaymentChain["signedTerms"]>,
+  network: string,
+  rpcUrl: string,
+  anchor: SigningAnchor,
+  payer: string,
+  signing: PaymentRequirements,
+): Promise<SigningTerms> {
+  if (anchor.reading === undefined) {
+    let latest: number;
+    try {
+      latest = await binding.latestUnit(network, rpcUrl);
+    } catch (error) {
+      throw new CheckSetupError(
+        `The chain's latest ledger could not be read before signing (${(error as Error).message}). Nothing was signed.`,
+      );
+    }
+    if (!Number.isSafeInteger(latest) || latest <= 0) {
+      throw new CheckSetupError("The chain's latest ledger could not be read before signing. Nothing was signed.");
+    }
+    anchor.set(latest);
+  }
+  return {
+    network,
+    payer,
+    asset: signing.asset,
+    payTo: signing.payTo,
+    amount: signing.amount,
+    maxExpiration: anchor.maxExpiration(binding.unitSeconds, signing.maxTimeoutSeconds),
+  };
+}
+
+/**
  * Reads the challenge and produces a signed payment payload for it.
  *
  * Shared by every payment check so each one starts from a challenge the
@@ -698,7 +775,10 @@ function plannedAmount(plan: EndpointPlan | undefined, check: string, selected: 
  * L2 (spec B3) is here, between the fresh challenge and the SDK: the pin over
  * every `exact` option, the plan, the $1 cap and the run's cap, the run charged
  * before the signature. The SDK is then handed exactly the one option checked,
- * and a payload whose `accepted` is not that option is discarded unsent.
+ * and a payload whose `accepted` is not that option is discarded unsent. On a
+ * chain with a signed-terms gate (Stellar), the key signs only an
+ * authorization for those same terms, and a payload that carries anything
+ * else is discarded unsent.
  */
 async function preparePayment(
   options: X402PaymentCheckOptions,
@@ -712,12 +792,15 @@ async function preparePayment(
   assertPaymentNetworkAllowed("x402", options.network);
   const chain = chainFor(options.network);
   const budget = options.budget ?? new RunBudget();
+  const rpcUrl = chain.resolveRpcUrl(options.network, options.rpcUrl);
+  const gate = new SigningGate();
   const { client, httpClient } = await buildX402Client(
     chain,
     options.network,
     options.payerSecretKey,
-    chain.resolveRpcUrl(options.network, options.rpcUrl),
+    rpcUrl,
     options.pin,
+    gate,
   );
 
   const { paymentRequired, selected, idempotent, payUrl } = await readPaymentChallenge(options);
@@ -741,6 +824,13 @@ async function preparePayment(
   });
 
   await beforeSigning?.(selected);
+  // The signed-terms gate (spec B17.2): the key signs only what was checked and
+  // charged above, once, within this payment's lifetime.
+  if (chain.signedTerms !== undefined) {
+    gate.arm(
+      await signingTerms(chain.signedTerms, options.network, rpcUrl, anchorOf(budget), chain.payerAddress(options.payerSecretKey), signing),
+    );
+  }
   const signed = await withinSpendControls(options.network, selected, () =>
     client.createPaymentPayload({ ...paymentRequired, accepts: [signing] }),
   );
@@ -754,6 +844,8 @@ async function preparePayment(
       { signed: true },
     );
   }
+  // And what it carries must be the one authorization the gate let the key sign.
+  chain.signedTerms?.bind(signed.payload, gate);
   const paymentPayload = alter === undefined ? signed : { ...signed, accepted: selected };
   return { httpClient, paymentPayload, selected, idempotent, payUrl };
 }
@@ -1573,11 +1665,10 @@ export async function runX402PaymentChecks(
           `or --payer-key).`,
       );
     }
-    // The RPC signs and settles nothing itself, but the settlement is read
-    // through it (and, on EVM and Solana, the payment is built through it): it
-    // must serve the run's network (D-023). On Stellar the x402 client builds
-    // the payment through its own default RPC.
-    await assertRpcServesNetwork(options.network, rpcUrl);
+    // The RPC signs and settles nothing itself, but the payment is built and
+    // the settlement read through it: it must be one the client accepts and
+    // serve the run's network (D-023).
+    await assertX402PaymentRpc(options.network, rpcUrl);
   } catch (error) {
     // A network no adapter pays on is not a failure of the run: Wasit does not
     // grade it (spec A3). Every payment check is skipped as unsupported, and

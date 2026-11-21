@@ -20,7 +20,9 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, afterEach, before, beforeEach, describe, it } from "node:test";
 
+import { Keypair } from "@stellar/stellar-sdk";
 import { setRpcIdentityTransportForTesting } from "@wasit-dev/core/dist/guard/rpc-identity.js";
+import { setPaymentChainsForTesting } from "@wasit-dev/core/dist/x402/chains/index.js";
 
 import { executeRun, type RunCommandOptions } from "../../src/run.js";
 import {
@@ -41,6 +43,7 @@ interface EnvironmentSpec {
   readonly operatedByMe?: boolean;
   readonly pinned?: { payTo: string; asset: string };
   readonly maxRunUsd?: number;
+  readonly rpcUrl?: string;
 }
 
 async function writePaymentConfig(
@@ -62,6 +65,7 @@ async function writePaymentConfig(
           operatedByMe: environment.operatedByMe ?? true,
           ...(environment.pinned === undefined ? {} : { pinned: environment.pinned }),
           ...(environment.maxRunUsd === undefined ? {} : { maxRunUsd: environment.maxRunUsd }),
+          ...(environment.rpcUrl === undefined ? {} : { rpcUrl: environment.rpcUrl }),
         },
       },
       endpoints,
@@ -283,6 +287,27 @@ describe("wasit run, payment tier", () => {
     assert.match(run.stderr, /The service was not started\./);
     assert.equal(paywall.requests, 0, "a request reached the service before the RPC was checked");
     assert.equal(recorder.signed.length, 0);
+  });
+
+  it("refuses an http RPC on Stellar before the service starts or any request is sent", async () => {
+    // The real adapters: the Stellar x402 client builds the payment through the run's RPC.
+    setPaymentChainsForTesting(undefined);
+    paywall = await multiPaywall({ "/weather": [option("10000")] });
+    const config = await writePaymentConfig(dir, paywall.base, {
+      network: "stellar:testnet",
+      rpcUrl: "http://127.0.0.1:9/soroban/rpc",
+    });
+    let asked = 0;
+    setRpcIdentityTransportForTesting(async () => {
+      asked += 1;
+      return undefined;
+    });
+    const run = await pay({ config }, { STELLAR_PRIVATE_KEY: Keypair.random().secret() });
+    assert.equal(run.code, 2, run.stderr);
+    assert.match(run.stderr, /accepts only an https RPC/);
+    assert.match(run.stderr, /The service was not started\./);
+    assert.equal(asked, 0);
+    assert.equal(paywall.requests, 0);
   });
 
   describe("in a CI that is not GitHub Actions (review R9 a, Najmi 2026-11-17)", () => {
