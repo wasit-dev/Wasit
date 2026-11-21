@@ -168,6 +168,42 @@ export {
   type LockHolder,
   type MainnetRunLock,
 } from "./guard/run-lock.js";
+// L1's mainnet rules and the two reads on public Horizon (spec B3, B4, B17.2): rules that only refuse; nothing calls them yet.
+export {
+  MAINNET_ANCHOR_MAX_GAP_LEDGERS,
+  MAINNET_MAX_TIMEOUT_SECONDS,
+  MAINNET_USDC,
+  MainnetPlanRefusedError,
+  PUBNET_HORIZON_URL,
+  assertAnchorNearHorizon,
+  assertBalancesAgree,
+  assertMainnetDecimals,
+  assertMainnetOption,
+  assertMainnetPin,
+  horizonBalances,
+  parseHorizonAmount,
+  type ClassicAsset,
+  type HorizonBalances,
+  type MainnetOption,
+  type MainnetPlanRefusal,
+} from "./guard/mainnet-plan.js";
+export { readHorizonAccount, readHorizonLatestLedger } from "./guard/horizon.js";
+// The run ledger (spec B5): every signature's intent written before the key signs, then its outcome.
+export {
+  RUN_LEDGER_FORMAT,
+  RunLedger,
+  RunLedgerError,
+  ledgerConsistency,
+  openAuthorizationsUntil,
+  runLedgerFileName,
+  type LedgerBalances,
+  type LedgerConsistency,
+  type LedgerEntry,
+  type LedgerEntryHandle,
+  type LedgerEntryState,
+  type PaymentLedger,
+  type RunLedgerHeader,
+} from "./guard/run-ledger.js";
 
 // Which RPC a result read the chain through, and the MCP server's start-up RPC lock (D-023c).
 export { RPC_LOCK_VARIABLE, describeRpcInUse, readRpcLock, rpcInUse } from "./guard/rpc-in-use.js";

@@ -55,6 +55,28 @@ All notable changes to Wasit are recorded here. Versions follow [Semantic Versio
   (its authorizations may still be open, so a person reads its ledger and
   deletes the file), or a file that is not a lock. It does not see another
   machine.
+- `@wasit-dev/core` exports the plan rules of the mainnet opt-in, which this
+  version does not have; nothing calls them yet. `MAINNET_USDC` is Circle's
+  USDC on Stellar mainnet (`CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75`,
+  checked against Circle's issuer, the contract the SDK derives from it, and
+  the x402 SDK's constant). A mainnet run would pay only that asset, to a
+  pinned payee other than the payer, at a lifetime of 1 to 300 seconds, with
+  the token's decimals read as 7; its RPC's latest ledger must be within 12
+  ledgers of public Horizon's, and the payer's USDC balance through the RPC
+  must equal Horizon's (`readHorizonLatestLedger`, `readHorizonAccount`). The
+  run budget still values no mainnet asset.
+- `@wasit-dev/core` has a run ledger (`RunLedger`), taken by the x402 payment
+  checks as the `ledger` option. Each signature's intent (check, endpoint,
+  amount, payee, asset) is written and flushed after the run is charged and
+  before the key is asked to sign; a ledger that cannot take it stops that
+  payment with nothing signed. Then its outcome: signed with the ledger its
+  authorization expires at (read from what the key signed), not signed, or
+  unknown; discarded unsent, or sent with the answer's status; and X402-06's
+  settlement. The file (`wasit-ledger-<UTC time>.json`) is created new, never
+  overwritten, and rewritten whole on every change so it stays valid JSON;
+  closing it records the payer's balances and whether they moved as the
+  ledger says. No CLI option writes one yet: it is the record a mainnet run
+  will keep.
 
 **Fixed.**
 - On Stellar testnet the x402 client builds and simulates the payment through
