@@ -152,6 +152,22 @@ export {
 } from "./guard/mainnet-optin.js";
 export { MainnetJobRefusedError, assertMainnetJob, isLocalHost, mainnetJobRefusals, type MainnetJob } from "./guard/ci-mainnet.js";
 export type { MainnetSwitch } from "./guard/mainnet-optin.js";
+// The mainnet payer's $10 and the lock of a mainnet run (spec B17.5): rules that only refuse; nothing calls them yet.
+export {
+  MAINNET_PAYER_MAX_BASE_UNITS,
+  MAINNET_PAYER_MAX_USD,
+  MainnetPayerRefusedError,
+  assertMainnetPayerBalance,
+  type MainnetPayerAccount,
+  type MainnetPayerRefusal,
+} from "./guard/mainnet-payer.js";
+export {
+  MAINNET_RUN_LOCK_FILE,
+  MainnetRunLockedError,
+  acquireMainnetRunLock,
+  type LockHolder,
+  type MainnetRunLock,
+} from "./guard/run-lock.js";
 
 // Which RPC a result read the chain through, and the MCP server's start-up RPC lock (D-023c).
 export { RPC_LOCK_VARIABLE, describeRpcInUse, readRpcLock, rpcInUse } from "./guard/rpc-in-use.js";
