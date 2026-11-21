@@ -50,8 +50,12 @@ function shownRef(ref: string): string {
   return PRINTABLE_REF.test(ref) ? ref : "(a ref Wasit does not print)";
 }
 
-/** The default branch the event payload names, or undefined. */
-function defaultBranch(event: unknown): string | undefined {
+/**
+ * The default branch the event payload names (`repository.default_branch`),
+ * in a shape that is safe to echo; undefined otherwise. The mainnet job rules
+ * hold the run's ref to it (spec B17.4).
+ */
+export function githubDefaultBranch(event: unknown): string | undefined {
   if (event === null || typeof event !== "object") return undefined;
   const repository = (event as { repository?: unknown }).repository;
   if (repository === null || typeof repository !== "object") return undefined;
@@ -91,7 +95,7 @@ export function paymentEventGate(env: Readonly<Record<string, string | undefined
   }
 
   const ref = env["GITHUB_REF"] ?? "";
-  const branch = defaultBranch(event);
+  const branch = githubDefaultBranch(event);
   if (branch === undefined) {
     // GitHub runs a schedule on the default branch, and its payload may not name
     // the repository; its ref must still be a branch.

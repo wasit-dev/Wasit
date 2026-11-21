@@ -3,6 +3,12 @@
  * for random combinations of flags, variables and config values, a payment on
  * `stellar:pubnet` is refused and the signer is never called.
  *
+ * On the opt-in branch (B18 O2) `--mainnet` is an allow path, when every rule
+ * of the opt-in holds; one of those rules is an adapter whose key signs only
+ * through Wasit's signed-terms gate. The chain here has none, so even a run
+ * whose other rules all hold is refused at its plan, before the target is
+ * asked anything: the property stays "never signed, never paid".
+ *
  * The chain installed into the built core stands in for Stellar's adapter and
  * opens every gate that is not Wasit's own: it takes any key, its RPC answers
  * the mainnet passphrase, its scheme signs whatever it is asked and records it,
@@ -14,6 +20,7 @@
  */
 
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import http from "node:http";
 import { tmpdir } from "node:os";
@@ -141,11 +148,19 @@ function challengeOption(network: string, amount: bigint): PaymentRequirements {
 async function execute(options: RunCommandOptions, env: Record<string, string>) {
   const out: string[] = [];
   const err: string[] = [];
-  const code = await executeRun(options, { env: { PATH: process.env["PATH"] ?? "", ...env }, stdout: (line) => out.push(line), stderr: (line) => err.push(line) });
+  // The working directory is the test's: a mainnet run takes its lock there.
+  const code = await executeRun(options, {
+    env: { PATH: process.env["PATH"] ?? "", ...env },
+    stdout: (line) => out.push(line),
+    stderr: (line) => err.push(line),
+    cwd: runDir,
+  });
   return { code, stdout: out.join("\n"), stderr: err.join("\n") };
 }
 
 const PAYMENT_CHECK = /^X402-(0[6-9]|1[01])$/;
+
+let runDir = tmpdir();
 
 describe("no allow path for stellar:pubnet (B11, B12), through wasit run", () => {
   let dir: string;
@@ -154,6 +169,7 @@ describe("no allow path for stellar:pubnet (B11, B12), through wasit run", () =>
 
   before(async () => {
     dir = await mkdtemp(path.join(tmpdir(), "wasit-no-allow-"));
+    runDir = dir;
     eventFile = path.join(dir, "event.json");
     await writeFile(eventFile, JSON.stringify({ repository: { default_branch: "main" } }));
   });
@@ -212,7 +228,7 @@ describe("no allow path for stellar:pubnet (B11, B12), through wasit run", () =>
     assert.ok(target.paid() > 0, "the control sent no payment");
   });
 
-  it("refuses every random combination: no signature, no paid request, no payment check passes; --mainnet stops before any request", async () => {
+  it("refuses every random combination: no signature, no paid request, no payment check passes; --mainnet asks the target nothing", async () => {
     const seed = Number(process.env["WASIT_PROPERTY_SEED"] ?? Date.now() % 2 ** 31);
     const next = random(seed);
     for (let round = 0; round < 40; round += 1) {
@@ -247,15 +263,17 @@ describe("no allow path for stellar:pubnet (B11, B12), through wasit run", () =>
       const label = `seed ${seed}, round ${round}: ${JSON.stringify({ ...options, config: "(file)", env: Object.keys(env) })}`;
       assert.equal(signed.length, 0, `${label}: signed ${signed.length}\n${result.stderr}`);
       assert.equal(target.paid(), 0, `${label}: a paid request reached the target`);
-      assert.doesNotMatch(result.stdout + result.stderr, /MAINNET RUN/, label);
-      if (mainnet) {
+      if (!mainnet || dryRun) assert.doesNotMatch(result.stdout + result.stderr, /MAINNET RUN/, label);
+      if (mainnet && !dryRun) {
         assert.equal(result.code, 2, label);
         assert.equal(target.requests(), 0, `${label}: --mainnet let a request through`);
-        assert.match(result.stderr, /--mainnet is refused: the mainnet opt-in is not part of this version/, label);
+        // Refused before anything: by the flags, the config's loader, the event, or a rule of the opt-in.
+        assert.match(result.stderr, /^(wasit run|Invalid wasit\.config\.json)/, label);
+        assert.ok(!existsSync(path.join(dir, "wasit-mainnet.lock")), `${label}: the lock was left`);
       }
       // A run that asks to pay on pubnet exits 2. On a pull request the payment tier is the
-      // read-only tier (D-022a), which may pass: it pays nothing.
-      if (mainnet || dryRun || (!readOnly && event !== "pull_request")) {
+      // read-only tier (D-022a), which may pass: it pays nothing. A dry run signs nothing and may pass.
+      if (mainnet || (!readOnly && !dryRun && event !== "pull_request")) {
         assert.equal(result.code, 2, `${label}: a run that asked to pay on pubnet did not exit 2\n${result.stderr}`);
       }
       if (options.json && result.stdout.startsWith("{")) {

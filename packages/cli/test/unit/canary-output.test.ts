@@ -10,7 +10,7 @@
  * its raw seed in hex and in base64, and the RPC key. Any hit fails.
  *
  * The MCP tools have their own canary (packages/server/test/unit/canary-output.test.ts).
- * Not covered here: the mainnet ledger (a later version).
+ * The mainnet run, its ledger included, has its own canary: run-mainnet.test.ts.
  */
 
 import assert from "node:assert/strict";

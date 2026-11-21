@@ -187,6 +187,11 @@ export function anchorOfOptIn(optIn: MainnetOptIn): SigningAnchor {
   return anchor;
 }
 
+/** True for an opt-in core made, live, stopped or closed alike. */
+export function isMainnetOptIn(value: unknown): value is MainnetOptIn {
+  return typeof value === "object" && value !== null && issued.has(value);
+}
+
 /** True only for an opt-in core made, for `network`, neither stopped nor closed. */
 export function isLiveOptIn(value: unknown, network: string): value is MainnetOptIn {
   return (

@@ -149,12 +149,21 @@ describe("wasit run --dry-run", () => {
     assert.match(result.stdout, /weather: refused: .*payTo/);
   });
 
-  it("refuses a network that is not a test network before anything is sent", async () => {
+  it("plans stellar:pubnet by the mainnet rules (B18 O2): without a pin it is refused before anything is sent", async () => {
     paywall = await startPaywall(priced("100000"));
     const config = await writeConfig(dir, { baseUrl: paywall.base, network: "stellar:pubnet" });
     const result = await dryRun({ config });
     assert.equal(result.code, 2);
-    assert.match(result.stderr, /the mainnet opt-in is not part of this version/);
+    assert.match(result.stdout, /needs pinned\.payTo and pinned\.asset/);
+    assert.equal(paywall.received.length, 0);
+  });
+
+  it("refuses a network that is not on Wasit's list before anything is sent", async () => {
+    paywall = await startPaywall(priced("100000"));
+    const config = await writeConfig(dir, { baseUrl: paywall.base, network: "eip155:8453" });
+    const result = await dryRun({ config });
+    assert.equal(result.code, 2);
+    assert.match(result.stderr, /eip155:8453/);
     assert.equal(paywall.received.length, 0);
   });
 

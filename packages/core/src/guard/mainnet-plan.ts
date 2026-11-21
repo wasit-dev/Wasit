@@ -100,9 +100,10 @@ function isStellarAddress(value: unknown): value is string {
  * The pin a mainnet environment must have (B5 point 2): a payee that is a
  * valid Stellar address and not the payer itself, and mainnet USDC as the
  * asset. A transfer to the payer would leave its balance as it was and hide
- * what the run paid.
+ * what the run paid. `payer` undefined: the dry run, which reads no key; the
+ * paid run holds the payee to the payer's address when it opens.
  */
-export function assertMainnetPin(pin: PinTerms | undefined, payer: string): void {
+export function assertMainnetPin(pin: PinTerms | undefined, payer: string | undefined): void {
   if (pin === undefined) {
     throw new MainnetPlanRefusedError(
       "pin",
@@ -120,7 +121,7 @@ export function assertMainnetPin(pin: PinTerms | undefined, payer: string): void
   if (!isStellarAddress(pin.payTo)) {
     throw new MainnetPlanRefusedError("pin", "pinned.payTo of a mainnet environment is not a valid Stellar address.");
   }
-  if (pin.payTo === payer) {
+  if (payer !== undefined && pin.payTo === payer) {
     throw new MainnetPlanRefusedError(
       "pin",
       "pinned.payTo is the payer's own address: on mainnet the payee must be another account, so the payer's " +

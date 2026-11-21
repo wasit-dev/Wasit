@@ -84,13 +84,20 @@ describe("the wasit binary", () => {
       });
     }
 
-    it("wasit run --mainnet is a switch that always refuses (B12): exit 2, the sentence, nothing read", async () => {
-      for (const args of [["run", "--mainnet"], ["run", "--read-only", "--mainnet"], ["run", "--dry-run", "--mainnet", "--config", "nope.json"]]) {
-        const result = await wasit(args, cwd);
-        assert.equal(result.code, 2, result.stderr);
-        assert.match(result.stderr, /^wasit run --mainnet is refused: the mainnet opt-in is not part of this version\./);
-        assert.doesNotMatch(result.stderr, /nope\.json|unknown option/);
-      }
+    it("wasit run --mainnet through the binary: refused with --read-only, and it reads the config (B18 O2)", async () => {
+      const both = await wasit(["run", "--read-only", "--mainnet"], cwd);
+      assert.equal(both.code, 2, both.stderr);
+      assert.match(both.stderr, /--mainnet is for a paying run on stellar:pubnet: choose --mainnet or --read-only/);
+      const missing = await wasit(["run", "--mainnet", "--config", "nope.json"], cwd);
+      assert.equal(missing.code, 2, missing.stderr);
+      assert.match(missing.stderr, /nope\.json/);
+      assert.doesNotMatch(missing.stderr, /unknown option|MAINNET RUN/);
+    });
+
+    it("wasit run --ledger-dir without --mainnet is refused, exit 2", async () => {
+      const result = await wasit(["run", "--read-only", "--ledger-dir", "ledgers"], cwd);
+      assert.equal(result.code, 2, result.stderr);
+      assert.match(result.stderr, /--ledger-dir is for a --mainnet run/);
     });
 
     it("wasit run --mainnet takes no value", async () => {
@@ -142,12 +149,14 @@ describe("the wasit binary", () => {
       }
     });
 
-    it("--help works and exits 0, offers --dry-run, shows --mainnet as refused in this version, and no key flag", async () => {
+    it("--help works and exits 0, offers --dry-run, --mainnet with its rules and --ledger-dir, and no key flag", async () => {
       const result = await wasit(["run", "--help"], cwd);
       assert.equal(result.code, 0);
       assert.match(result.stdout, /--start/);
       assert.match(result.stdout, /--dry-run/);
-      assert.match(result.stdout, /--mainnet\s+Refused in this version/);
+      assert.match(result.stdout, /--mainnet\s+Pay real USDC on stellar:pubnet/);
+      assert.match(result.stdout, /WASIT_MAINNET_PAYER_SECRET/);
+      assert.match(result.stdout, /--ledger-dir <dir>/);
       assert.ok(!/--payer-key/.test(result.stdout));
     });
 

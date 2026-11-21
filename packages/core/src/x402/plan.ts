@@ -31,10 +31,11 @@ import {
   assertBalancesAgree,
   assertMainnetDecimals,
   assertMainnetOption,
+  assertMainnetPin,
   paidUrlOf,
 } from "../guard/mainnet-plan.js";
 import { assertPaymentNetworkAllowed } from "../guard/networks.js";
-import { MainnetRunRefusedError, anchorOfOptIn, recordMainnetPlan, type MainnetOptIn } from "../guard/optin.js";
+import { MainnetRunRefusedError, anchorOfOptIn, isLiveOptIn, recordMainnetPlan, type MainnetOptIn } from "../guard/optin.js";
 import {
   PER_PAYMENT_CAP_USD,
   PER_RUN_CAP_USD,
@@ -52,6 +53,8 @@ import {
   type PlannedSignature,
 } from "../guard/budget.js";
 import { paymentChainFor } from "./chains/index.js";
+
+const STELLAR_PUBNET = "stellar:pubnet";
 import type { PaymentChain } from "./chains/types.js";
 import { REJECTED_REQUEST_MAX_LIFETIME_SECONDS, REJECTED_REQUEST_MIN_LIFETIME_SECONDS, type RejectCase } from "./rejected-request.js";
 import { readPaymentChallenge, type RequestShape } from "./simulator.js";
@@ -148,6 +151,8 @@ export interface RunPlan {
   readonly refusal?: string;
   /** A mainnet plan only: what it read before planning. */
   readonly mainnet?: MainnetReadings;
+  /** The dry run of a mainnet run (`planMainnetDryRun`): no key, so nothing of the payer was read. */
+  readonly mainnetDryRun?: true;
 }
 
 function message(error: unknown): string {
@@ -397,6 +402,87 @@ async function readMainnet(optIn: MainnetOptIn, chain: PaymentChain): Promise<Om
 }
 
 /**
+ * Why a mainnet run may not start on these endpoints, or undefined: one
+ * endpoint that could not be planned keeps the whole run from starting (B4),
+ * and so does a worst case above what is left of the budget.
+ */
+function mainnetRefusal(
+  endpoints: readonly EndpointPlan[],
+  worstCaseUsd: bigint,
+  budget: { readonly capUsd: bigint; readonly spentUsd: bigint },
+  capLowered: boolean,
+): string | undefined {
+  const unplanned = endpoints.filter((endpoint) => endpoint.status !== "planned");
+  if (unplanned.length > 0) {
+    const reasons = unplanned.map(
+      (endpoint) =>
+        `Endpoint ${sanitizeText(endpoint.name)} could not be planned: ` +
+        `${(endpoint.reason ?? endpoint.status).replace(/\s*Nothing was signed\.?/g, "").trim().replace(/\.?$/, ".")}`,
+    );
+    return `This mainnet run does not start: it pays only endpoints it could plan. ${reasons.join(" ")} Nothing was signed.`;
+  }
+  const remainingUsd = budget.capUsd - budget.spentUsd;
+  if (worstCaseUsd <= remainingUsd) return undefined;
+  const parts = endpoints.map((endpoint) => `${sanitizeText(endpoint.name)} ${formatUsd(endpoint.worstCaseUsd)}`);
+  const left =
+    budget.spentUsd === 0n
+      ? `the ${formatUsd(budget.capUsd)} per run`
+      : `the ${formatUsd(remainingUsd)} left of the ${formatUsd(budget.capUsd)} per run`;
+  return (
+    `This run could spend up to ${formatUsd(worstCaseUsd)} (${parts.join(", ")}), above ${left}` +
+    `${capLowered ? " set by maxRunUsd" : ""}. Nothing was signed. Select fewer endpoints, or test a cheaper route.`
+  );
+}
+
+export interface MainnetDryRunOptions {
+  /** The config environment's pin: required, mainnet USDC to a valid payee. */
+  readonly pin?: PinTerms;
+  /** A lower per-run cap in dollars. */
+  readonly maxRunUsd?: number;
+  readonly endpoints: readonly PlanEndpointInput[];
+}
+
+/**
+ * The dry run of a mainnet run on `stellar:pubnet` (spec B5): each endpoint's
+ * unpaid challenge, by the mainnet rules (the URL, exact on pubnet, USDC, a
+ * lifetime of at most 300 s, $1 a payment), against the caps. It needs no
+ * opt-in because it signs nothing, and it reads no key, so nothing of the
+ * payer is read: no balance, and no read of the chain, the RPC or Horizon. A
+ * paying run makes those reads first, and refuses on any of them.
+ */
+export async function planMainnetDryRun(options: MainnetDryRunOptions): Promise<RunPlan> {
+  const budget = new RunBudget(options.maxRunUsd === undefined ? {} : { maxRunUsd: options.maxRunUsd });
+  const capLowered = budget.capUsd < usdFromDollars(PER_RUN_CAP_USD);
+  const base = {
+    network: STELLAR_PUBNET,
+    ...(options.pin === undefined ? {} : { pin: options.pin }),
+    perPaymentCapUsd: usdFromDollars(PER_PAYMENT_CAP_USD),
+    capUsd: budget.capUsd,
+    capLowered,
+    mainnetDryRun: true as const,
+  };
+  try {
+    // No key is read, so the payee is held to the payer's address only by the paying run.
+    assertMainnetPin(options.pin, undefined);
+  } catch (error) {
+    if (error instanceof MainnetPlanRefusedError) {
+      return { ...base, endpoints: [], worstCaseUsd: 0n, refusal: `This mainnet run does not start: ${message(error)}` };
+    }
+    throw error;
+  }
+  const endpoints: EndpointPlan[] = [];
+  for (const endpoint of options.endpoints) {
+    endpoints.push(await planEndpoint(STELLAR_PUBNET, options.pin, endpoint, true));
+  }
+  const worstCaseUsd = endpoints
+    .filter((endpoint) => endpoint.status === "planned")
+    .reduce((sum, endpoint) => sum + endpoint.worstCaseUsd, 0n);
+  const plan: RunPlan = { ...base, endpoints, worstCaseUsd };
+  const refusal = mainnetRefusal(endpoints, worstCaseUsd, budget, capLowered);
+  return refusal === undefined ? plan : { ...plan, refusal };
+}
+
+/**
  * L1 of a mainnet run: the reads, then each endpoint by the mainnet rules.
  * Every endpoint must plan, and the worst case must fit what is left of the
  * run's budget; otherwise the run is refused and the opt-in stopped. A plan
@@ -450,28 +536,35 @@ async function planLiveMainnetRun(options: X402PlanOptions, optIn: MainnetOptIn)
   };
 
   // B4: on mainnet one endpoint that cannot be planned keeps the whole run from starting.
-  const unplanned = endpoints.filter((endpoint) => endpoint.status !== "planned");
-  let refusal: string | undefined;
-  if (unplanned.length > 0) {
-    const reasons = unplanned.map(
-      (endpoint) =>
-        `Endpoint ${sanitizeText(endpoint.name)} could not be planned: ` +
-        `${(endpoint.reason ?? endpoint.status).replace(/\s*Nothing was signed\.?/g, "").trim().replace(/\.?$/, ".")}`,
-    );
-    refusal = `This mainnet run does not start: it pays only endpoints it could plan. ${reasons.join(" ")} Nothing was signed.`;
-  } else if (worstCaseUsd > remainingUsd) {
-    const parts = planned.map((endpoint) => `${sanitizeText(endpoint.name)} ${formatUsd(endpoint.worstCaseUsd)}`);
-    const left = budget.spentUsd === 0n ? `the ${formatUsd(budget.capUsd)} per run` : `the ${formatUsd(remainingUsd)} left of the ${formatUsd(budget.capUsd)} per run`;
-    refusal =
-      `This run could spend up to ${formatUsd(worstCaseUsd)} (${parts.join(", ")}), above ${left}` +
-      `${capLowered ? " set by maxRunUsd" : ""}. Nothing was signed. Select fewer endpoints, or test a cheaper route.`;
-  }
+  const refusal = mainnetRefusal(endpoints, worstCaseUsd, budget, capLowered);
   if (refusal !== undefined) {
     optIn.stop(refusal);
     return { ...plan, refusal };
   }
   recordMainnetPlan(optIn, plan);
   return plan;
+}
+
+/**
+ * The opening line of a mainnet run (spec B5: a mainnet run says so in its
+ * first line): printed when the opt-in opens, before a service is started or
+ * the target is asked anything. The network, real funds, the payer, the one
+ * payee and the caps; the worst case comes with the plan
+ * ({@link mainnetFirstLine}).
+ */
+export function mainnetOpeningLine(optIn: MainnetOptIn): string {
+  if (!isLiveOptIn(optIn, STELLAR_PUBNET)) throw new ConfigurationError("Not a mainnet opt-in that is still open.");
+  const { budget } = optIn;
+  const remaining = budget.capUsd - budget.spentUsd;
+  const cap =
+    budget.spentUsd === 0n
+      ? `at most ${formatUsd(budget.capUsd)} this run`
+      : `at most ${formatUsd(remaining)} this run, what is left of the ${formatUsd(budget.capUsd)} cap`;
+  return sanitizeText(
+    `MAINNET RUN on ${optIn.network}: real funds. Payer ${optIn.payer}; pays only ${optIn.pin.payTo} in USDC; ` +
+      `at most ${formatUsd(usdFromDollars(PER_PAYMENT_CAP_USD))} per payment; ${cap}. ` +
+      `The plan is read next; nothing is signed before it passes.`,
+  );
 }
 
 /**
@@ -507,6 +600,13 @@ export function describePlan(plan: RunPlan): string[] {
           `Mainnet: hosts contacted beside the service: the RPC ${plan.mainnet.rpc} and public Horizon ${plan.mainnet.horizon}; ` +
             `latest ledger ${plan.mainnet.rpcLatest} (RPC) and ${plan.mainnet.horizonLatest} (Horizon).`,
         ]),
+    ...(plan.mainnetDryRun === true
+      ? [
+          "Mainnet dry run: no key is read, so nothing of the payer was read. A paying mainnet run first reads, and refuses " +
+            "on any of them: the payer's USDC through the RPC and on public Horizon (the two equal, $10.00 at most), the " +
+            "token's decimals (7), and the RPC's latest ledger beside public Horizon's (12 apart at most).",
+        ]
+      : []),
   ];
   for (const endpoint of plan.endpoints) {
     const at = endpoint.url === undefined ? "" : ` at ${endpoint.url}`;

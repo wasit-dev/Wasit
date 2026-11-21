@@ -18,15 +18,28 @@
  * opt-in: `planX402Run({ ..., mainnet })`.
  */
 
+import { basename } from "node:path";
+
 import { Keypair, StrKey } from "@stellar/stellar-sdk";
 
 import { DENIED_ENV_NAMES } from "../denied-env.js";
+import { ConfigurationError } from "../errors.js";
+import { paymentChainFor } from "../x402/chains/index.js";
 import { assertX402PaymentRpc } from "../x402/simulator.js";
 import { RunBudget } from "./budget.js";
 import { inGithubActions } from "./ci-event.js";
 import { assertMainnetJob, type MainnetJob } from "./ci-mainnet.js";
-import { assertMainnetPin } from "./mainnet-plan.js";
-import { MainnetRunRefusedError, issueMainnetOptIn, type MainnetFrontEnd, type MainnetOptIn } from "./optin.js";
+import { readHorizonAccount, readHorizonLatestLedger } from "./horizon.js";
+import { MAINNET_MAX_TIMEOUT_SECONDS, assertMainnetPin } from "./mainnet-plan.js";
+import {
+  MainnetRunRefusedError,
+  anchorOfOptIn,
+  isMainnetOptIn,
+  issueMainnetOptIn,
+  type MainnetFrontEnd,
+  type MainnetOptIn,
+} from "./optin.js";
+import { openAuthorizationsUntil, type LedgerConsistency } from "./run-ledger.js";
 import { acquireMainnetRunLock } from "./run-lock.js";
 import type { PinTerms } from "./budget.js";
 
@@ -149,4 +162,134 @@ export async function openMainnetOptIn(input: MainnetOptInInput): Promise<Mainne
     ledgerDir: input.ledgerDir,
     lock,
   });
+}
+
+export interface MainnetCloseOptions {
+  /** Waits `ms` between two reads of the latest ledger. Default: a timer. */
+  readonly sleep?: (ms: number) => Promise<void>;
+  /** One line when the wait starts. It holds nothing from the service. */
+  readonly onProgress?: (line: string) => void;
+}
+
+export interface MainnetCloseResult {
+  /** What the ledger says of the balances; undefined when the run opened no ledger. */
+  readonly consistency?: LedgerConsistency;
+  readonly ledgerPath?: string;
+  /** The ledger that had to close before the balances after were read; undefined when nothing may have been signed. */
+  readonly waitedUntil?: number;
+  /** Why the balances after were not read, or the run was already closed. */
+  readonly problem?: string;
+}
+
+/** Reads of the latest ledger that may fail in a row before the wait gives up. */
+const MAX_FAILED_READS = 5;
+/** Reads beyond the ledgers left to close, for a chain slower than its shortest unit. */
+const SLACK_READS = 60;
+/** The most reads in one wait, whatever is left to close. */
+const MAX_READS = 400;
+
+function defaultSleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Reads `latest` until it is past `target`, sleeping `step` between reads. A
+ * reading that is not a positive whole number counts as a failed read.
+ * Returns false when it gives up: too many failed reads in a row, or the
+ * ledger stopped moving for longer than the ledgers left to close allow.
+ */
+async function waitPast(
+  latest: () => Promise<number>,
+  target: number,
+  sleep: (ms: number) => Promise<void>,
+  step: number,
+): Promise<boolean> {
+  let failures = 0;
+  let allowed: number | undefined;
+  for (let reads = 0; allowed === undefined || reads < allowed; reads += 1) {
+    let reading: unknown;
+    try {
+      reading = await latest();
+    } catch {
+      reading = undefined;
+    }
+    if (typeof reading === "number" && Number.isSafeInteger(reading) && reading > 0) {
+      failures = 0;
+      if (reading > target) return true;
+      allowed ??= Math.min(MAX_READS, target - reading + SLACK_READS);
+    } else {
+      failures += 1;
+      if (failures >= MAX_FAILED_READS) return false;
+      allowed ??= MAX_READS;
+    }
+    await sleep(step);
+  }
+  return false;
+}
+
+/**
+ * L4 of a mainnet run (spec B3, B5): reports, does not prevent. Waits until
+ * every authorization the run signed, or may have signed, has expired: the
+ * latest expiry its ledger holds and, for a signature whose expiry is not
+ * known, the latest one the run's anchor allows a 300 s lifetime. Then waits
+ * for public Horizon to have closed that ledger too, reads the payer's
+ * balances after there (where the balances before were read), and closes the
+ * ledger with them: consistent or not. A wait or a read that fails closes the
+ * ledger without them, and `problem` says to wait and compare by hand.
+ *
+ * Always closes the opt-in, so its lock is released: nothing more is signed.
+ *
+ * @throws {ConfigurationError} When `optIn` is not an opt-in core made.
+ */
+export async function closeMainnetRun(optIn: MainnetOptIn, options: MainnetCloseOptions = {}): Promise<MainnetCloseResult> {
+  if (!isMainnetOptIn(optIn)) throw new ConfigurationError("Not a mainnet opt-in.");
+  if (optIn.closed) return { problem: "The mainnet run is already closed: its ledger was closed with it." };
+  try {
+    const ledger = optIn.ledger;
+    const horizon = optIn.plan?.mainnet?.horizon;
+    if (ledger === undefined || horizon === undefined) return {};
+    const sleep = options.sleep ?? defaultSleep;
+    const terms = paymentChainFor(optIn.network)?.signedTerms;
+    const { latest, unknown } = openAuthorizationsUntil(ledger.entries);
+    let target = latest;
+    if (unknown > 0 && terms !== undefined) {
+      const bound = anchorOfOptIn(optIn).maxExpiration(terms.unitSeconds, MAINNET_MAX_TIMEOUT_SECONDS);
+      target = Math.max(target ?? 0, bound);
+    }
+    const unread = (what: string): MainnetCloseResult => ({
+      consistency: ledger.close(),
+      ledgerPath: ledger.path,
+      ...(target === undefined ? {} : { waitedUntil: target }),
+      problem:
+        `The payer's balances after this run were not read: ${what} could not be confirmed. Read the ledger ` +
+        `${basename(ledger.path)}, ${target === undefined ? "" : `wait until ledger ${target} has closed, `}then ` +
+        `compare the payer's balances with it by hand.`,
+    });
+    if (unknown > 0 && terms === undefined) return unread("how long its signatures stay valid");
+    if (target !== undefined) {
+      if (terms === undefined) return unread("how long its signatures stay valid");
+      const step = terms.unitSeconds * 1000;
+      options.onProgress?.(
+        `Waiting until ledger ${target} has closed: every authorization this run signed has expired by then. ` +
+          `Then the payer's balances after are read on public Horizon.`,
+      );
+      const rpcUrl = optIn.rpcUrl;
+      if (!(await waitPast(() => terms.latestUnit(optIn.network, rpcUrl), target, sleep, step))) {
+        return unread(`that the RPC has closed ledger ${target}`);
+      }
+      if (!(await waitPast(() => readHorizonLatestLedger(horizon), target, sleep, step))) {
+        return unread(`that public Horizon has closed ledger ${target}`);
+      }
+    }
+    let after;
+    try {
+      after = await readHorizonAccount(horizon, optIn.payer);
+    } catch {
+      return unread("the payer's account on public Horizon");
+    }
+    const consistency = ledger.close({ after: { usdc: after.usdc, native: after.native }, source: `public Horizon (${horizon})` });
+    return { consistency, ledgerPath: ledger.path, ...(target === undefined ? {} : { waitedUntil: target }) };
+  } finally {
+    optIn.close();
+  }
 }

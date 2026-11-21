@@ -11,7 +11,7 @@
  * The payment tier pays only when every one of these holds (D-022a, B3, A1):
  * the GitHub event may pay (push to the default branch, schedule,
  * workflow_dispatch on it; outside GitHub Actions always), the network is a
- * test network (L0; the mainnet opt-in is not part of this version), the
+ * test network (L0; `stellar:pubnet` pays only through `--mainnet`, below), the
  * environment has `operatedByMe: true`, the chain's key variable is set, and
  * the plan (L1) fits the caps. Then one budget is shared by every endpoint, each
  * endpoint's checks get its entry of the plan, and the pin and `maxRunUsd` come
@@ -19,35 +19,56 @@
  * run is the read-only tier and says so. A key variable that is set on a run that
  * may not pay is refused before the service starts (Najmi, 2026-11-16).
  *
- * `--mainnet` asks for the mainnet opt-in, which this version does not have:
- * the run is refused at once, exit 2, before the config is read (spec B12).
+ * `--mainnet` (spec B5, B18 O2) is the CLI's switch of the mainnet opt-in: an
+ * x402 run on `stellar:pubnet` that pays real USDC. Core opens it
+ * (`openMainnetOptIn`) only when every rule holds: a pubnet environment with
+ * `operatedByMe` and a USDC pin, the key in `WASIT_MAINNET_PAYER_SECRET` only,
+ * an https RPC that serves pubnet, no other mainnet run holding the lock in the
+ * ledger's folder, and in GitHub Actions the mainnet job rules. All of that is
+ * checked before a service starts or the target is asked anything. The first
+ * line then says MAINNET RUN; the plan reads the payer and the chain; the
+ * ledger takes every signature before the key signs; a refusal stops the whole
+ * run; L4 waits for every authorization to expire and compares the balances.
+ * The switch is never read from the config or the environment. Without it, a
+ * paying run on pubnet is refused. `--dry-run` on pubnet plans by the mainnet
+ * rules and reads no key.
  *
  * `executeRun` does not call `process.exit` and does not read the process: the
  * environment and the output are passed in, so it can be tested in-process.
  */
 
 import { readFileSync, statSync, writeFileSync } from "node:fs";
+import path from "node:path";
 
 import {
+  CHECK_CATALOGUE,
+  CheckSetupError,
   ConfigError,
   ConfigurationError,
+  MAINNET_PAYER_KEY_ENV,
   MAX_BASELINE_BYTES,
   PER_PAYMENT_CAP_USD,
   RunBudget,
   assertPaymentNetworkAllowed,
   buildEndpointReport,
   buildRunReport,
+  closeMainnetRun,
   deniedEnvValues,
   describePlan,
   describeRun,
   errored,
   formatUsd,
+  githubDefaultBranch,
   inGithubActions,
   isLoopbackUrl,
+  mainnetFirstLine,
+  mainnetOpeningLine,
+  openMainnetOptIn,
   payerKeyVariables,
   paymentChainFor,
   paymentChecksSkipped,
   paymentEventGate,
+  planMainnetDryRun,
   planX402Run,
   readBaseline,
   readConfigFile,
@@ -55,17 +76,19 @@ import {
   readGithubEvent,
   readToolVersions,
   redactReport,
-  refuseMainnetSwitch,
   resolveRun,
   runExitCode,
   runX402PaymentChecks,
   runX402ReadChecks,
   sanitizeText,
   selectBaseline,
+  skipped,
   skippedPaymentChecks,
   urlOrigin,
   type BaselineResult,
   type CheckResult,
+  type MainnetCloseResult,
+  type MainnetOptIn,
   type PaymentChain,
   type PinTerms,
   type ResolvedEndpoint,
@@ -73,7 +96,6 @@ import {
   type RunPlan,
   type RunVerdict,
   type SkipKind,
-  MainnetOptInRefusedError,
   RpcIdentityError,
   UnsupportedPaymentNetworkError,
   assertX402PaymentRpc,
@@ -101,11 +123,16 @@ export interface RunCommandOptions {
   readonly startIfLocal?: boolean;
   readonly baseline?: string;
   /**
-   * `--mainnet`: the switch of the mainnet opt-in (spec B5). This version has no
-   * opt-in, so it always refuses, exit 2, before anything else is done (B12).
+   * `--mainnet`: the switch of the mainnet opt-in (spec B5): an x402 run that
+   * pays real USDC on `stellar:pubnet`, when every rule of the opt-in holds.
    * Never read from the config or the environment.
    */
   readonly mainnet?: boolean;
+  /**
+   * `--ledger-dir`: where a mainnet run writes its ledger and takes its lock.
+   * Only with `--mainnet`. Default: the working directory.
+   */
+  readonly ledgerDir?: string;
 }
 
 export interface RunContext {
@@ -119,9 +146,13 @@ export interface RunContext {
   readonly cwd?: string;
   /** Tests only: the sudo `--start` uses for a separate service user. Index never sets it; no flag or variable reaches it. */
   readonly sudo?: string;
+  /** Tests only: the wait between two reads of L4 (a mainnet run). Index never sets it. */
+  readonly sleep?: (ms: number) => Promise<void>;
 }
 
 const TIER_NOTE = "Tier: read-only. The payment checks were not run, and nothing was signed.";
+
+const STELLAR_PUBNET = "stellar:pubnet";
 
 const MPP_NOT_IN_RUN =
   "wasit run does not pay MPP in this version: run wasit mpp-charge or wasit mpp-channel against this endpoint";
@@ -141,6 +172,8 @@ type PaymentStep =
       readonly plan: RunPlan;
       /** Where a check's progress line goes (X402-11's wait): the same channel as the tier line. */
       readonly progress?: (line: string) => void;
+      /** A mainnet run: its opt-in, whose budget, pin, plan, ledger and RPC the checks pay by. */
+      readonly mainnet?: MainnetOptIn;
     };
 
 function skippedFor(protocol: ResolvedEndpoint["protocol"], step: Extract<PaymentStep, { pay: false }>): CheckResult[] {
@@ -150,8 +183,20 @@ function skippedFor(protocol: ResolvedEndpoint["protocol"], step: Extract<Paymen
   return paymentChecksSkipped(protocol, step.kind, step.reason ?? "the payment checks were not run");
 }
 
+/** Every check of a protocol, skipped: the endpoints of a mainnet run after it stopped. */
+function everyCheckSkipped(protocol: ResolvedEndpoint["protocol"], reason: string): CheckResult[] {
+  const why = `the mainnet run stopped, and nothing more is signed in it: ${sanitizeText(reason).slice(0, 400)}`;
+  // MPP-13 closes a channel for good and is never listed (report.ts).
+  return CHECK_CATALOGUE.filter((entry) => entry.protocol === protocol && entry.id !== "MPP-13").map((entry) =>
+    skipped(entry.id, entry.name, why),
+  );
+}
+
 /** What the run does for one endpoint. */
 async function runEndpoint(endpoint: ResolvedEndpoint, step: PaymentStep): Promise<CheckResult[]> {
+  // B3: once a mainnet run is stopped, every remaining check is skipped with the reason, the unpaid ones too.
+  const stopped = step.pay ? step.mainnet?.stopped : undefined;
+  if (stopped !== undefined) return everyCheckSkipped(endpoint.protocol, stopped);
   try {
     if (endpoint.protocol === "x402") {
       const shape = {
@@ -168,6 +213,7 @@ async function runEndpoint(endpoint: ResolvedEndpoint, step: PaymentStep): Promi
         target: endpoint.url,
         network: step.network,
         payerSecretKey: step.key,
+        ...(step.mainnet === undefined ? {} : { mainnet: step.mainnet }),
         ...(step.rpcUrl === undefined ? {} : { rpcUrl: step.rpcUrl }),
         budget: step.budget,
         ...(step.pin === undefined ? {} : { pin: step.pin }),
@@ -210,6 +256,15 @@ function planEndpoints(resolved: ResolvedRun) {
  */
 function keyOnRefusedEvent(keys: readonly string[], reason: string): string {
   const why = reason.replace(/^payment checks not run: /, "");
+  if (keys.includes(MAINNET_PAYER_KEY_ENV)) {
+    // The mainnet key has one place: a job started by hand on the default branch (spec B17.4).
+    return (
+      `wasit run: ${keys.join(", ")} ${keys.length === 1 ? "is" : "are"} set, and this run may not pay (${why}). ` +
+      `Nothing was started, sent or signed. ${MAINNET_PAYER_KEY_ENV} belongs only to a mainnet job started by hand ` +
+      `(workflow_dispatch) on the default branch, as the secret of a GitHub environment limited to that branch, with a ` +
+      `required reviewer.`
+    );
+  }
   const first = keys[0] ?? "STELLAR_PRIVATE_KEY";
   return (
     `wasit run: ${keys.join(", ")} ${keys.length === 1 ? "is" : "are"} set, and this run may not pay (${why}). ` +
@@ -267,13 +322,21 @@ async function printPlan(
   fail: (message: string) => number,
 ): Promise<number> {
   let plan;
+  const mainnet = resolved.network === STELLAR_PUBNET;
   try {
-    plan = await planX402Run({
-      network: resolved.network,
-      ...(resolved.pinned === undefined ? {} : { pin: resolved.pinned }),
-      ...(resolved.maxRunUsd === undefined ? {} : { maxRunUsd: resolved.maxRunUsd }),
-      endpoints: planEndpoints(resolved),
-    });
+    // B5: the dry run of a mainnet run needs no opt-in, because it signs nothing, and reads no key.
+    plan = mainnet
+      ? await planMainnetDryRun({
+          ...(resolved.pinned === undefined ? {} : { pin: resolved.pinned }),
+          ...(resolved.maxRunUsd === undefined ? {} : { maxRunUsd: resolved.maxRunUsd }),
+          endpoints: planEndpoints(resolved),
+        })
+      : await planX402Run({
+          network: resolved.network,
+          ...(resolved.pinned === undefined ? {} : { pin: resolved.pinned }),
+          ...(resolved.maxRunUsd === undefined ? {} : { maxRunUsd: resolved.maxRunUsd }),
+          endpoints: planEndpoints(resolved),
+        });
   } catch (error) {
     // L0: a network that is not a test network, refused before any request.
     if (error instanceof ConfigurationError) return fail(`wasit run --dry-run: ${error.message}`);
@@ -293,8 +356,17 @@ async function printPlan(
         `refused: Wasit pays only a service its operator runs. Nothing was signed.`,
     );
   }
+  if (mainnet) {
+    lines.push(
+      `A paying run on ${STELLAR_PUBNET} needs --mainnet, its key in ${MAINNET_PAYER_KEY_ENV} only (a dry run reads ` +
+        `no key), and an https RPC that serves ${STELLAR_PUBNET} (rpcUrl or WASIT_RPC_URL): ` +
+        (resolved.rpcUrl === undefined
+          ? "no RPC is set, so a paying run would be refused."
+          : `the RPC is ${urlOrigin(resolved.rpcUrl)} (not read by a dry run).`),
+    );
+  }
   for (const line of lines) stdout(clean(line));
-  return refused || !resolved.operatedByMe ? 2 : 0;
+  return refused || !resolved.operatedByMe || (mainnet && resolved.rpcUrl === undefined) ? 2 : 0;
 }
 
 export async function executeRun(options: RunCommandOptions, context: RunContext): Promise<number> {
@@ -306,22 +378,14 @@ export async function executeRun(options: RunCommandOptions, context: RunContext
     return 2;
   };
 
-  // B12: the switch exists only to refuse. First, so nothing is read, started, sent or signed.
-  if (options.mainnet === true) {
-    try {
-      refuseMainnetSwitch(
-        "--mainnet",
-        inGithubActions(context.env)
-          ? { event: context.env["GITHUB_EVENT_NAME"] ?? "", runner: context.env["RUNNER_ENVIRONMENT"] ?? "" }
-          : {},
-      );
-    } catch (error) {
-      if (error instanceof MainnetOptInRefusedError) return fail(`wasit run ${error.message}`);
-      throw error;
-    }
-  }
-
+  const mainnet = options.mainnet === true;
   const dryRun = options.dryRun === true;
+  if (mainnet && options.readOnly) {
+    return fail("wasit run: --mainnet is for a paying run on stellar:pubnet: choose --mainnet or --read-only, not both.");
+  }
+  if (options.ledgerDir !== undefined && (!mainnet || dryRun)) {
+    return fail("wasit run: --ledger-dir is for a --mainnet run that pays: no other run writes a ledger.");
+  }
   if (dryRun && options.readOnly) {
     return fail("wasit run: choose --dry-run or --read-only, not both.");
   }
@@ -347,10 +411,19 @@ export async function executeRun(options: RunCommandOptions, context: RunContext
     throw error;
   }
 
+  // --mainnet is for stellar:pubnet only, the dry run included.
+  if (mainnet && resolved.network !== STELLAR_PUBNET) {
+    return fail(
+      `wasit run --mainnet: A mainnet run is on ${STELLAR_PUBNET} only, and environment ${resolved.environment} is on ` +
+        `another network. Nothing was started, sent or signed.`,
+    );
+  }
+
   // D-022a: which GitHub events may pay. A key given to a run that may not pay is
   // refused here, before the service of this run (code that may not be reviewed
   // yet) starts in the same job as the key. Every tier, the read-only one too.
-  const gate = paymentEventGate(context.env, readGithubEvent(context.env));
+  const event = readGithubEvent(context.env);
+  const gate = paymentEventGate(context.env, event);
   if (gate.ciOutsideGithub === true) {
     // In a CI that is not GitHub Actions the payment tier does not run at all, and
     // no tier runs beside a payer key (Najmi, 2026-11-17, review R9 a).
@@ -359,12 +432,30 @@ export async function executeRun(options: RunCommandOptions, context: RunContext
   } else if (!gate.allowed) {
     const keys = payerKeyVariables(context.env);
     if (keys.length > 0) return fail(keyOnRefusedEvent(keys, gate.reason ?? "this event"));
+    // A mainnet run is never turned into the read-only tier: it stops, and says why.
+    if (mainnet && !dryRun) {
+      return fail(
+        `wasit run --mainnet: this run may not pay (${(gate.reason ?? "this event").replace(/^payment checks not run: /, "")}). ` +
+          `In GitHub Actions a mainnet run is started by hand (workflow_dispatch) on the default branch. ` +
+          `Nothing was started, sent or signed.`,
+      );
+    }
   }
+
+  // The mainnet run (spec B5): its own path, opened by core before anything is started or sent.
+  if (mainnet && !dryRun) return executeMainnetRun(options, context, resolved, event, { clean, stderr, fail, secrets });
 
   // The payment tier: neither --read-only nor --dry-run. On an event that may not
   // pay it is the read-only tier, and the report says why.
   const paymentAsked = !options.readOnly && !dryRun;
   const paying = paymentAsked && gate.allowed;
+  // Without its switch, a paying run on mainnet is refused before anything is started or sent.
+  if (paying && resolved.network === STELLAR_PUBNET) {
+    return fail(
+      `wasit run: ${STELLAR_PUBNET} is Stellar mainnet: a paying run there needs --mainnet, and every rule of the ` +
+        `mainnet opt-in (see wasit run --help). Nothing was started, sent or signed.`,
+    );
+  }
   const chain = paying ? paymentChainFor(resolved.network) : undefined;
   if (paying && (chain !== undefined || resolved.networkClass !== "unknown")) {
     // L0, before the service starts or anything is sent: a test network only.
@@ -401,51 +492,11 @@ export async function executeRun(options: RunCommandOptions, context: RunContext
     }
   }
 
-  // The decision is the CLI's, in one place: --start always starts, --start-if-local starts only
-  // when service.start is set and the environment is on this machine, and says which it did.
-  let shouldStart = options.start;
-  if (options.startIfLocal === true) {
-    const origin = urlOrigin(resolved.baseUrl);
-    if (resolved.service?.start === undefined) {
-      stderr(`wasit run: service.start is not set, so ${origin} is read as it is.`);
-    } else if (!isLoopbackUrl(resolved.baseUrl)) {
-      stderr(
-        `wasit run: environment ${resolved.environment} is at ${origin}, not on this machine, ` +
-          `so service.start is not used and ${origin} is read as it is.`,
-      );
-    } else {
-      shouldStart = true;
-    }
-  }
-
-  let service: StartedService | undefined;
-  // D-022a option 2: on a GitHub-hosted runner, a service started while a payer key is set runs as its own user.
-  const serviceUser = serviceUserFor(context.env);
-  if (shouldStart) {
-    const { start, ready } = resolved.service ?? {};
-    if (start === undefined) {
-      return fail("wasit run --start needs service.start in the config: the command that starts the service.");
-    }
-    if (ready === undefined) {
-      return fail(
-        "wasit run --start needs service.ready in the config: the url on this machine to wait for, " +
-          'for example { "url": "http://127.0.0.1:3000/", "timeoutSeconds": 60 }.',
-      );
-    }
-    try {
-      service = await startService({
-        command: start,
-        ready,
-        env: context.env,
-        log: (line) => context.stderr(line),
-        ...(context.cwd === undefined ? {} : { cwd: context.cwd }),
-        ...(serviceUser === undefined ? {} : { separateUser: { name: serviceUser, ...(context.sudo === undefined ? {} : { sudo: context.sudo }) } }),
-      });
-    } catch (error) {
-      if (error instanceof ServiceError) return fail(error.message);
-      throw error;
-    }
-  }
+  const decision = startDecision(options, resolved);
+  for (const note of decision.notes) stderr(note);
+  const started = await startIfAsked(decision.start, resolved, context, fail);
+  if (typeof started === "number") return started;
+  const service = started;
 
   if (dryRun) {
     try {
@@ -530,49 +581,272 @@ export async function executeRun(options: RunCommandOptions, context: RunContext
         `${formatUsd(budget.capUsd)} cap, at most $${PER_PAYMENT_CAP_USD}.00 a payment; every signature is counted as if it settled.`;
     }
 
-    const input = {
+    return writeReport({ options, context, resolved, startedAt, endpoints, notes: [tierNote], secrets, clean, fail }, (verdict) =>
+      // The payment tier was asked for on an event that may pay and did not pay:
+      // not green (a FAIL still outranks it).
+      notPaid !== undefined && hasX402 && verdict.code === 0
+        ? { ...verdict, code: 2, reason: `the payment tier was asked for and its payment checks were not run: ${notPaid}` }
+        : verdict,
+    );
+  } finally {
+    await service?.stop();
+  }
+}
+
+/** Whether this run starts `service.start`, and the notes that say why not. */
+function startDecision(options: RunCommandOptions, resolved: ResolvedRun): { readonly start: boolean; readonly notes: string[] } {
+  // The decision is the CLI's, in one place: --start always starts, --start-if-local starts only
+  // when service.start is set and the environment is on this machine, and says which it did.
+  const notes: string[] = [];
+  let start = options.start;
+  if (options.startIfLocal === true) {
+    const origin = urlOrigin(resolved.baseUrl);
+    if (resolved.service?.start === undefined) {
+      notes.push(`wasit run: service.start is not set, so ${origin} is read as it is.`);
+    } else if (!isLoopbackUrl(resolved.baseUrl)) {
+      notes.push(
+        `wasit run: environment ${resolved.environment} is at ${origin}, not on this machine, ` +
+          `so service.start is not used and ${origin} is read as it is.`,
+      );
+    } else {
+      start = true;
+    }
+  }
+  return { start, notes };
+}
+
+/** Starts the service when asked: the service, undefined when not asked, or the exit code of a failure. */
+async function startIfAsked(
+  start: boolean,
+  resolved: ResolvedRun,
+  context: RunContext,
+  fail: (message: string) => number,
+): Promise<StartedService | undefined | number> {
+  if (!start) return undefined;
+  const { start: command, ready } = resolved.service ?? {};
+  if (command === undefined) {
+    return fail("wasit run --start needs service.start in the config: the command that starts the service.");
+  }
+  if (ready === undefined) {
+    return fail(
+      "wasit run --start needs service.ready in the config: the url on this machine to wait for, " +
+        'for example { "url": "http://127.0.0.1:3000/", "timeoutSeconds": 60 }.',
+    );
+  }
+  // D-022a option 2: on a GitHub-hosted runner, a service started while a payer key is set runs as its own user.
+  const serviceUser = serviceUserFor(context.env);
+  try {
+    return await startService({
+      command,
+      ready,
+      env: context.env,
+      log: (line) => context.stderr(line),
+      ...(context.cwd === undefined ? {} : { cwd: context.cwd }),
+      ...(serviceUser === undefined ? {} : { separateUser: { name: serviceUser, ...(context.sudo === undefined ? {} : { sudo: context.sudo }) } }),
+    });
+  } catch (error) {
+    if (error instanceof ServiceError) return fail(error.message);
+    throw error;
+  }
+}
+
+interface ReportInput {
+  readonly options: RunCommandOptions;
+  readonly context: RunContext;
+  readonly resolved: ResolvedRun;
+  readonly startedAt: string;
+  readonly endpoints: ReturnType<typeof buildEndpointReport>[];
+  readonly notes: readonly string[];
+  readonly secrets: readonly string[];
+  readonly clean: (text: string) => string;
+  readonly fail: (message: string) => number;
+}
+
+/** Builds, writes and prints the report; returns the exit code, after `adjust` has had its say. */
+function writeReport(input: ReportInput, adjust: (verdict: RunVerdict) => RunVerdict = (verdict) => verdict): number {
+  const { options, context, resolved, startedAt, endpoints, notes, secrets, clean, fail } = input;
+  const base = {
+    environment: resolved.environment,
+    network: resolved.network,
+    startedAt,
+    versions: readToolVersions(CLI_VERSION, readBuildCommit(context.env)),
+    endpoints,
+  };
+  const preliminary = buildRunReport({ ...base, notes: [...notes] });
+  const selected = selectBaseline(
+    preliminary,
+    options.baseline === undefined ? undefined : readBaselineFile(options.baseline),
+  );
+  const report = redactReport(
+    selected.note === undefined ? preliminary : buildRunReport({ ...base, notes: [...notes, `Baseline not used: ${selected.note}.`] }),
+    [...secrets],
+  );
+  const verdict = adjust(runExitCode(report, selected.baseline?.report));
+
+  const json = `${JSON.stringify(report, null, 2)}\n`;
+  if (options.out !== undefined) {
+    try {
+      writeFileSync(options.out, json);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      return fail(`wasit run: cannot write ${options.out}${typeof code === "string" ? ` (${code})` : ""}`);
+    }
+  }
+  if (options.json) {
+    context.stdout(json.trimEnd());
+    // The JSON says what was found; this line says what the exit code is and why, for a log.
+    context.stderr(clean(`Result: ${verdict.reason} (exit ${verdict.code}).`));
+  } else {
+    for (const line of formatRun(resolved, report, verdict)) context.stdout(clean(line));
+  }
+  return verdict.code;
+}
+
+interface Output {
+  readonly clean: (text: string) => string;
+  readonly stderr: (text: string) => void;
+  readonly fail: (message: string) => number;
+  readonly secrets: readonly string[];
+}
+
+/** What L4 found, in one line for the run's output. */
+function ledgerLine(close: MainnetCloseResult): string {
+  const file = close.ledgerPath ?? "(no ledger)";
+  const consistency = close.consistency;
+  if (consistency === undefined) return `Ledger: none was opened, so nothing was signed. ${close.problem ?? ""}`.trim();
+  if (consistency.consistent) {
+    return (
+      `Ledger: consistent: the payer's USDC went down by exactly the settlements this run verified ` +
+      `(${consistency.settledUsdc} base units), and its XLM did not move. ${file}`
+    );
+  }
+  return `Ledger: INCONSISTENT: ${consistency.reasons.join(" ")} ${close.problem ?? ""} ${file}`.replace(/\s+/g, " ").trim();
+}
+
+/**
+ * `wasit run --mainnet` (spec B5, B18 O2). Core opens the opt-in before a
+ * service starts or the target is asked anything; every refusal before that is
+ * exit 2 with nothing started, sent or signed. Once it is open, its opt-in is
+ * closed on every way out: L4 waits for the run's authorizations to expire,
+ * compares the balances after with the ledger, and releases the lock.
+ */
+async function executeMainnetRun(
+  options: RunCommandOptions,
+  context: RunContext,
+  resolved: ResolvedRun,
+  event: unknown,
+  output: Output,
+): Promise<number> {
+  const { clean, stderr, fail, secrets } = output;
+  const cwd = context.cwd ?? process.cwd();
+  const ledgerDir = path.resolve(cwd, options.ledgerDir ?? ".");
+  const decision = startDecision(options, resolved);
+  const workspace = context.env["GITHUB_WORKSPACE"];
+  const installDirs = [
+    ...(workspace === undefined || workspace.trim() === "" ? [] : [{ label: "GITHUB_WORKSPACE", dir: workspace }]),
+    { label: "the config's directory", dir: path.dirname(path.resolve(cwd, options.config)) },
+  ];
+
+  let optIn: MainnetOptIn;
+  try {
+    optIn = await openMainnetOptIn({
+      frontEnd: "cli",
+      env: context.env,
       environment: resolved.environment,
       network: resolved.network,
-      startedAt,
-      versions: readToolVersions(CLI_VERSION, readBuildCommit(context.env)),
-      endpoints,
-    };
-    const preliminary = buildRunReport({ ...input, notes: [tierNote] });
-    const selected = selectBaseline(
-      preliminary,
-      options.baseline === undefined ? undefined : readBaselineFile(options.baseline),
-    );
-    const report = redactReport(
-      selected.note === undefined
-        ? preliminary
-        : buildRunReport({ ...input, notes: [tierNote, `Baseline not used: ${selected.note}.`] }),
-      secrets,
-    );
-    let verdict: RunVerdict = runExitCode(report, selected.baseline?.report);
-    // The payment tier was asked for on an event that may pay and did not pay:
-    // not green (a FAIL still outranks it).
-    if (notPaid !== undefined && hasX402 && verdict.code === 0) {
-      verdict = { ...verdict, code: 2, reason: `the payment tier was asked for and its payment checks were not run: ${notPaid}` };
-    }
+      operatedByMe: resolved.operatedByMe,
+      pin: resolved.pinned,
+      rpcUrl: resolved.rpcUrl,
+      ledgerDir,
+      ...(resolved.maxRunUsd === undefined ? {} : { maxRunUsd: resolved.maxRunUsd }),
+      ...(inGithubActions(context.env)
+        ? { job: { defaultBranch: githubDefaultBranch(event), startsService: decision.start, baseUrl: resolved.baseUrl, installDirs } }
+        : {}),
+    });
+  } catch (error) {
+    if (error instanceof ConfigurationError) return fail(`wasit run --mainnet: ${error.message}`);
+    throw error;
+  }
 
-    const json = `${JSON.stringify(report, null, 2)}\n`;
-    if (options.out !== undefined) {
-      try {
-        writeFileSync(options.out, json);
-      } catch (error) {
-        const code = (error as NodeJS.ErrnoException).code;
-        return fail(`wasit run: cannot write ${options.out}${typeof code === "string" ? ` (${code})` : ""}`);
+  // Lines about money go where the report is not: stderr with --json, else stdout.
+  const say = (line: string): void => (options.json ? stderr(line) : context.stdout(clean(line)));
+  let service: StartedService | undefined;
+  let close: MainnetCloseResult | undefined;
+  try {
+    // B5: a mainnet run says so in its first line, before a service starts or the target is asked anything.
+    say(mainnetOpeningLine(optIn));
+    for (const note of decision.notes) stderr(note);
+    const started = await startIfAsked(decision.start, resolved, context, fail);
+    if (typeof started === "number") return started;
+    service = started;
+
+    const startedAt = (context.now?.() ?? new Date()).toISOString();
+    let plan: RunPlan;
+    try {
+      // L1: the payer's balances, the token's decimals and the latest ledger first, then every endpoint.
+      plan = await planX402Run({ network: resolved.network, endpoints: planEndpoints(resolved), mainnet: optIn });
+    } catch (error) {
+      if (error instanceof ConfigurationError || error instanceof CheckSetupError) return fail(`wasit run --mainnet: ${error.message}`);
+      throw error;
+    }
+    if (plan.refusal !== undefined) {
+      for (const line of describePlan(plan)) stderr(line);
+      return fail(`wasit run --mainnet: ${plan.refusal}`);
+    }
+    say(mainnetFirstLine(plan));
+    for (const line of describePlan(plan).slice(1)) say(line);
+
+    // The ledger's header names the versions flat: "wasit.cli", "sdk.@x402/core" and so on.
+    const versions: Record<string, string> = {};
+    for (const [group, entries] of Object.entries(readToolVersions(CLI_VERSION, readBuildCommit(context.env)))) {
+      for (const [name, value] of Object.entries(entries as Record<string, unknown>)) {
+        if (value !== undefined) versions[`${group}.${name}`] = String(value);
       }
     }
-    if (options.json) {
-      context.stdout(json.trimEnd());
-      // The JSON says what was found; this line says what the exit code is and why, for a log.
-      context.stderr(clean(`Result: ${verdict.reason} (exit ${verdict.code}).`));
-    } else {
-      for (const line of formatRun(resolved, report, verdict)) context.stdout(clean(line));
+    let ledgerPath: string;
+    try {
+      ledgerPath = optIn.openLedger(versions).path;
+    } catch (error) {
+      if (error instanceof ConfigurationError || error instanceof CheckSetupError) return fail(`wasit run --mainnet: ${error.message}`);
+      throw error;
     }
-    return verdict.code;
+    say(`Ledger: ${ledgerPath}: every signature is written there before the key signs.`);
+
+    // The key, read at the moment of use from its one variable (B5, B6); core holds it to the opt-in's payer.
+    const key = (context.env[MAINNET_PAYER_KEY_ENV] ?? "").trim();
+    const step: PaymentStep = { pay: true, network: resolved.network, key, budget: optIn.budget, plan, progress: say, mainnet: optIn };
+    const endpoints = [];
+    for (const endpoint of resolved.endpoints) {
+      const results = await runEndpoint(endpoint, step);
+      endpoints.push(
+        buildEndpointReport({ name: endpoint.name, protocol: endpoint.protocol, method: endpoint.method, path: endpoint.path, results }),
+      );
+    }
+
+    // L4: every authorization expired, the balances after read, the ledger closed, the lock released.
+    close = await closeMainnetRun(optIn, { ...(context.sleep === undefined ? {} : { sleep: context.sleep }), onProgress: say });
+    say(ledgerLine(close));
+    const stopped = optIn.stopped;
+    if (stopped !== undefined) stderr(`wasit run --mainnet: the run stopped: ${stopped}`);
+
+    const consistent = close.consistency?.consistent === true;
+    const notes = [
+      `Tier: MAINNET payment on ${resolved.network}: real funds. The run charged ${formatUsd(optIn.budget.spentUsd)} of the ` +
+        `${formatUsd(optIn.budget.capUsd)} cap, at most $${PER_PAYMENT_CAP_USD}.00 a payment; every signature is counted as if it settled.`,
+      `Run ledger ${path.basename(ledgerPath)}: ${consistent ? "consistent" : "inconsistent"} with the payer's balances on public Horizon.`,
+      ...(stopped === undefined ? [] : [`The mainnet run stopped: ${stopped}`]),
+    ];
+    return writeReport({ options, context, resolved, startedAt, endpoints, notes, secrets, clean, fail }, (verdict) => {
+      // B3: a mainnet run that stopped exits 2, and so does one whose ledger does not match the chain.
+      if (stopped !== undefined) return { ...verdict, code: 2, reason: `the mainnet run stopped: ${stopped}` };
+      if (!consistent) return { ...verdict, code: 2, reason: "the run ledger is not consistent with the payer's balances" };
+      return verdict;
+    });
   } finally {
+    // Every way out closes the opt-in; a run that signed waits for its authorizations first.
+    if (close === undefined) {
+      await closeMainnetRun(optIn, { ...(context.sleep === undefined ? {} : { sleep: context.sleep }), onProgress: say });
+    }
     await service?.stop();
   }
 }

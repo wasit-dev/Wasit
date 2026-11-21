@@ -211,7 +211,7 @@ export { RpcIdentityError, assertRpcServesNetwork } from "./guard/rpc-identity.j
 export type { RpcInUse, RpcSource } from "./guard/rpc-in-use.js";
 
 // Which GitHub events may run the payment tier (D-022a), and which key variables are set.
-export { inGithubActions, payerKeyVariables, paymentEventGate, readGithubEvent } from "./guard/ci-event.js";
+export { githubDefaultBranch, inGithubActions, payerKeyVariables, paymentEventGate, readGithubEvent } from "./guard/ci-event.js";
 export type { PaymentEventGate } from "./guard/ci-event.js";
 
 // L1 and L2: the plan, and the caps every signature is charged against.
@@ -223,13 +223,24 @@ export {
   formatUsd,
 } from "./guard/budget.js";
 export type { GuardRefusal, PinTerms, PlannedSignature } from "./guard/budget.js";
-export { describePlan, mainnetFirstLine, planX402Run } from "./x402/plan.js";
-export type { EndpointPlan, EndpointPlanStatus, MainnetReadings, PlannedOption, RunPlan, X402PlanOptions } from "./x402/plan.js";
+export { describePlan, mainnetFirstLine, mainnetOpeningLine, planMainnetDryRun, planX402Run } from "./x402/plan.js";
+export type {
+  EndpointPlan,
+  EndpointPlanStatus,
+  MainnetDryRunOptions,
+  MainnetReadings,
+  PlannedOption,
+  RunPlan,
+  X402PlanOptions,
+} from "./x402/plan.js";
 // The mainnet opt-in (spec B5): made by openMainnetOptIn only, for one run. The type is exported, the class is not.
 export {
   MAINNET_PAYER_KEY_ENV,
   MainnetRunRefusedError,
+  closeMainnetRun,
   openMainnetOptIn,
+  type MainnetCloseOptions,
+  type MainnetCloseResult,
   type MainnetOptInInput,
   type MainnetRunRefusal,
 } from "./guard/mainnet-run.js";

@@ -94,8 +94,26 @@ All notable changes to Wasit are recorded here. Versions follow [Semantic Versio
   on this machine), with no user name or password in it, and not through a
   redirect. The plan prints that URL (origin and path, never the query), and a
   payment the service sends anywhere else after the plan is refused. The run
-  budget values mainnet USDC (7 decimals). MPP never pays on mainnet. The CLI,
-  the Action and the MCP server do not use it yet.
+  budget values mainnet USDC (7 decimals). MPP never pays on mainnet. The
+  Action and the MCP server do not use it yet.
+- `wasit run --mainnet` pays real USDC on `stellar:pubnet` (x402 only), through
+  that opt-in: every rule above is checked before a service starts or the
+  target is asked anything, and a run that may not pay (a pull request, a run
+  in another CI) is refused, never turned into the read-only tier. Its first
+  line says `MAINNET RUN`, with the payer, the one payee and the caps; the plan
+  follows, then a second `MAINNET RUN` line with the run's worst case, then the
+  path of the run ledger (`--ledger-dir`, default the working directory, where
+  the lock is taken too). At the end the run waits until every authorization
+  it signed has expired (up to about five minutes), reads the payer's balances
+  again on public Horizon and closes the ledger with them: consistent, or not.
+  A run that stopped on a refusal, or whose ledger is not consistent, exits 2.
+  Without `--mainnet`, a paying run on `stellar:pubnet` is refused and says so.
+  `wasit run --dry-run` on `stellar:pubnet` plans by the mainnet rules without
+  a key and without reading the payer, the chain, the RPC or Horizon, and says
+  what a paying run still reads first. `@wasit-dev/core` exports the parts the
+  front ends share: `planMainnetDryRun`, `mainnetOpeningLine`, `closeMainnetRun`
+  (the wait, the balances after, the ledger closed, the lock released) and
+  `githubDefaultBranch`.
 
 **Fixed.**
 - On Stellar testnet the x402 client builds and simulates the payment through
