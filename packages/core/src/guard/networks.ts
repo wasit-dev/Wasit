@@ -8,12 +8,13 @@
  * third party using @wasit-dev/core get the same refusals; a guard in each
  * front end would be three copies, and one forgotten copy is a hole.
  *
- * `stellar:pubnet` has its own class because a later version may let an x402
- * run pay on it behind an explicit opt-in. This version has no such opt-in,
- * so this module has no path that allows it.
+ * `stellar:pubnet` has its own class: an x402 run pays on it only with a live
+ * mainnet opt-in (spec B5), which only core makes (`openMainnetOptIn`). MPP
+ * never pays on it.
  */
 
 import { ConfigurationError } from "../errors.js";
+import { isLiveOptIn, whyNotLive, type MainnetOptIn } from "./optin.js";
 
 /** How the guard treats a network. */
 export type NetworkClass = "test" | "mainnet-optin" | "unknown";
@@ -71,15 +72,22 @@ export class PaymentNetworkRefusedError extends ConfigurationError {
  * Throws unless a payment by `protocol` may be made on `network`.
  *
  * Call it before any request is sent and before any key or signer is used.
- * Only test networks pass. `stellar:pubnet` is refused for every protocol in
- * this version: MPP stays on test networks for good, and x402 on mainnet
- * needs an opt-in this version does not have.
+ * Test networks pass. `stellar:pubnet` passes for x402 only with `mainnet`, a
+ * live opt-in for it (made by core, neither stopped nor closed); MPP stays on
+ * test networks for good. Anything else is refused.
  *
- * @throws {PaymentNetworkRefusedError} For any network that is not a test network.
+ * @throws {PaymentNetworkRefusedError} For any network that is not a test network, but x402 on a live opt-in's.
  */
-export function assertPaymentNetworkAllowed(protocol: PaymentProtocol, network: string): void {
+export function assertPaymentNetworkAllowed(protocol: PaymentProtocol, network: string, mainnet?: MainnetOptIn): void {
   const kind = networkClass(network);
   if (kind === "test") return;
+
+  if (kind === "mainnet-optin" && protocol === "x402") {
+    if (isLiveOptIn(mainnet, network)) return;
+    // An opt-in core made, that is no longer live: say why, not that there is none.
+    const why = whyNotLive(mainnet, network);
+    if (why !== undefined) throw new PaymentNetworkRefusedError(protocol, network, kind, `${network} is Stellar mainnet, and ${why}.`);
+  }
 
   if (kind === "mainnet-optin") {
     throw new PaymentNetworkRefusedError(
@@ -102,3 +110,4 @@ export function assertPaymentNetworkAllowed(protocol: PaymentProtocol, network: 
       `(${testNetworks()}), so no payment is made on it.`,
   );
 }
+

@@ -74,7 +74,9 @@ export type MainnetPlanRefusal =
   /** The RPC's USDC balance of the payer differs from Horizon's, or has no reading. */
   | "balance"
   /** Horizon could not be read, or its answer cannot be trusted. */
-  | "horizon";
+  | "horizon"
+  /** The endpoint's URL: not https (and not on this machine), credentials in it, or a redirect elsewhere. */
+  | "endpoint";
 
 /**
  * A mainnet run does not start, or stops, because of one of L1's rules. A
@@ -125,6 +127,16 @@ export function assertMainnetPin(pin: PinTerms | undefined, payer: string): void
         "balance shows what the run paid.",
     );
   }
+}
+
+/**
+ * Where a URL pays, as a mainnet plan records it and L2 holds each payment to
+ * it: origin and path, the query and the fragment left out (a query may hold
+ * a key, and the plan is written to the ledger).
+ */
+export function paidUrlOf(target: string): string {
+  const url = new URL(target);
+  return `${url.origin}${url.pathname}`;
 }
 
 /** The fields of a challenge's option these rules judge. */

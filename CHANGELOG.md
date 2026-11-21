@@ -63,8 +63,7 @@ All notable changes to Wasit are recorded here. Versions follow [Semantic Versio
   pinned payee other than the payer, at a lifetime of 1 to 300 seconds, with
   the token's decimals read as 7; its RPC's latest ledger must be within 12
   ledgers of public Horizon's, and the payer's USDC balance through the RPC
-  must equal Horizon's (`readHorizonLatestLedger`, `readHorizonAccount`). The
-  run budget still values no mainnet asset.
+  must equal Horizon's (`readHorizonLatestLedger`, `readHorizonAccount`).
 - `@wasit-dev/core` has a run ledger (`RunLedger`), taken by the x402 payment
   checks as the `ledger` option. Each signature's intent (check, endpoint,
   amount, payee, asset) is written and flushed after the run is charged and
@@ -77,6 +76,26 @@ All notable changes to Wasit are recorded here. Versions follow [Semantic Versio
   closing it records the payer's balances and whether they moved as the
   ledger says. No CLI option writes one yet: it is the record a mainnet run
   will keep.
+- `@wasit-dev/core` has the mainnet opt-in for x402 on `stellar:pubnet`:
+  `openMainnetOptIn` is the one place it is made. It opens a run only when the
+  environment is on `stellar:pubnet` with `operatedByMe: true`, the key is in
+  `WASIT_MAINNET_PAYER_SECRET` (and in no other key variable), the pin pays
+  mainnet USDC to a payee that is not the payer, the RPC is https and serves
+  mainnet, the GitHub Actions job rules hold when it runs there, and no other
+  mainnet run holds the lock. The plan (`planX402Run` with `mainnet`) first
+  reads the token's decimals, the payer's USDC through the RPC and on public
+  Horizon ($10 at most, both equal) and the latest ledger on both, before the
+  service is asked anything; any endpoint it cannot plan, or a worst case above
+  what is left of the cap, refuses the whole run. The payment checks then pay
+  only through the opt-in's budget, pin, plan, ledger and RPC, with the mainnet
+  rules held again on every fresh challenge, and any refusal stops the whole
+  run: every later check is skipped with the reason and nothing more is
+  signed. A mainnet endpoint is paid only at the URL in the config: https (or
+  on this machine), with no user name or password in it, and not through a
+  redirect. The plan prints that URL (origin and path, never the query), and a
+  payment the service sends anywhere else after the plan is refused. The run
+  budget values mainnet USDC (7 decimals). MPP never pays on mainnet. The CLI,
+  the Action and the MCP server do not use it yet.
 
 **Fixed.**
 - On Stellar testnet the x402 client builds and simulates the payment through

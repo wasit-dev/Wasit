@@ -59,8 +59,13 @@ describe("the caps", () => {
 });
 
 describe("the US dollar assets", () => {
-  it("lists only test networks, each in the guard's table, and nothing on mainnet in this version", () => {
-    for (const entry of USD_ASSETS) {
+  it("lists test networks, each in the guard's table, and on mainnet only stellar:pubnet's USDC (the opt-in)", () => {
+    const mainnet = USD_ASSETS.filter((entry) => NETWORK_CLASSES.get(entry.network) !== "test");
+    assert.deepEqual(mainnet, [
+      { network: "stellar:pubnet", asset: "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75", decimals: 7, symbol: "USDC" },
+    ]);
+    assert.equal(NETWORK_CLASSES.get("stellar:pubnet"), "mainnet-optin");
+    for (const entry of USD_ASSETS.filter((item) => item.network !== "stellar:pubnet")) {
       assert.equal(NETWORK_CLASSES.get(entry.network), "test", entry.network);
     }
   });
@@ -85,7 +90,9 @@ describe("the US dollar assets", () => {
   it("does not value an asset on another network, or one it does not list", () => {
     assert.equal(usdAsset(BASE, STELLAR_USDC), undefined);
     assert.equal(usdAsset(STELLAR, BASE_USDC), undefined);
-    assert.equal(usdAsset("stellar:pubnet", "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75"), undefined);
+    // Mainnet USDC is valued on stellar:pubnet only (the opt-in), never on testnet.
+    assert.equal(usdAsset(STELLAR, "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75"), undefined);
+    assert.equal(usdAsset("stellar:pubnet", STELLAR_USDC), undefined);
   });
 
   it("formats a dollar amount exactly, with at least two decimals", () => {

@@ -223,8 +223,17 @@ export {
   formatUsd,
 } from "./guard/budget.js";
 export type { GuardRefusal, PinTerms, PlannedSignature } from "./guard/budget.js";
-export { describePlan, planX402Run } from "./x402/plan.js";
-export type { EndpointPlan, EndpointPlanStatus, PlannedOption, RunPlan, X402PlanOptions } from "./x402/plan.js";
+export { describePlan, mainnetFirstLine, planX402Run } from "./x402/plan.js";
+export type { EndpointPlan, EndpointPlanStatus, MainnetReadings, PlannedOption, RunPlan, X402PlanOptions } from "./x402/plan.js";
+// The mainnet opt-in (spec B5): made by openMainnetOptIn only, for one run. The type is exported, the class is not.
+export {
+  MAINNET_PAYER_KEY_ENV,
+  MainnetRunRefusedError,
+  openMainnetOptIn,
+  type MainnetOptInInput,
+  type MainnetRunRefusal,
+} from "./guard/mainnet-run.js";
+export type { MainnetFrontEnd, MainnetOptIn } from "./guard/optin.js";
 
 export * from "./x402/simulator.js";
 export * from "./mpp/channel.js";

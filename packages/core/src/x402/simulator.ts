@@ -13,11 +13,14 @@ import {
   RunBudget,
   assertPinned,
   sameAddress,
+  shown,
   type PinTerms,
 } from "../guard/budget.js";
-import { assertPaymentNetworkAllowed } from "../guard/networks.js";
+import { MainnetPlanRefusedError, assertMainnetOption, paidUrlOf } from "../guard/mainnet-plan.js";
+import { PaymentNetworkRefusedError, assertPaymentNetworkAllowed } from "../guard/networks.js";
+import { MainnetRunRefusedError, anchorOfOptIn, isLiveOptIn, type MainnetOptIn } from "../guard/optin.js";
 import { SigningAnchor, SigningGate, expirationOfSigned, type SigningTerms } from "../guard/signed-terms.js";
-import type { LedgerEntryHandle, PaymentLedger } from "../guard/run-ledger.js";
+import { RunLedgerError, type LedgerEntryHandle, type PaymentLedger } from "../guard/run-ledger.js";
 import { RpcIdentityError, assertRpcServesNetwork } from "../guard/rpc-identity.js";
 import type { EndpointPlan } from "./plan.js";
 import {
@@ -441,9 +444,17 @@ export interface X402PaymentCheckOptions extends RequestShape {
    * The run ledger of this endpoint (spec B5): each signature's intent is
    * written before the key is asked to sign, then what became of it. A ledger
    * that cannot take an intent stops that payment, with nothing signed.
-   * Required on mainnet; optional on a test network.
+   * Optional on a test network. On mainnet the opt-in's own ledger is used,
+   * and one handed in here is refused.
    */
   readonly ledger?: PaymentLedger;
+  /**
+   * The mainnet opt-in of the run (spec B5), made by `openMainnetOptIn`, its
+   * plan passed and its ledger open. On `stellar:pubnet` nothing is paid
+   * without it, and the checks pay by its budget, pin, plan, ledger and RPC
+   * only: a different one handed in beside it is refused.
+   */
+  readonly mainnet?: MainnetOptIn;
   /**
    * Called with one line when a check starts a long wait on the chain (X402-11
    * waits up to six minutes), so a log does not look stuck. The line holds no
@@ -507,13 +518,14 @@ async function buildX402Client(
   rpcUrl: string,
   pin: PinTerms | undefined,
   gate: SigningGate,
+  mainnet: MainnetOptIn | undefined,
 ) {
   const client = new x402Client();
   // L3 (spec B3): the SDK's own spend controls, set here rather than left to
   // its default, as a second implementation of the $1 cap. An adapter that
   // allows more assets replaces them and states the cap again (`evm.ts`).
   client.setSpendControls({ maxAmountPerPayment: `$${PER_PAYMENT_CAP_USD}` });
-  await chain.registerPayer(client, network, payerSecretKey, rpcUrl, gate);
+  await chain.registerPayer(client, network, payerSecretKey, rpcUrl, gate, mainnet);
   client
     // A challenge may offer several networks, including both Stellar ones.
     // The client's default pick is the first it supports, which would sign
@@ -744,8 +756,13 @@ async function signingTerms(
   anchor: SigningAnchor,
   payer: string,
   signing: PaymentRequirements,
+  readIfMissing: boolean,
 ): Promise<SigningTerms> {
   if (anchor.reading === undefined) {
+    // A mainnet run's anchor is read in its plan, beside public Horizon's latest ledger (B17.2), never here.
+    if (!readIfMissing) {
+      throw new PaymentGuardRefusedError("plan", "The mainnet run's latest ledger was not read in its plan, so no expiration can be bounded.");
+    }
     let latest: number;
     try {
       latest = await binding.latestUnit(network, rpcUrl);
@@ -787,6 +804,11 @@ async function signingTerms(
  * chain with a signed-terms gate (Stellar), the key signs only an
  * authorization for those same terms, and a payload that carries anything
  * else is discarded unsent.
+ *
+ * On mainnet (a live opt-in, spec B5) the fresh terms are also held to the
+ * mainnet rules (exact, USDC, a lifetime of at most 300 s), the ledger is the
+ * opt-in's, the anchor is the one its plan read, and a refusal here stops the
+ * whole run (B3): nothing more is signed in it.
  */
 async function preparePayment(
   options: X402PaymentCheckOptions,
@@ -796,10 +818,44 @@ async function preparePayment(
 ) {
   // L0 again at the one function every x402 signature goes through, whoever
   // reaches it: nothing is fetched or signed on a network that is not a test
-  // network.
-  assertPaymentNetworkAllowed("x402", options.network);
+  // network, but stellar:pubnet with a live mainnet opt-in.
+  assertPaymentNetworkAllowed("x402", options.network, options.mainnet);
+  const mainnet = isLiveOptIn(options.mainnet, options.network) ? options.mainnet : undefined;
+  if (mainnet === undefined) return signPayment(options, check, undefined, alter, beforeSigning);
+  try {
+    return await signPayment(options, check, mainnet, alter, beforeSigning);
+  } catch (error) {
+    if (isGuardRefusal(error)) mainnet.stop((error as Error).message);
+    throw error;
+  }
+}
+
+/** A refusal of Wasit's own guard, the ledger's included: on mainnet it stops the whole run (B3). */
+function isGuardRefusal(error: unknown): boolean {
+  return (
+    error instanceof PaymentGuardRefusedError ||
+    error instanceof PaymentNetworkRefusedError ||
+    error instanceof MainnetPlanRefusedError ||
+    error instanceof MainnetRunRefusedError ||
+    error instanceof RunLedgerError
+  );
+}
+
+async function signPayment(
+  options: X402PaymentCheckOptions,
+  check: string,
+  mainnet: MainnetOptIn | undefined,
+  alter?: (selected: PaymentRequirements) => AlteredSigning | Promise<AlteredSigning>,
+  beforeSigning?: (selected: PaymentRequirements) => Promise<void>,
+) {
   const chain = chainFor(options.network);
   const budget = options.budget ?? new RunBudget();
+  if (mainnet !== undefined && (budget !== mainnet.budget || options.ledger === undefined || chain.signedTerms === undefined)) {
+    throw new MainnetRunRefusedError(
+      "run",
+      `${check} on mainnet pays only through the run's own budget and ledger, with a signer that signs only the checked terms.`,
+    );
+  }
   const rpcUrl = chain.resolveRpcUrl(options.network, options.rpcUrl);
   const gate = new SigningGate();
   const { client, httpClient } = await buildX402Client(
@@ -809,9 +865,18 @@ async function preparePayment(
     rpcUrl,
     options.pin,
     gate,
+    mainnet,
   );
 
   const { paymentRequired, selected, idempotent, payUrl } = await readPaymentChallenge(options);
+  // On mainnet a payment goes to the one URL the plan recorded, never to one the service sends it to later.
+  if (mainnet !== undefined && (options.plan?.url === undefined || paidUrlOf(payUrl) !== options.plan.url)) {
+    throw new PaymentGuardRefusedError(
+      "plan",
+      `${check} would pay ${shown(paidUrlOf(payUrl))}, not the URL the plan recorded for this endpoint: the service ` +
+        `sent the request elsewhere after the plan.`,
+    );
+  }
 
   // L2, before anything is built: the service may change its challenge between
   // requests, so the plan alone is not enough.
@@ -823,6 +888,9 @@ async function preparePayment(
       throw new PaymentGuardRefusedError("accepted", `${check} would sign different ${field} terms than the target's.`);
     }
   }
+  // The mainnet rules on the terms about to be signed, not only on the plan's:
+  // a lifetime raised after the plan is refused here (B3, L2).
+  if (mainnet !== undefined) assertMainnetOption(signing);
   budget.charge({
     check,
     network: options.network,
@@ -848,7 +916,15 @@ async function preparePayment(
     // charged above, once, within this payment's lifetime.
     if (chain.signedTerms !== undefined) {
       gate.arm(
-        await signingTerms(chain.signedTerms, options.network, rpcUrl, anchorOf(budget), chain.payerAddress(options.payerSecretKey), signing),
+        await signingTerms(
+          chain.signedTerms,
+          options.network,
+          rpcUrl,
+          mainnet === undefined ? anchorOf(budget) : anchorOfOptIn(mainnet),
+          chain.payerAddress(options.payerSecretKey),
+          signing,
+          mainnet === undefined,
+        ),
       );
     }
     asked = true;
@@ -1736,10 +1812,24 @@ export const X402_PAYMENT_CHECK_IDS: readonly string[] = [
 export async function runX402PaymentChecks(
   input: X402PaymentCheckOptions,
 ): Promise<CheckResult[]> {
-  // One budget for every signature these checks make: the run's, when the
-  // caller shares one across endpoints, or this call's own $5.
-  const options: X402PaymentCheckOptions = { ...input, budget: input.budget ?? new RunBudget() };
+  const allChecks: ReadonlyArray<readonly [string, string]> = [
+    ["X402-06", "Signature Resubmit Accepted"],
+    ...NEGATIVE_CHECKS.map(([id, name]) => [id, name] as const),
+  ];
+  // A mainnet run stopped by an earlier refusal (B3): every check of this
+  // endpoint is skipped with the reason, and nothing is fetched or signed.
+  const stoppedBefore = stopReason(input.mainnet);
+  if (stoppedBefore !== undefined) {
+    const results = allChecks.map(([id, name]) => skipped(id, name, stoppedBefore));
+    for (const result of results) input.onResult?.(result);
+    return results;
+  }
+  let options: X402PaymentCheckOptions = input;
   try {
+    // One budget for every signature these checks make: the run's, when the
+    // caller shares one across endpoints, or this call's own $5. On mainnet,
+    // the opt-in's budget, pin, plan, ledger and RPC, and nothing else.
+    options = input.mainnet === undefined ? { ...input, budget: input.budget ?? new RunBudget() } : mainnetOptions(input);
     assertHttpUrl(options.target);
     buildInit(options);
     // The payment checks pay only where Wasit has an adapter, and X402-06 can
@@ -1748,21 +1838,24 @@ export async function runX402PaymentChecks(
     // after paying.
     const chain = chainFor(options.network);
     // L0: an adapter for the network is not permission to pay on it. Only a
-    // test network passes; stellar:pubnet waits for the mainnet opt-in, which
-    // this version does not have.
-    assertPaymentNetworkAllowed("x402", options.network);
+    // test network passes, and stellar:pubnet with a live mainnet opt-in.
+    assertPaymentNetworkAllowed("x402", options.network, options.mainnet);
     const rpcUrl = chain.resolveRpcUrl(options.network, options.rpcUrl);
     // A key for another chain, or a malformed one, would otherwise surface
     // mid-payment as a harness error. Checked here, it is what it is: the
     // run's configuration. The message never echoes the key.
+    let payer: string;
     try {
-      chain.payerAddress(options.payerSecretKey);
+      payer = chain.payerAddress(options.payerSecretKey);
     } catch (error) {
       if (error instanceof ConfigurationError) throw error;
       throw new ConfigurationError(
         `The payer key is not a valid ${chain.name} key (read from ${chain.payerKeyEnv} ` +
           `or --payer-key).`,
       );
+    }
+    if (options.mainnet !== undefined && payer !== options.mainnet.payer) {
+      throw stopMainnet(options.mainnet, "These checks were handed the key of another account than the mainnet run's payer.");
     }
     // The RPC signs and settles nothing itself, but the payment is built and
     // the settlement read through it: it must be one the client accepts and
@@ -1804,6 +1897,8 @@ export async function runX402PaymentChecks(
     }
     const failed = errored("X402-06", "Signature Resubmit Accepted", error);
     emit(failed);
+    const stopped = stopReason(options.mainnet);
+    if (stopped !== undefined) return skipNegatives(stopped);
     // If the payment flow could not be exercised at all, no altered variant of
     // it can be either, and none may be reported as a passing rejection.
     return skipNegatives(
@@ -1824,6 +1919,12 @@ export async function runX402PaymentChecks(
   }
 
   for (const [id, name, run] of NEGATIVE_CHECKS) {
+    // B3: once a mainnet run is stopped, nothing more is signed in it.
+    const stopped = stopReason(options.mainnet);
+    if (stopped !== undefined) {
+      emit(skipped(id, name, stopped));
+      continue;
+    }
     try {
       emit(await run(options, honest));
     } catch (error) {
@@ -1831,4 +1932,56 @@ export async function runX402PaymentChecks(
     }
   }
   return results;
+}
+
+/** Why a check of a stopped mainnet run is skipped; undefined while the run goes on, or with no opt-in. */
+function stopReason(mainnet: MainnetOptIn | undefined): string | undefined {
+  const reason: unknown = mainnet?.stopped;
+  if (reason === undefined) return undefined;
+  return `the mainnet run stopped, and nothing more is signed in it: ${sanitizeText(String(reason)).slice(0, 400)}`;
+}
+
+/** Stops `mainnet` with `message` and returns the error to throw. */
+function stopMainnet(mainnet: MainnetOptIn, message: string): MainnetRunRefusedError {
+  const error = new MainnetRunRefusedError("run", message);
+  mainnet.stop(error.message);
+  return error;
+}
+
+/**
+ * The options a mainnet run's checks pay by (spec B5): the opt-in's own
+ * budget, pin, plan entry, ledger and RPC. A value handed in beside it that is
+ * not the opt-in's is refused and the run stopped: on mainnet nothing is paid
+ * by terms core did not plan.
+ */
+function mainnetOptions(input: X402PaymentCheckOptions): X402PaymentCheckOptions {
+  const optIn = input.mainnet!;
+  if (input.network !== optIn.network) {
+    throw stopMainnet(optIn, `A mainnet opt-in was handed to checks on another network than ${optIn.network}.`);
+  }
+  // L0 first: a stopped, closed or forged opt-in is refused here, and says why.
+  assertPaymentNetworkAllowed("x402", input.network, optIn);
+  const plan = optIn.plan;
+  if (plan === undefined) throw stopMainnet(optIn, "The mainnet run has no plan that passed: its plan comes before any payment.");
+  const entry = input.plan;
+  if (entry === undefined || !plan.endpoints.includes(entry)) {
+    throw stopMainnet(optIn, "These checks were not handed an entry of the mainnet run's own plan.");
+  }
+  if (input.budget !== undefined && input.budget !== optIn.budget) {
+    throw stopMainnet(optIn, "These checks were handed another budget than the mainnet run's.");
+  }
+  if (input.pin !== undefined && (input.pin.payTo !== optIn.pin.payTo || input.pin.asset !== optIn.pin.asset)) {
+    throw stopMainnet(optIn, "These checks were handed another pin than the mainnet run's.");
+  }
+  if (input.rpcUrl !== undefined && input.rpcUrl !== optIn.rpcUrl) {
+    throw stopMainnet(optIn, "These checks were handed another RPC than the mainnet run's.");
+  }
+  if (input.ledger !== undefined) {
+    throw stopMainnet(optIn, "These checks were handed a ledger of their own: a mainnet run writes every signature to its own.");
+  }
+  const ledger = optIn.ledger;
+  if (ledger === undefined) {
+    throw stopMainnet(optIn, "The mainnet run's ledger is not open: on mainnet every signature is written to it first.");
+  }
+  return { ...input, budget: optIn.budget, pin: optIn.pin, rpcUrl: optIn.rpcUrl, ledger: ledger.forEndpoint(entry.name) };
 }
