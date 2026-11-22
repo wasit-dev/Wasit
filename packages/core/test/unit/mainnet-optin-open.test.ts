@@ -253,6 +253,46 @@ describe("L0 with the opt-in: stellar:pubnet for x402, only with a live one", ()
     );
   });
 
+  it("cannot be changed once core made it: not its fields, its methods or its state, nor its prototype", async () => {
+    const optIn = await open();
+    const other = Keypair.random().publicKey();
+    const fields = optIn as unknown as Record<string, unknown>;
+    const changes: Array<[string, unknown]> = [
+      ["rpcUrl", "https://other.invalid/"],
+      ["payer", other],
+      ["budget", new RunBudget()],
+      ["network", TESTNET],
+      ["ledgerDir", path.join(dir, "elsewhere")],
+      ["pin", { payTo: other, asset: PUBNET_USDC }],
+      ["environment", "other"],
+      ["frontEnd", "mcp"],
+      ["stop", () => undefined],
+      ["close", () => undefined],
+      ["openLedger", () => undefined],
+    ];
+    for (const [field, value] of changes) {
+      assert.throws(() => {
+        fields[field] = value;
+      }, TypeError, field);
+    }
+    assert.equal(optIn.rpcUrl, PUBNET_RPC);
+    assert.equal(optIn.payer, PAYER_KEY.publicKey());
+    const prototype = MainnetOptIn.prototype as unknown as Record<string, unknown>;
+    assert.throws(() => {
+      prototype["stop"] = () => undefined;
+    }, TypeError);
+    for (const target of [optIn, MainnetOptIn.prototype]) {
+      for (const name of ["stopped", "closed", "plan", "ledger"]) {
+        assert.throws(() => Object.defineProperty(target, name, { get: () => undefined }), TypeError, name);
+      }
+    }
+    assert.throws(() => Object.setPrototypeOf(optIn, {}), TypeError);
+    // So a stop holds: L0 refuses it, and says why.
+    optIn.stop("a guard refusal");
+    assert.equal(isLiveOptIn(optIn, PUBNET), false);
+    assert.throws(() => assertPaymentNetworkAllowed("x402", PUBNET, optIn), /a guard refusal/);
+  });
+
   it("refuses once the opt-in is stopped, and says why", async () => {
     const optIn = await open();
     optIn.stop("a guard refusal");

@@ -37,6 +37,8 @@ export interface PubnetState {
   decimals: unknown;
   rpcLatest: number;
   horizonLatest: number;
+  /** Amounts whose settlement the stand-in chain does not show (a reference it cannot match). */
+  readonly unverified: Set<bigint>;
 }
 
 export interface PubnetWorld {
@@ -63,6 +65,7 @@ export async function installPubnetWorld(): Promise<PubnetWorld> {
     decimals: 7,
     rpcLatest: 61_000_000,
     horizonLatest: 61_000_002,
+    unverified: new Set(),
   };
   const signed: PaymentRequirements[] = [];
   const reads: string[] = [];
@@ -115,7 +118,10 @@ export async function installPubnetWorld(): Promise<PubnetWorld> {
       return state.rpcUsdc;
     },
     isSettlementReference: (reference) => reference.startsWith("tx-"),
-    verifySettlement: async () => ({ pass: true, detail: "settled (stand-in chain)" }),
+    verifySettlement: async (_network, _rpc, _reference, expected) =>
+      state.unverified.has(expected.amount)
+        ? { pass: false, detail: "the stand-in chain shows no such transfer" }
+        : { pass: true, detail: "settled (stand-in chain)" },
     corruptPayload: (payload) => ({ ...payload, signature: "corrupted" }),
   };
   setPaymentChainsForTesting([chain]);

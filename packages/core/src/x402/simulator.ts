@@ -20,7 +20,7 @@ import { MainnetPlanRefusedError, assertMainnetOption, paidUrlOf } from "../guar
 import { PaymentNetworkRefusedError, assertPaymentNetworkAllowed } from "../guard/networks.js";
 import { MainnetRunRefusedError, anchorOfOptIn, isLiveOptIn, type MainnetOptIn } from "../guard/optin.js";
 import { SigningAnchor, SigningGate, expirationOfSigned, type SigningTerms } from "../guard/signed-terms.js";
-import { RunLedgerError, type LedgerEntryHandle, type PaymentLedger } from "../guard/run-ledger.js";
+import { RunLedgerError, type LedgerEntryHandle, type LedgerVerdict, type PaymentLedger } from "../guard/run-ledger.js";
 import { RpcIdentityError, assertRpcServesNetwork } from "../guard/rpc-identity.js";
 import type { EndpointPlan } from "./plan.js";
 import {
@@ -31,9 +31,11 @@ import {
   REJECTED_REQUEST_NAME,
   rejectRequestShape,
   rejectedRequestHardStopMs,
+  rejectedRequestSettlement,
   rejectedRequestVerdict,
   watchAuthorization,
   type RejectCase,
+  type RejectedRequestEvidence,
   type WatchOutcome,
 } from "./rejected-request.js";
 import { sanitizeText } from "../sanitize.js";
@@ -854,6 +856,7 @@ async function signPayment(
     throw new MainnetRunRefusedError(
       "run",
       `${check} on mainnet pays only through the run's own budget and ledger, with a signer that signs only the checked terms.`,
+      { during: true },
     );
   }
   const rpcUrl = chain.resolveRpcUrl(options.network, options.rpcUrl);
@@ -1437,13 +1440,70 @@ async function checkUnderpaymentRejected(options: X402PaymentCheckOptions): Prom
     }
     throw error;
   }
-  const { httpClient, paymentPayload, payUrl, entry } = prepared;
+  const { httpClient, paymentPayload, selected, payUrl, entry } = prepared;
   const response = await sendPayment(
     entry,
     payUrl,
     withPaymentHeaders(options, httpClient.encodePaymentSignatureHeader(paymentPayload)),
   );
-  return underpaymentVerdict(response.status, offered, advertised, await refusalReason(response));
+  const reason = await refusalReason(response);
+  const verdict = underpaymentVerdict(response.status, offered, advertised, reason);
+  if (verdict.pass) return verdict;
+  // Accepted: the lower amount may have settled. What the chain shows is
+  // added to the FAIL, and recorded in the run ledger, as X402-06 records its own.
+  const settlement = await underpaymentSettlement(options, httpClient, response, entry, offered, selected);
+  return settlement === "" ? verdict : { ...verdict, detail: `${verdict.detail}${settlement}` };
+}
+
+/**
+ * Whether the underpaid payment a target accepted settled, as X402-06 reads
+ * its own: the `PAYMENT-RESPONSE` names a transaction, which is looked up and
+ * held to the payment signed (the offered amount, the asset, payTo, the
+ * payer). Recorded in the run ledger, verified or not. Returns the sentence
+ * the FAIL adds; empty when the response names no settlement. A chain that
+ * gives no answer changes nothing in the FAIL: the target served for less.
+ */
+async function underpaymentSettlement(
+  options: X402PaymentCheckOptions,
+  httpClient: x402HTTPClient,
+  response: Response,
+  entry: LedgerEntryHandle | undefined,
+  offered: bigint,
+  selected: PaymentRequirements,
+): Promise<string> {
+  const chain = chainFor(options.network);
+  const read = readSettlementReference(
+    response.status,
+    () => httpClient.getPaymentSettleResponse((header) => response.headers.get(header)),
+    chain,
+  );
+  if ("failure" in read) return "";
+  const reference = read.reference;
+  let verdict: { readonly pass: boolean; readonly detail: string };
+  try {
+    verdict = await chain.verifySettlement(options.network, chain.resolveRpcUrl(options.network, options.rpcUrl), reference, {
+      amount: offered,
+      token: selected.asset,
+      recipient: selected.payTo,
+      payer: chain.payerAddress(options.payerSecretKey),
+    });
+  } catch (error) {
+    recordSettlement(entry, reference, false);
+    return ` Its PAYMENT-RESPONSE names ${reference}, which could not be read on chain (${sanitizeText((error as Error).message).slice(0, 200)}).`;
+  }
+  recordSettlement(entry, reference, verdict.pass);
+  return verdict.pass
+    ? ` It settled on chain: ${offered} base units moved from the payer to payTo in ${reference}, read back from the transfer event.`
+    : ` Its PAYMENT-RESPONSE names ${reference}, which the chain does not show as this payment: ${verdict.detail}`;
+}
+
+/** A settlement for the run ledger. A ledger that cannot take it leaves it unverified, which explains nothing. */
+function recordSettlement(entry: LedgerEntryHandle | undefined, reference: string, verified: boolean): void {
+  try {
+    entry?.settled(reference, verified);
+  } catch {
+    // The check's own verdict stands; the next intent finds the ledger broken and stops the run.
+  }
 }
 
 /** X402-09's verdict from the status the underpaid payment drew. */
@@ -1770,7 +1830,7 @@ async function checkRejectedRequestNotSettled(
     }
   }
 
-  return rejectedRequestVerdict({
+  const evidence: RejectedRequestEvidence = {
     status,
     ...(reason === undefined ? {} : { reason }),
     amount,
@@ -1779,7 +1839,12 @@ async function checkRejectedRequestNotSettled(
     watch: outcome,
     ...(balance === undefined ? {} : { balance }),
     ...(transfers === undefined ? {} : { transfers }),
-  });
+  };
+  // What the chain shows of this payment goes into the run ledger: a payment
+  // the service took for a request it must refuse is a settlement the chain verified.
+  const settlement = rejectedRequestSettlement(evidence);
+  if (settlement !== undefined) recordSettlement(entry, settlement, true);
+  return rejectedRequestVerdict(evidence);
 }
 
 /** The negative checks, in catalogue order, each with how it runs. */
@@ -1880,6 +1945,7 @@ export async function runX402PaymentChecks(
   const results: CheckResult[] = [];
   const emit = (result: CheckResult): void => {
     results.push(result);
+    recordVerdict(options.ledger, result);
     options.onResult?.(result);
   };
   const skipNegatives = (reason: string): CheckResult[] => {
@@ -1934,6 +2000,26 @@ export async function runX402PaymentChecks(
   return results;
 }
 
+/** What a result says about the target, as the run ledger records it. */
+function verdictOf(result: CheckResult): LedgerVerdict {
+  if (result.skipped === true) return "skipped";
+  if (result.error !== undefined) return "no-verdict";
+  return result.pass ? "pass" : "fail";
+}
+
+/**
+ * Records a check's verdict on its entries in the run ledger. A ledger that
+ * cannot take it keeps none, and a payment of that check then explains
+ * nothing when the balances are compared: the safe side.
+ */
+function recordVerdict(ledger: PaymentLedger | undefined, result: CheckResult): void {
+  try {
+    ledger?.verdict?.(result.id, verdictOf(result));
+  } catch {
+    // The result stands; see above.
+  }
+}
+
 /** Why a check of a stopped mainnet run is skipped; undefined while the run goes on, or with no opt-in. */
 function stopReason(mainnet: MainnetOptIn | undefined): string | undefined {
   const reason: unknown = mainnet?.stopped;
@@ -1943,7 +2029,7 @@ function stopReason(mainnet: MainnetOptIn | undefined): string | undefined {
 
 /** Stops `mainnet` with `message` and returns the error to throw. */
 function stopMainnet(mainnet: MainnetOptIn, message: string): MainnetRunRefusedError {
-  const error = new MainnetRunRefusedError("run", message);
+  const error = new MainnetRunRefusedError("run", message, { during: true });
   mainnet.stop(error.message);
   return error;
 }

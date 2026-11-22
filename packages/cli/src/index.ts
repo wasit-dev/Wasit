@@ -101,15 +101,17 @@ Full check catalogue (every check ID, spec reference, pass criteria):
   https://github.com/wasit-dev/wasit/blob/main/docs/CHECKS.md`,
   );
 
-// `.env` is loaded before a command's action, as it always was, with two
-// exceptions (spec A8 #2, A-A01): `wasit run` does not load it in CI, where the
-// working directory is a checked-out pull request and a `.env` it added could
-// steer the run; `wasit ci-report` never does, it has no use for it. CI is read
-// from the real environment, before any `.env` could change it.
+// `.env` is loaded before a command's action, as it always was, with three
+// exceptions (spec A8 #2, A-A01, B5): `wasit run` does not load it in CI, where
+// the working directory is a checked-out pull request and a `.env` it added
+// could steer the run; nor with --mainnet, whose key comes from the shell's
+// WASIT_MAINNET_PAYER_SECRET only, never from a file in the service's folder
+// that an agent could read; `wasit ci-report` never does, it has no use for it.
+// CI is read from the real environment, before any `.env` could change it.
 program.hook("preAction", (_program, action) => {
   const name = action.name();
   if (name === "ci-report") return;
-  if (name === "run" && inCi(process.env)) return;
+  if (name === "run" && (inCi(process.env) || action.opts()["mainnet"] === true)) return;
   loadDotenv();
 });
 
@@ -329,7 +331,8 @@ program
       "variable; an https RPC for stellar:pubnet is set (rpcUrl or WASIT_RPC_URL); the payer holds at most $10.00 of USDC; " +
       "no other mainnet run holds the lock; in GitHub Actions, the run is started by hand on the default branch on a " +
       "GitHub-hosted runner, tests a deployed service and has no other key variable set. Otherwise exit 2 before anything " +
-      "is started, sent or signed. Not with --read-only.",
+      "is started, sent or signed. With --mainnet, wasit run does not read .env: the variables come from the shell. " +
+      "Not with --read-only.",
     false,
   )
   .option(
@@ -360,8 +363,9 @@ On stellar:pubnet it pays only with --mainnet: the first line says MAINNET RUN; 
 plan reads the payer's balances on the RPC and public Horizon first; every signature
 is in the run ledger; one refusal stops the whole run (exit 2); at the end the run
 waits until every authorization it signed has expired (up to about five minutes),
-reads the payer's balances again and says whether they match the ledger (exit 2 when
-they do not).
+reads the payer's balances again and says whether they match the ledger: consistent;
+explained (more USDC left than the run verified settled, within the payments of
+checks that FAILed: exit 1, by the checks); or inconsistent (exit 2).
 In GitHub Actions it pays only on push to the default branch, schedule and
 workflow_dispatch; a pull request runs the read-only checks, and a payer key set on
 a run that may not pay is refused before the service starts. In another CI (CI set,

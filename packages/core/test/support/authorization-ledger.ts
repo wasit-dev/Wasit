@@ -176,6 +176,11 @@ export interface RejectPaywallOptions {
    * one repeats): a service that changes the lifetime between two reads.
    */
   readonly invalidUnpaidLifetimes?: readonly number[];
+  /**
+   * A lax service (B13 V6): a payment for less than the price, otherwise
+   * valid, is settled and served, with its PAYMENT-RESPONSE or without one.
+   */
+  readonly acceptUnderpayment?: "with-response" | "without-response";
 }
 
 export interface RejectPaywall {
@@ -272,12 +277,22 @@ export async function rejectPaywall(
         return;
       }
 
-      if (!valid) return challenge(response, "invalid_payment");
-      const reference = settle(ledger, payload, payTo);
+      const underpaid =
+        options.acceptUnderpayment !== undefined &&
+        payload !== undefined &&
+        price !== undefined &&
+        payload.signature !== "corrupted" &&
+        BigInt(payload.amount) < BigInt(price) &&
+        payload.maxTimeoutSeconds !== 1 &&
+        !ledger.used.has(payload.nonce);
+      if (!valid && !underpaid) return challenge(response, "invalid_payment");
+      const reference = settle(ledger, payload!, payTo);
       const settled = { success: true, transaction: reference, network: NETWORK, payer: PAYER };
       response.writeHead(200, {
         "content-type": "application/json",
-        "payment-response": Buffer.from(JSON.stringify(settled)).toString("base64"),
+        ...(underpaid && options.acceptUnderpayment === "without-response"
+          ? {}
+          : { "payment-response": Buffer.from(JSON.stringify(settled)).toString("base64") }),
       });
       response.end("{}");
     });

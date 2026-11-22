@@ -13,7 +13,12 @@
  * Each call opens its own mainnet run through core (`openMainnetOptIn`), which
  * checks every rule of the opt-in again (the key, the pin, the RPC, the lock),
  * on ONE budget for the whole process: $5.00, or the config's lower maxRunUsd
- * (Najmi, D-018). A restart resets it. One call at a time.
+ * (Najmi, D-018). A restart resets it. One call at a time. Once a call has
+ * opened its ledger and ends stopped, or with a ledger that does not match the
+ * payer's balances (or with the balances after not read), the tool refuses
+ * every later call of this process: a person reads the ledger, compares it
+ * with the chain, then restarts the server (B13: any mismatch, stop
+ * everything). An explained ledger does not lock it.
  *
  * This is the weakest switch (B5, B-A05): an MCP server takes its environment
  * from the client's configuration, so the mainnet key may sit where the agent
@@ -49,6 +54,7 @@ import {
   sanitizeText,
   urlOrigin,
   type CheckResult,
+  type LedgerResult,
   type MainnetCloseResult,
   type MainnetOptIn,
   type ResolvedEndpoint,
@@ -208,7 +214,8 @@ export function mainnetToolDescription(setup: MainnetSetup): string {
     `Every rule of the mainnet opt-in is checked before anything is signed, and each call writes a run ledger next to ` +
     `the config. The service must already be running: this tool never starts it. A call waits for every authorization ` +
     `it signed to expire (each lifetime is at most 300 s), then reads the payer's balances on public Horizon, so it can ` +
-    `take several minutes; a call the client cancels still runs to its end. One call at a time. The only argument is ` +
+    `take several minutes; a call the client cancels still runs to its end. One call at a time. A call that stops, or ` +
+    `whose ledger does not match the payer's balances, locks this tool until a person restarts the server. The only argument is ` +
     `the endpoint's name: the network, the payee, the amount and the RPC (${setup.run.rpcUrl === undefined ? "none" : urlOrigin(setup.run.rpcUrl)}) come from the config.`
   );
 }
@@ -232,7 +239,7 @@ export interface MainnetToolResult {
   readonly refused?: string;
   readonly ledgerPath?: string;
   /** The ledger against the balances after, on public Horizon; undefined when no ledger was opened. */
-  readonly consistent?: boolean;
+  readonly ledgerResult?: LedgerResult;
   /** Why the run stopped (B3), when it did. */
   readonly stopped?: string;
   /** What this call charged, what the process has charged, and the process's cap: dollar units. */
@@ -243,7 +250,10 @@ export interface MainnetToolResult {
 
 /** What a mainnet call's result says beside its checks. */
 export interface MainnetSummary {
-  /** The checks' outcome may stand: the run did not stop and its ledger is consistent. Else the result is no-verdict, as the CLI exits 2. */
+  /**
+   * The checks' outcome may stand: the run did not stop, and its ledger is consistent, or explained by checks
+   * that FAILed. Else the result is no-verdict, as the CLI exits 2.
+   */
   readonly trusted: boolean;
   /** The sentence the text ends with when it is not trusted; empty otherwise. */
   readonly caveat: string;
@@ -252,7 +262,8 @@ export interface MainnetSummary {
     readonly network: string;
     readonly payTo: string;
     readonly ledger: string;
-    readonly consistent: boolean;
+    /** "consistent", "explained" or "inconsistent" (also when the balances after were not read). */
+    readonly ledgerResult: LedgerResult;
     readonly stopped?: string;
     readonly spentUsd: string;
     readonly processSpentUsd: string;
@@ -262,11 +273,12 @@ export interface MainnetSummary {
 
 /** The summary of a call that ran its checks (`ledgerPath` set). */
 export function summarizeMainnetRun(setup: MainnetSetup, result: MainnetToolResult): MainnetSummary {
-  const trusted = result.stopped === undefined && result.consistent === true;
+  const ledgerResult = result.ledgerResult ?? "inconsistent";
+  const trusted = result.stopped === undefined && ledgerResult !== "inconsistent";
   const caveat = trusted
     ? ""
     : `No verdict: ${result.stopped === undefined ? "the run ledger does not match the payer's balances on public Horizon" : "the mainnet run stopped"}. ` +
-      "Compare the ledger with the chain by hand before the next mainnet run.";
+      "The mainnet tool is locked until the server is restarted: compare the ledger with the chain by hand first.";
   return {
     trusted,
     caveat,
@@ -274,7 +286,7 @@ export function summarizeMainnetRun(setup: MainnetSetup, result: MainnetToolResu
       network: setup.run.network,
       payTo: setup.run.pinned?.payTo ?? "",
       ledger: result.ledgerPath ?? "",
-      consistent: result.consistent === true,
+      ledgerResult,
       ...(result.stopped === undefined ? {} : { stopped: result.stopped }),
       spentUsd: formatUsd(result.spentUsd),
       processSpentUsd: formatUsd(result.processSpentUsd),
@@ -286,6 +298,9 @@ export function summarizeMainnetRun(setup: MainnetSetup, result: MainnetToolResu
 /** Calls that are running, per setup: one at a time. */
 const running = new WeakSet<MainnetSetup>();
 
+/** Why the mainnet tool of a setup is locked until the process restarts, with the ledger to read. */
+const locked = new WeakMap<MainnetSetup, string>();
+
 const NOTHING_SIGNED = /nothing (was|is) (started, sent or )?signed|nothing was sent and nothing was signed/i;
 
 /** What L4 found, in one line (the CLI's words). */
@@ -293,13 +308,22 @@ function ledgerLine(close: MainnetCloseResult): string {
   const file = close.ledgerPath ?? "(no ledger)";
   const consistency = close.consistency;
   if (consistency === undefined) return `Ledger: none was opened, so nothing was signed. ${close.problem ?? ""}`.trim();
-  if (consistency.consistent) {
+  if (consistency.result === "consistent") {
     return (
       `Ledger: consistent: the payer's USDC went down by exactly the settlements this run verified ` +
       `(${consistency.settledUsdc} base units), and its XLM did not move. ${file}`
     );
   }
+  if (consistency.result === "explained") return `Ledger: explained: ${consistency.reasons.join(" ")} ${file}`.replace(/\s+/g, " ").trim();
   return `Ledger: INCONSISTENT: ${consistency.reasons.join(" ")} ${close.problem ?? ""} ${file}`.replace(/\s+/g, " ").trim();
+}
+
+/** Why a call locked the tool, in one sentence that names its ledger. */
+function lockReason(stopped: string | undefined, close: MainnetCloseResult, ledgerPath: string): string {
+  const file = path.basename(close.ledgerPath ?? ledgerPath);
+  if (stopped !== undefined) return `an earlier call stopped (its ledger is ${file}).`;
+  if (close.problem !== undefined) return `the payer's balances after an earlier call were not read (its ledger is ${file}).`;
+  return `the ledger of an earlier call does not match the payer's balances (${file}).`;
 }
 
 function planEndpoint(endpoint: ResolvedEndpoint) {
@@ -319,7 +343,9 @@ function planEndpoint(endpoint: ResolvedEndpoint) {
  * left of the process's budget, opens the ledger, runs the read checks and the
  * payment checks, then waits for every authorization to expire, reads the
  * balances after and closes. The run is closed on every way out; a refusal
- * before the checks returns `refused`, with nothing signed.
+ * before the checks returns `refused`, with nothing signed. A call that opened
+ * its ledger and did not end with a trusted ledger (not stopped; consistent or
+ * explained) locks the tool for the rest of the process, whatever ended it.
  */
 export async function runMainnetEndpoint(setup: MainnetSetup, name: string, io: MainnetToolIo): Promise<MainnetToolResult> {
   const lines: string[] = [];
@@ -337,6 +363,13 @@ export async function runMainnetEndpoint(setup: MainnetSetup, name: string, io: 
     return result({ refused: NOTHING_SIGNED.test(text) ? text : `${text} Nothing was signed.` });
   };
 
+  const lock = locked.get(setup);
+  if (lock !== undefined) {
+    return refuse(
+      `The mainnet tool of this server is locked: ${lock} Read that ledger, compare it with the payer's account on ` +
+        `the chain, then restart the server to use the mainnet tool again. Nothing was sent.`,
+    );
+  }
   const endpoint = setup.run.endpoints.find((entry) => entry.name === name && entry.protocol === "x402");
   if (endpoint === undefined || !setup.endpoints.includes(name)) {
     return refuse(
@@ -372,6 +405,9 @@ export async function runMainnetEndpoint(setup: MainnetSetup, name: string, io: 
 
     const closeOptions = { ...(io.sleep === undefined ? {} : { sleep: io.sleep }), onProgress: say };
     let close: MainnetCloseResult | undefined;
+    // Set once the ledger is open: from then on, only a trusted end leaves the tool unlocked.
+    let openedLedger: string | undefined;
+    let trustedEnd = false;
     try {
       // B5: the first line, before the target is asked anything.
       say(mainnetOpeningLine(optIn));
@@ -396,6 +432,7 @@ export async function runMainnetEndpoint(setup: MainnetSetup, name: string, io: 
         if (error instanceof ConfigurationError || error instanceof CheckSetupError) return refuse(error.message);
         throw error;
       }
+      openedLedger = ledgerPath;
       say(`Ledger: ${ledgerPath}: every signature is written there before the key signs.`);
 
       const shape = {
@@ -431,15 +468,20 @@ export async function runMainnetEndpoint(setup: MainnetSetup, name: string, io: 
       say(ledgerLine(close));
       const stopped = optIn.stopped;
       if (stopped !== undefined) say(`The mainnet run stopped: ${stopped}`);
-      return result({
-        results,
-        ledgerPath,
-        consistent: close.consistency?.consistent === true,
-        ...(stopped === undefined ? {} : { stopped }),
-      });
+      const ledgerResult = close.consistency?.result ?? "inconsistent";
+      if (stopped === undefined && ledgerResult !== "inconsistent") trustedEnd = true;
+      else {
+        locked.set(setup, lockReason(stopped, close, ledgerPath));
+        say("The mainnet tool is now locked until the server is restarted: compare the ledger with the chain by hand first.");
+      }
+      return result({ results, ledgerPath, ledgerResult, ...(stopped === undefined ? {} : { stopped }) });
     } finally {
       // Every way out closes the run; one that signed waits for its authorizations first.
       if (close === undefined) await closeMainnetRun(optIn, closeOptions);
+      // A call that opened its ledger and did not end trusted (a throw included) locks the tool.
+      if (openedLedger !== undefined && !trustedEnd && !locked.has(setup)) {
+        locked.set(setup, `an earlier call did not finish (its ledger is ${path.basename(openedLedger)}).`);
+      }
     }
   } finally {
     running.delete(setup);

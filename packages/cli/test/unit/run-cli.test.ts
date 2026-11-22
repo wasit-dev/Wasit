@@ -17,6 +17,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { after, before, describe, it } from "node:test";
 
+import { Keypair } from "@stellar/stellar-sdk";
+
 import { challengeHeader, freePort, startPaywall, writeConfig } from "./run-helpers.js";
 
 const CLI = fileURLToPath(new URL("../../dist/index.js", import.meta.url));
@@ -220,6 +222,47 @@ describe("the wasit binary", () => {
       } finally {
         await paywall.close();
       }
+    });
+  });
+
+  describe(".env and --mainnet (B5: the key from the shell's variable only)", () => {
+    let dir: string;
+    const key = Keypair.random();
+    before(async () => {
+      dir = await mkdtemp(path.join(tmpdir(), "wasit-dotenv-mainnet-"));
+      // A key left in a file beside the service, and an RPC: a mainnet run reads neither.
+      await writeFile(path.join(dir, ".env"), `WASIT_MAINNET_PAYER_SECRET=${key.secret()}\nWASIT_RPC_URL=https://127.0.0.1:9/from-dotenv\n`);
+      await writeFile(
+        path.join(dir, "wasit.config.json"),
+        JSON.stringify({
+          version: 1,
+          environments: {
+            mainnet: {
+              baseUrl: "http://127.0.0.1:9",
+              network: "stellar:pubnet",
+              operatedByMe: true,
+              pinned: { payTo: Keypair.random().publicKey(), asset: "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75" },
+            },
+          },
+          endpoints: [{ name: "weather", protocol: "x402", path: "/weather", method: "GET" }],
+        }),
+      );
+    });
+    after(async () => {
+      await rm(dir, { recursive: true, force: true });
+    });
+
+    it("is not read by wasit run --mainnet: the key in .env is not found, exit 2, nothing started", async () => {
+      const result = await wasit(["run", "--mainnet", "--env", "mainnet"], dir);
+      assert.equal(result.code, 2, result.stderr);
+      assert.match(result.stderr, /WASIT_MAINNET_PAYER_SECRET is not set: a mainnet run reads its key from that variable only/);
+      assert.ok(!(result.stdout + result.stderr).includes(key.secret()), "the key was printed");
+      assert.ok(!/from-dotenv/.test(result.stdout + result.stderr), "the RPC of .env was read");
+    });
+
+    it("says so in --mainnet's help", async () => {
+      const result = await wasit(["run", "--help"], cwd);
+      assert.match(result.stdout.replace(/\s+/g, " "), /With --mainnet, wasit run does not read \.env: the variables come from the shell/);
     });
   });
 

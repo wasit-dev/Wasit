@@ -28,6 +28,11 @@ All notable changes to Wasit are recorded here. Versions follow [Semantic Versio
   a testnet token whose `transfer` needs further authorized calls. A payment
   whose built transaction carries anything but that one signed authorization
   is discarded unsent.
+- When a target accepts `X402-09`'s underpayment and names a settlement in its
+  `PAYMENT-RESPONSE`, Wasit looks that transaction up as it does `X402-06`'s,
+  and the FAIL says whether the chain shows the offered amount moved from the
+  payer to `payTo`. The verdict is the same FAIL; a chain that gives no answer
+  leaves it as it was.
 - A payment run on Stellar refuses an `http://` RPC (`rpcUrl` in the config,
   `WASIT_RPC_URL`, `--rpc-url`, the MCP tools' `rpcUrl`) before anything is
   sent, and `wasit run` refuses it before it starts the service: the x402
@@ -68,11 +73,17 @@ All notable changes to Wasit are recorded here. Versions follow [Semantic Versio
   before the key is asked to sign; a ledger that cannot take it stops that
   payment with nothing signed. Then its outcome: signed with the ledger its
   authorization expires at (read from what the key signed), not signed, or
-  unknown; discarded unsent, or sent with the answer's status; and X402-06's
-  settlement. The file (`wasit-ledger-<UTC time>.json`) is created new, never
+  unknown; discarded unsent, or sent with the answer's status; the settlements
+  the chain shows (`X402-06`'s, an underpayment `X402-09` found accepted and
+  settled, a payment `X402-11` found taken); and the verdict of each entry's
+  check. The file (`wasit-ledger-<UTC time>.json`) is created new, never
   overwritten, and rewritten whole on every change so it stays valid JSON;
   closing it records the payer's balances and whether they moved as the
-  ledger says. Every mainnet run writes one.
+  ledger says: consistent; explained (the payer's XLM did not move, and its
+  USDC went down by more than the settlements the run verified, but by no more
+  than the payments, sent and not verified, of checks that FAILed: a service
+  that settles what it should refuse); or inconsistent. Every mainnet run
+  writes one.
 - `@wasit-dev/core` has the mainnet opt-in for x402 on `stellar:pubnet`:
   `openMainnetOptIn` is the one place it is made. It opens a run only when the
   environment is on `stellar:pubnet` with `operatedByMe: true`, the key is in
@@ -101,8 +112,11 @@ All notable changes to Wasit are recorded here. Versions follow [Semantic Versio
   path of the run ledger (`--ledger-dir`, default the working directory, where
   the lock is taken too). At the end the run waits until every authorization
   it signed has expired (up to about five minutes), reads the payer's balances
-  again on public Horizon and closes the ledger with them: consistent, or not.
-  A run that stopped on a refusal, or whose ledger is not consistent, exits 2.
+  again on public Horizon and closes the ledger with them: consistent,
+  explained or inconsistent. A run that stopped on a refusal, or whose ledger
+  is inconsistent, exits 2; an explained one exits by its checks (1, for the
+  FAILs that explain it). `wasit run --mainnet` does not read `.env`: its
+  variables come from the shell.
   Without `--mainnet`, a paying run on `stellar:pubnet` is refused and says so.
   `wasit run --dry-run` on `stellar:pubnet` plans by the mainnet rules without
   a key and without reading the payer, the chain, the RPC or Horizon, and says
@@ -127,8 +141,13 @@ All notable changes to Wasit are recorded here. Versions follow [Semantic Versio
   exit 2. Each call opens its own mainnet run, one at a time, on one budget
   for the whole process ($5.00, or the config's lower `maxRunUsd`; a restart
   resets it), writes its ledger next to the config, and runs to its end even
-  when the client cancels it. The other tools still refuse `stellar:pubnet`,
-  and `--mainnet` among the server's arguments still stops it.
+  when the client cancels it. A call that stops, or whose ledger is
+  inconsistent (its balances after unread included), locks the tool for the
+  rest of the process: every later call is refused until a person has
+  compared the ledger with the chain and restarted the server. An explained
+  ledger does not lock it. The result's `mainnet.ledgerResult` says which. The
+  other tools still refuse `stellar:pubnet`, and `--mainnet` among the
+  server's arguments still stops it.
 
 **Removed.**
 - `@wasit-dev/core` no longer exports `refuseMainnetSwitch`,

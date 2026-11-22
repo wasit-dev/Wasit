@@ -17,8 +17,13 @@
  * unsent, or sent with the answer's status, and the settlement if any. An
  * entry with no outcome reads as "assume signed and sent".
  *
- * Balances before and after the run (USDC and XLM) and whether they are
- * consistent with what the ledger says settled close it.
+ * Each entry also takes the verdict of the check it belongs to, once that
+ * check has one. Balances before and after the run (USDC and XLM) close it,
+ * with whether they are consistent with what the ledger says settled:
+ * consistent, explained (the payer paid more than the settlements the run
+ * verified, but no more than the payments of checks that FAILed, which a
+ * service that takes what it should refuse may have settled), or
+ * inconsistent.
  *
  * No secret: the payer is named by its public address, the RPC by its origin,
  * and free text is cut, with anything shaped like a Stellar secret or a 64-hex
@@ -84,6 +89,9 @@ export type LedgerEntryState =
   /** The client failed when it may already have signed. Read as signed. */
   | "unknown";
 
+/** What the check a signature belongs to found, as the ledger records it. */
+export type LedgerVerdict = "pass" | "fail" | "no-verdict" | "skipped";
+
 /** One signature of the run, as the file holds it. */
 export interface LedgerEntry {
   readonly id: number;
@@ -105,6 +113,8 @@ export interface LedgerEntry {
   readonly discarded?: string;
   readonly sent?: { readonly at: string; readonly status?: number; readonly error?: string };
   readonly settlement?: { readonly reference: string; readonly verified: boolean };
+  /** The verdict of the check this signature belongs to; absent until that check has one. */
+  readonly verdict?: LedgerVerdict;
 }
 
 /** What a payment check records about one signature. */
@@ -132,10 +142,28 @@ export interface PaymentLedger {
     readonly payTo: string;
     readonly amount: string;
   }): LedgerEntryHandle;
+  /**
+   * Records `check`'s verdict on every entry of it that has none yet. Only a
+   * FAIL recorded here can explain USDC the run did not verify settled; a
+   * ledger without this method, or one that cannot write it, explains none.
+   */
+  verdict?(check: string, verdict: LedgerVerdict): void;
 }
+
+/**
+ * How the payer's balances compare with the ledger. `consistent`: its USDC
+ * went down by exactly the settlements the run verified, and its XLM did not
+ * move. `explained`: its XLM did not move, and its USDC went down by more
+ * than the verified settlements, but by no more than the payments, signed and
+ * sent, of checks that FAILed (each counted once): a service that settles
+ * what it should refuse. Anything else is `inconsistent`.
+ */
+export type LedgerResult = "consistent" | "explained" | "inconsistent";
 
 /** Whether the payer's balances moved as the ledger says they should have. */
 export interface LedgerConsistency {
+  readonly result: LedgerResult;
+  /** True only when `result` is "consistent". */
   readonly consistent: boolean;
   readonly reasons: readonly string[];
   /** USDC that left the payer, in base units, when both readings exist. */
@@ -187,7 +215,7 @@ export class RunLedger {
   readonly #entries: MutableEntry[] = [];
   #before: Readings | undefined;
   #after: Readings | undefined;
-  #result: { consistent: boolean; reasons: readonly string[] } | undefined;
+  #result: { result: LedgerResult; reasons: readonly string[] } | undefined;
   #closedAt: string | undefined;
 
   private constructor(path: string, header: RunLedgerHeader, now: () => Date) {
@@ -237,7 +265,11 @@ export class RunLedger {
 
   /** The payment ledger of one endpoint's checks. */
   public forEndpoint(endpoint: string): PaymentLedger {
-    return { intent: (entry) => this.#intent(endpoint, entry) };
+    const name = note(endpoint);
+    return {
+      intent: (entry) => this.#intent(endpoint, entry),
+      verdict: (check, verdict) => this.#verdict(name, check, verdict),
+    };
   }
 
   /** The payer's balances before the first signature, and where they were read. */
@@ -257,7 +289,7 @@ export class RunLedger {
     if (input.after !== undefined) this.#after = this.#readings(input.after, input.source ?? "");
     const before = this.#before === undefined ? undefined : { usdc: BigInt(this.#before.usdc), native: BigInt(this.#before.native) };
     const result = ledgerConsistency(before, input.after, this.entries);
-    this.#result = { consistent: result.consistent, reasons: result.reasons };
+    this.#result = { result: result.result, reasons: result.reasons };
     this.#closedAt = this.#now().toISOString();
     this.#flush();
     return result;
@@ -295,6 +327,20 @@ export class RunLedger {
       throw new RunLedgerError(`${(error as Error).message} Nothing was signed.`);
     }
     return this.#handle(entry);
+  }
+
+  #verdict(endpoint: string, check: string, verdict: LedgerVerdict): void {
+    this.#assertOpen();
+    if (!LEDGER_VERDICTS.has(verdict)) throw new RunLedgerError("The run ledger takes a check's verdict as pass, fail, no-verdict or skipped.");
+    const id = note(check);
+    let changed = false;
+    for (const entry of this.#entries) {
+      if (entry.endpoint === endpoint && entry.check === id && entry.verdict === undefined) {
+        entry.verdict = verdict;
+        changed = true;
+      }
+    }
+    if (changed) this.#flush();
   }
 
   #handle(entry: MutableEntry): LedgerEntryHandle {
@@ -364,7 +410,7 @@ export class RunLedger {
       ...(this.#before === undefined ? {} : { balancesBefore: this.#before }),
       entries: this.#entries,
       ...(this.#after === undefined ? {} : { balancesAfter: this.#after }),
-      result: this.#result === undefined ? "open" : this.#result.consistent ? "consistent" : "inconsistent",
+      result: this.#result === undefined ? "open" : this.#result.result,
       ...(this.#result === undefined ? {} : { reasons: this.#result.reasons }),
       ...(this.#closedAt === undefined ? {} : { closedAt: this.#closedAt }),
     };
@@ -420,17 +466,28 @@ function syncDirectory(dir: string): void {
   }
 }
 
+const LEDGER_VERDICTS: ReadonlySet<string> = new Set<LedgerVerdict>(["pass", "fail", "no-verdict", "skipped"]);
+
 /** An entry that holds a signature, or may: everything but "not-signed". */
 function maySign(entry: LedgerEntry): boolean {
   return entry.state !== "not-signed";
 }
 
+/** An entry whose payment may have reached the service: it may be signed, and was not discarded unsent. */
+function maySend(entry: LedgerEntry): boolean {
+  return maySign(entry) && entry.discarded === undefined;
+}
+
 /**
- * Whether the payer's balances moved as the ledger says: its USDC went down by
- * exactly the amounts of the settlements the run verified on chain, and its
- * XLM did not move (on Stellar the facilitator pays the fees; Wasit sends no
- * transaction from the payer). The reasons also name every entry with no
- * recorded outcome, which is read as signed and sent.
+ * Whether the payer's balances moved as the ledger says (see
+ * {@link LedgerResult}). On Stellar the facilitator pays the fees and Wasit
+ * sends no transaction from the payer, so its XLM must not move. The USDC
+ * the run verified settled is the sum of the entries whose settlement it read
+ * back from the chain. More than that is explained only by the entries, sent
+ * and not verified, of checks that FAILed: a check with no verdict, a SKIP or
+ * a PASS explains nothing, and neither does a payment discarded unsent. The
+ * reasons also name every entry with no recorded outcome, which is read as
+ * signed and sent.
  */
 export function ledgerConsistency(
   before: LedgerBalances | undefined,
@@ -448,28 +505,46 @@ export function ledgerConsistency(
   const settledUsdc = entries
     .filter((entry) => entry.settlement?.verified === true)
     .reduce((sum, entry) => sum + BigInt(entry.amount), 0n);
+  const inconsistent = (lines: readonly string[], spentUsdc?: bigint): LedgerConsistency => ({
+    result: "inconsistent",
+    consistent: false,
+    reasons: [...lines, ...reasons],
+    ...(spentUsdc === undefined ? {} : { spentUsdc }),
+    settledUsdc,
+  });
   if (before === undefined || after === undefined) {
-    return {
-      consistent: false,
-      reasons: ["The payer's balances before and after the run were not both read.", ...reasons],
-      settledUsdc,
-    };
+    return inconsistent(["The payer's balances before and after the run were not both read."]);
   }
   const spentUsdc = before.usdc - after.usdc;
-  let consistent = true;
-  if (spentUsdc !== settledUsdc) {
-    consistent = false;
-    reasons.unshift(
-      `The payer's USDC went down by ${spentUsdc} base units, and the settlements this run verified add up to ${settledUsdc}.`,
-    );
-  }
+  const problems: string[] = [];
   if (before.native !== after.native) {
-    consistent = false;
-    reasons.unshift(
-      `The payer's XLM changed by ${after.native - before.native} stroops; Wasit sends no transaction from the payer.`,
+    problems.push(`The payer's XLM changed by ${after.native - before.native} stroops; Wasit sends no transaction from the payer.`);
+  }
+  const gap = spentUsdc - settledUsdc;
+  const failed = entries.filter((entry) => maySend(entry) && entry.settlement?.verified !== true && entry.verdict === "fail");
+  const failedUsdc = failed.reduce((sum, entry) => sum + BigInt(entry.amount), 0n);
+  const explained = gap > 0n && gap <= failedUsdc;
+  if (gap !== 0n && !explained) {
+    problems.push(
+      `The payer's USDC went down by ${spentUsdc} base units, and the settlements this run verified add up to ${settledUsdc}` +
+        (gap > 0n && failedUsdc > 0n ? `; the payments of the checks that FAILed add up to only ${failedUsdc} more.` : "."),
     );
   }
-  return { consistent, reasons, spentUsdc, settledUsdc };
+  if (problems.length > 0) return inconsistent(problems, spentUsdc);
+  if (!explained) return { result: "consistent", consistent: true, reasons, spentUsdc, settledUsdc };
+  return {
+    result: "explained",
+    consistent: false,
+    reasons: [
+      `The payer's USDC went down by ${spentUsdc} base units: ${settledUsdc} in the settlements this run verified, and ` +
+        `${gap} more, within the ${failedUsdc} of payments sent for checks that FAILed (` +
+        failed.map((entry) => `${entry.check} of ${entry.endpoint}, entry ${entry.id}, ${entry.amount}`).join("; ") +
+        `): the service settled payments it should have refused. Its XLM did not move.`,
+      ...reasons,
+    ],
+    spentUsdc,
+    settledUsdc,
+  };
 }
 
 /**

@@ -181,6 +181,10 @@ describe("paying on stellar:pubnet with a live opt-in", () => {
       refusedAtPreflight(results, targets.get("weather")!);
       assert.ok(optIn.stopped !== undefined, `${label}: the run was not stopped`);
       assert.ok(!JSON.stringify(results).includes(PAYER_KEY.secret()), `${label}: the key is in the results`);
+      // A stop of a run that is open: an earlier endpoint may have paid, so the words are about what comes next.
+      const detail = results[0]?.detail ?? "";
+      assert.match(detail, /Nothing more is signed in this run\.$/, `${label}: ${detail}`);
+      assert.doesNotMatch(detail, /Nothing was started, sent or signed/, label);
     }
   });
 

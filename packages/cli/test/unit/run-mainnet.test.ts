@@ -322,7 +322,8 @@ describe("wasit run --mainnet", () => {
 
     it("says MAINNET RUN in its first line, before anything else is printed, then plans, pays, waits, and closes the ledger", async () => {
       wall = await pubnetWall({ "/weather": [pubnetOption(payTo, CENT)] });
-      // The settlement leaves the payer's USDC on Horizon once the run has paid: consistent.
+      // The settlements leave the payer's USDC on Horizon once the run has paid: X402-06's cent and the half cent
+      // of X402-09, whose underpayment the stand-in paywall serves and settles. Both are verified: consistent.
       const sleep = world.sleep(10);
       let moved = false;
       const result = await executeRun(
@@ -335,7 +336,7 @@ describe("wasit run --mainnet", () => {
           sleep: async (ms) => {
             if (!moved) {
               moved = true;
-              world.state.horizonUsdc = world.state.horizonUsdc! - CENT;
+              world.state.horizonUsdc = world.state.horizonUsdc! - CENT - CENT / 2n;
               world.state.rpcUsdc = world.state.horizonUsdc;
             }
             await sleep(ms);
@@ -408,6 +409,41 @@ describe("wasit run --mainnet", () => {
       assert.ok(statuses.includes("X402-07 FAIL"), statuses.join(", "));
       assert.match(result.stderr, /the run stopped/);
       assert.equal(result.code, 2, statuses.join(", "));
+    });
+
+    it("exits by the checks when the ledger is explained: more USDC left than was verified, within the FAILed checks' payments", async () => {
+      wall = await pubnetWall({ "/weather": [pubnetOption(payTo, CENT)] });
+      // The service settles X402-09's half cent, but the chain shows no such transfer for it: unverified, and X402-09 FAILs.
+      world.state.unverified.add(CENT / 2n);
+      const sleep = world.sleep(10);
+      let moved = false;
+      const lines: string[] = [];
+      const result = await executeRun(
+        { config: await config(["weather"]), readOnly: false, json: false, start: false, mainnet: true, ledgerDir },
+        {
+          env: { PATH: process.env["PATH"] ?? "", WASIT_MAINNET_PAYER_SECRET: payer.secret() },
+          stdout: (line) => lines.push(line),
+          stderr: (line) => lines.push(line),
+          cwd: dir,
+          sleep: async (ms) => {
+            if (!moved) {
+              moved = true;
+              world.state.horizonUsdc = world.state.horizonUsdc! - CENT - CENT / 2n;
+              world.state.rpcUsdc = world.state.horizonUsdc;
+            }
+            await sleep(ms);
+          },
+        },
+      );
+      assert.equal(result, 1, lines.slice(-6).join("\n"));
+      assert.ok(lines.some((line) => /^Ledger: explained: The payer's USDC went down by 150000 base units: 100000 in the settlements this run verified, and 50000 more/.test(line)), lines.slice(-6).join("\n"));
+      assert.ok(lines.some((line) => /^Note: Run ledger wasit-ledger-.*: explained/.test(line)));
+      assert.ok(!lines.some((line) => /the run ledger is not consistent/.test(line)));
+      const file = readLedger();
+      assert.equal(file["result"], "explained", JSON.stringify(file["reasons"]));
+      const entries = file["entries"] as Array<{ check: string; verdict?: string; settlement?: { verified: boolean } }>;
+      assert.deepEqual(entries.find((entry) => entry.check === "X402-09")?.settlement?.verified, false);
+      assert.equal(entries.find((entry) => entry.check === "X402-09")?.verdict, "fail");
     });
 
     it("exits 2 when the ledger is not consistent: the payer's USDC did not move as the settlements say", async () => {

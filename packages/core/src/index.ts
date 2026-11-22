@@ -193,6 +193,8 @@ export {
   type LedgerEntry,
   type LedgerEntryHandle,
   type LedgerEntryState,
+  type LedgerResult,
+  type LedgerVerdict,
   type PaymentLedger,
   type RunLedgerHeader,
 } from "./guard/run-ledger.js";

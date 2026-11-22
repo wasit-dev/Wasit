@@ -714,12 +714,13 @@ function ledgerLine(close: MainnetCloseResult): string {
   const file = close.ledgerPath ?? "(no ledger)";
   const consistency = close.consistency;
   if (consistency === undefined) return `Ledger: none was opened, so nothing was signed. ${close.problem ?? ""}`.trim();
-  if (consistency.consistent) {
+  if (consistency.result === "consistent") {
     return (
       `Ledger: consistent: the payer's USDC went down by exactly the settlements this run verified ` +
       `(${consistency.settledUsdc} base units), and its XLM did not move. ${file}`
     );
   }
+  if (consistency.result === "explained") return `Ledger: explained: ${consistency.reasons.join(" ")} ${file}`.replace(/\s+/g, " ").trim();
   return `Ledger: INCONSISTENT: ${consistency.reasons.join(" ")} ${close.problem ?? ""} ${file}`.replace(/\s+/g, " ").trim();
 }
 
@@ -829,17 +830,19 @@ async function executeMainnetRun(
     const stopped = optIn.stopped;
     if (stopped !== undefined) stderr(`wasit run --mainnet: the run stopped: ${stopped}`);
 
-    const consistent = close.consistency?.consistent === true;
+    // Explained: the payer paid more than the verified settlements, within the payments of checks that FAILed.
+    const ledgerResult = close.consistency?.result ?? "inconsistent";
     const notes = [
       `Tier: MAINNET payment on ${resolved.network}: real funds. The run charged ${formatUsd(optIn.budget.spentUsd)} of the ` +
         `${formatUsd(optIn.budget.capUsd)} cap, at most $${PER_PAYMENT_CAP_USD}.00 a payment; every signature is counted as if it settled.`,
-      `Run ledger ${path.basename(ledgerPath)}: ${consistent ? "consistent" : "inconsistent"} with the payer's balances on public Horizon.`,
+      `Run ledger ${path.basename(ledgerPath)}: ${ledgerResult} with the payer's balances on public Horizon.`,
       ...(stopped === undefined ? [] : [`The mainnet run stopped: ${stopped}`]),
     ];
     return writeReport({ options, context, resolved, startedAt, endpoints, notes, secrets, clean, fail }, (verdict) => {
-      // B3: a mainnet run that stopped exits 2, and so does one whose ledger does not match the chain.
+      // B3: a mainnet run that stopped exits 2, and so does one whose ledger does not match the chain. An
+      // explained ledger exits by the checks: the FAILs that explain it are the run's verdict.
       if (stopped !== undefined) return { ...verdict, code: 2, reason: `the mainnet run stopped: ${stopped}` };
-      if (!consistent) return { ...verdict, code: 2, reason: "the run ledger is not consistent with the payer's balances" };
+      if (ledgerResult === "inconsistent") return { ...verdict, code: 2, reason: "the run ledger is not consistent with the payer's balances" };
       return verdict;
     });
   } finally {

@@ -603,7 +603,7 @@ const mainnetOutputShape = {
     network: z.string(),
     payTo: z.string(),
     ledger: z.string(),
-    consistent: z.boolean(),
+    ledgerResult: z.enum(["consistent", "explained", "inconsistent"]),
     stopped: z.string().optional(),
     spentUsd: z.string(),
     processSpentUsd: z.string(),
@@ -625,7 +625,8 @@ function mainnetVersions(): Record<string, string> {
 /**
  * A mainnet call for both channels: its lines first (MAINNET RUN), then the
  * checks as every tool shows them. A run that stopped, or whose ledger does
- * not match the payer's balances, is no-verdict, as the CLI exits 2 for it.
+ * not match the payer's balances, is no-verdict, as the CLI exits 2 for it;
+ * an explained ledger leaves the checks' verdict.
  */
 function presentMainnet(setup: MainnetSetup, result: MainnetToolResult) {
   const secrets = deniedEnvValues(process.env);

@@ -9,7 +9,9 @@
  * endpoint and the key variable set. The config is frozen then. Each call
  * opens its own opt-in on the process's one budget ($5, D-018), says MAINNET
  * RUN first, plans, writes the ledger next to the config, runs the checks,
- * waits for every authorization to expire and closes. One call at a time.
+ * waits for every authorization to expire and closes. One call at a time. A
+ * call that stops, or whose ledger does not match the payer's balances, locks
+ * the tool until the server is restarted; an explained ledger does not.
  *
  * Offline: pubnet-world.ts. Every key is made up; nothing leaves 127.0.0.1.
  */
@@ -29,6 +31,8 @@ import { PUBNET_RPC, PUBNET_USDC, TESTNET_USDC, installPubnetWorld, pubnetOption
 
 const CENT = 100_000n;
 const DOLLAR = 10_000_000n;
+/** What a run on the stand-in paywall settles: X402-06's price and X402-09's half price (the paywall serves the underpayment). */
+const SETTLES = (price: bigint): bigint => price + price / 2n;
 const LOCK = "wasit-mainnet.lock";
 
 describe("the MCP server's mainnet opt-in", () => {
@@ -279,14 +283,14 @@ describe("the MCP server's mainnet opt-in", () => {
     it("says MAINNET RUN first, plans, writes the ledger next to the config, runs the checks and closes consistent", async () => {
       wall = await pubnetWall({ "/weather": [pubnetOption(payTo, CENT)] });
       const setup = setupOf(await config(["weather"]));
-      const { result, lines } = await call(setup, "weather", { WASIT_MAINNET_PAYER_SECRET: payer.secret() }, CENT);
+      const { result, lines } = await call(setup, "weather", { WASIT_MAINNET_PAYER_SECRET: payer.secret() }, SETTLES(CENT));
       assert.equal(result.refused, undefined, result.refused ?? "");
       assert.match(lines[0] ?? "", /^MAINNET RUN on stellar:pubnet: real funds\. Payer G[A-Z2-7]{55}; pays only G[A-Z2-7]{55} in USDC; at most \$1\.00 per payment; at most \$5\.00 this run\./);
       assert.deepEqual(result.lines, lines, "the result carries every line, in order");
       assert.ok(lines.some((line) => /^MAINNET RUN on stellar:pubnet: real funds\..*this run could spend up to \$0\.035 of the \$5\.00 cap\./.test(line)), lines.join("\n"));
       assert.equal(ledgers().length, 1);
       assert.equal(result.ledgerPath, path.join(dir, ledgers()[0]!));
-      assert.equal(result.consistent, true);
+      assert.equal(result.ledgerResult, "consistent");
       assert.ok(lines.some((line) => /^Ledger: consistent/.test(line)), lines.slice(-4).join("\n"));
       const x06 = result.results.find((entry) => entry.id === "X402-06");
       assert.equal(x06 === undefined ? undefined : checkStatus(x06), "PASS", JSON.stringify(result.results.map((entry) => [entry.id, checkStatus(entry), entry.detail])));
@@ -303,8 +307,9 @@ describe("the MCP server's mainnet opt-in", () => {
     it("shares one budget across the calls of the process: a later call's worst case is held to what is left", async () => {
       wall = await pubnetWall({ "/weather": [pubnetOption(payTo, DOLLAR)] });
       const setup = setupOf(await config(["weather"]));
-      const first = await call(setup, "weather");
+      const first = await call(setup, "weather", { WASIT_MAINNET_PAYER_SECRET: payer.secret() }, SETTLES(DOLLAR));
       assert.equal(first.result.refused, undefined, first.result.refused ?? "");
+      assert.equal(first.result.ledgerResult, "consistent", first.lines.slice(-3).join("\n"));
       assert.equal(formatUsd(first.result.processSpentUsd), "$3.50");
       const signedBefore = world.signed.length;
       const paidBefore = wall.paid.get("/weather") ?? 0;
@@ -319,7 +324,7 @@ describe("the MCP server's mainnet opt-in", () => {
     it("runs one call at a time: a second call while one runs is refused before anything is sent", async () => {
       wall = await pubnetWall({ "/weather": [pubnetOption(payTo, CENT)] });
       const setup = setupOf(await config(["weather"]));
-      const running = call(setup, "weather");
+      const running = call(setup, "weather", { WASIT_MAINNET_PAYER_SECRET: payer.secret() }, SETTLES(CENT));
       const second = await call(setup, "weather");
       assert.match(second.result.refused ?? "", /in progress/);
       assert.deepEqual(second.lines, []);
@@ -366,7 +371,7 @@ describe("the MCP server's mainnet opt-in", () => {
     it("is a verdict the result can carry only when the run did not stop and its ledger is consistent", async () => {
       wall = await pubnetWall({ "/weather": [pubnetOption(payTo, CENT)] });
       const setup = setupOf(await config(["weather"]));
-      const good = await call(setup, "weather", { WASIT_MAINNET_PAYER_SECRET: payer.secret() }, CENT);
+      const good = await call(setup, "weather", { WASIT_MAINNET_PAYER_SECRET: payer.secret() }, SETTLES(CENT));
       const summary = summarizeMainnetRun(setup, good.result);
       assert.equal(summary.trusted, true);
       assert.equal(summary.caveat, "");
@@ -374,23 +379,134 @@ describe("the MCP server's mainnet opt-in", () => {
         network: "stellar:pubnet",
         payTo,
         ledger: good.result.ledgerPath,
-        consistent: true,
+        ledgerResult: "consistent",
         spentUsd: "$0.035",
         processSpentUsd: "$0.035",
         processCapUsd: "$5.00",
       });
       // The payer's USDC does not move although X402-06 verified a settlement: the ledger is not consistent.
       const bad = await call(setup, "weather");
-      assert.equal(bad.result.consistent, false);
+      assert.equal(bad.result.ledgerResult, "inconsistent");
       assert.ok(bad.lines.some((line) => /^Ledger: INCONSISTENT/.test(line)), bad.lines.slice(-3).join("\n"));
       const flagged = summarizeMainnetRun(setup, bad.result);
       assert.equal(flagged.trusted, false);
-      assert.match(flagged.caveat, /No verdict: the run ledger does not match the payer's balances on public Horizon\. Compare the ledger with the chain by hand/);
-      assert.equal(flagged.fields.consistent, false);
+      assert.match(flagged.caveat, /No verdict: the run ledger does not match the payer's balances on public Horizon\. The mainnet tool is locked until the server is restarted: compare the ledger with the chain by hand first\./);
+      assert.equal(flagged.fields.ledgerResult, "inconsistent");
       const stopped = summarizeMainnetRun(setup, { ...good.result, stopped: "the service changed its price" });
       assert.equal(stopped.trusted, false);
       assert.match(stopped.caveat, /No verdict: the mainnet run stopped/);
       assert.equal(stopped.fields.stopped, "the service changed its price");
+    });
+
+    it("an explained ledger is a verdict: the checks that FAILed explain it, and the tool stays open", async () => {
+      wall = await pubnetWall({ "/weather": [pubnetOption(payTo, CENT)] });
+      const setup = setupOf(await config(["weather"]));
+      // X402-09's half cent leaves the payer, but the stand-in chain does not show its settlement: unverified, X402-09 FAILs.
+      world.state.unverified.add(CENT / 2n);
+      const first = await call(setup, "weather", { WASIT_MAINNET_PAYER_SECRET: payer.secret() }, SETTLES(CENT));
+      assert.equal(first.result.ledgerResult, "explained", first.lines.slice(-3).join("\n"));
+      assert.ok(first.lines.some((line) => /^Ledger: explained: /.test(line)), first.lines.slice(-3).join("\n"));
+      const summary = summarizeMainnetRun(setup, first.result);
+      assert.equal(summary.trusted, true);
+      assert.equal(summary.caveat, "");
+      assert.equal(summary.fields.ledgerResult, "explained");
+      assert.ok(!first.lines.some((line) => /locked/.test(line)));
+      world.state.unverified.clear();
+      const second = await call(setup, "weather", { WASIT_MAINNET_PAYER_SECRET: payer.secret() }, SETTLES(CENT));
+      assert.equal(second.result.refused, undefined, "an explained ledger does not lock the tool");
+    });
+
+    describe("the lock after a call that cannot be trusted", () => {
+      /** A second call on the same setup: refused before anything is asked, signed or written. */
+      async function assertLocked(setup: MainnetSetup, why: RegExp): Promise<void> {
+        const requests = wall!.requests;
+        const signed = world.signed.length;
+        const files = ledgers().length;
+        const identity = world.identityCalls.length;
+        const next = await call(setup, "weather", { WASIT_MAINNET_PAYER_SECRET: payer.secret() }, SETTLES(CENT));
+        assert.match(next.result.refused ?? "", /^The mainnet tool of this server is locked: /);
+        assert.match(next.result.refused ?? "", why);
+        assert.match(next.result.refused ?? "", /then restart the server to use the mainnet tool again\. Nothing was sent\. Nothing was signed\.$/);
+        assert.deepEqual(next.lines, [], "a locked call prints no MAINNET RUN line: nothing was opened");
+        assert.equal(wall!.requests, requests, "the service was asked something");
+        assert.equal(world.signed.length, signed);
+        assert.equal(ledgers().length, files, "a locked call opened a ledger");
+        assert.equal(world.identityCalls.length, identity, "a locked call read the RPC");
+        assert.equal(formatUsd(next.result.spentUsd), "$0.00");
+        // Unknown names are refused by the lock too: the tool is closed, not one endpoint.
+        assert.match((await call(setup, "summarize")).result.refused ?? "", /locked/);
+      }
+
+      it("locks after a call whose ledger does not match the payer's balances; a restart (a new setup) opens it", async () => {
+        wall = await pubnetWall({ "/weather": [pubnetOption(payTo, CENT)] });
+        const file = await config(["weather"]);
+        const setup = setupOf(file);
+        const bad = await call(setup, "weather");
+        assert.equal(bad.result.ledgerResult, "inconsistent");
+        assert.ok(bad.lines.some((line) => /^The mainnet tool is now locked until the server is restarted/.test(line)), bad.lines.slice(-3).join("\n"));
+        await assertLocked(setup, /the ledger of an earlier call does not match the payer's balances \(wasit-ledger-[^)]+\.json\)\. Read that ledger/);
+        // A restart reads the start-up again: a new setup, its own lock and its own $5.
+        const restarted = setupOf(file);
+        const after = await call(restarted, "weather", { WASIT_MAINNET_PAYER_SECRET: payer.secret() }, SETTLES(CENT));
+        assert.equal(after.result.refused, undefined, after.result.refused ?? "");
+      });
+
+      it("locks after a call that stopped", async () => {
+        wall = await pubnetWall({ "/weather": [pubnetOption(payTo, CENT)] });
+        const setup = setupOf(await config(["weather"]));
+        // X402-06 and X402-07 are paid; then the payee changes and L2 stops the run.
+        wall.onChallenge = (at) => {
+          if (at === "/weather" && (wall!.paid.get("/weather") ?? 0) >= 2) wall!.accepts.set("/weather", [pubnetOption(Keypair.random().publicKey(), CENT)]);
+        };
+        const stopped = await call(setup, "weather", { WASIT_MAINNET_PAYER_SECRET: payer.secret() }, 2n * CENT);
+        assert.ok(stopped.result.stopped !== undefined, stopped.lines.slice(-3).join("\n"));
+        await assertLocked(setup, /an earlier call stopped \(its ledger is wasit-ledger-[^)]+\.json\)/);
+      });
+
+      it("locks after a call whose balances after were not read", async () => {
+        wall = await pubnetWall({ "/weather": [pubnetOption(payTo, CENT)] });
+        const setup = setupOf(await config(["weather"]));
+        const lines: string[] = [];
+        const unread = await runMainnetEndpoint(setup, "weather", {
+          env: { WASIT_MAINNET_PAYER_SECRET: payer.secret() },
+          versions: { "wasit.server": "test" },
+          onLine: (line) => lines.push(line),
+          // The RPC moves on, public Horizon does not: the wait for Horizon gives up, the balances after are not read.
+          sleep: async () => {
+            world.state.rpcLatest += 10;
+          },
+        });
+        assert.equal(unread.ledgerResult, "inconsistent", lines.slice(-3).join("\n"));
+        assert.ok(lines.some((line) => /were not read/.test(line)), lines.slice(-3).join("\n"));
+        await assertLocked(setup, /the payer's balances after an earlier call were not read \(its ledger is wasit-ledger-[^)]+\.json\)/);
+      });
+
+      it("locks after a call that threw once its ledger was open", async () => {
+        wall = await pubnetWall({ "/weather": [pubnetOption(payTo, CENT)] });
+        const setup = setupOf(await config(["weather"]));
+        await assert.rejects(
+          runMainnetEndpoint(setup, "weather", {
+            env: { WASIT_MAINNET_PAYER_SECRET: payer.secret() },
+            versions: { "wasit.server": "test" },
+            onLine: (line) => {
+              if (/^Ledger: \//.test(line)) throw new Error("the client went away");
+            },
+            sleep: world.sleep(10),
+          }),
+          /the client went away/,
+        );
+        assert.equal(existsSync(path.join(dir, LOCK)), false, "the run was closed and its lock released");
+        await assertLocked(setup, /an earlier call did not finish \(its ledger is wasit-ledger-[^)]+\.json\)/);
+      });
+
+      it("does not lock after a refusal that signed nothing", async () => {
+        wall = await pubnetWall({ "/weather": [pubnetOption(payTo, DOLLAR + 1n)] });
+        const setup = setupOf(await config(["weather"]));
+        assert.ok((await call(setup, "weather")).result.refused !== undefined);
+        wall.accepts.set("/weather", [pubnetOption(payTo, CENT)]);
+        const next = await call(setup, "weather", { WASIT_MAINNET_PAYER_SECRET: payer.secret() }, SETTLES(CENT));
+        assert.equal(next.result.refused, undefined, next.result.refused ?? "");
+      });
     });
 
     it("never puts the key, its seed in hex or base64 in a line, a result or the ledger", async () => {

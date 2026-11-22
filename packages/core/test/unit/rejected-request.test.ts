@@ -19,9 +19,13 @@
  */
 
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, it } from "node:test";
 
 import type { CheckResult } from "../../src/check.js";
+import { RunLedger, type LedgerEntry } from "../../src/guard/run-ledger.js";
 import { setRpcIdentityTransportForTesting } from "../../src/guard/rpc-identity.js";
 import { setPaymentChainsForTesting } from "../../src/x402/chains/index.js";
 import { planX402Run } from "../../src/x402/plan.js";
@@ -154,6 +158,100 @@ describe("X402-11 in the payment checks", () => {
       assert.equal(result.pass, true, `${refusalStatus}: ${result.detail}`);
       assert.match(result.detail, new RegExp(`HTTP ${refusalStatus}`));
     }
+  });
+});
+
+describe("X402-11 and the run ledger: what the chain shows is recorded", () => {
+  const dirs: string[] = [];
+  afterEach(() => {
+    for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+  });
+
+  function book(): RunLedger {
+    const dir = mkdtempSync(join(tmpdir(), "wasit-x402-11-ledger-"));
+    dirs.push(dir);
+    const created = RunLedger.create(dir, {
+      versions: { core: "test" },
+      environment: "test",
+      network: NETWORK,
+      payer: "0x2222222222222222222222222222222222222222",
+      caps: { perPaymentUsd: "$1.00", runUsd: "$5.00" },
+      plan: {},
+      rpc: "http://127.0.0.1:9",
+    });
+    created.recordBalancesBefore({ usdc: ledger.balance, native: 1n }, "the stand-in ledger");
+    return created;
+  }
+
+  const eleven = (entries: readonly LedgerEntry[]): LedgerEntry => {
+    const found = entries.find((entry) => entry.check === "X402-11");
+    assert.ok(found, "no X402-11 entry");
+    return found;
+  };
+
+  it("settled then refused: X402-11's settlement is recorded as verified, from the nonce read and its transfer", async () => {
+    const target = await wall("settle-then-refuse");
+    const run11 = book();
+    const result = byId(await run(target.url, { ledger: run11.forEndpoint("paid") }), "X402-11");
+    assert.equal(result.pass, false, result.detail);
+    assert.equal(result.error, undefined);
+    const entry = eleven(run11.entries);
+    assert.deepEqual(entry.settlement, { reference: "tx-nonce-5", verified: true });
+    assert.equal(entry.verdict, "fail");
+    const closed = run11.close({ after: { usdc: ledger.balance, native: 1n }, source: "the stand-in ledger" });
+    assert.equal(closed.result, "consistent", closed.reasons.join("; "));
+  });
+
+  it("served: X402-11's settlement is recorded as verified too", async () => {
+    const target = await wall("serve");
+    const run11 = book();
+    await run(target.url, { ledger: run11.forEndpoint("paid") });
+    assert.deepEqual(eleven(run11.entries).settlement, { reference: "tx-nonce-5", verified: true });
+  });
+
+  it("refused without settling (PASS): no settlement is recorded", async () => {
+    const target = await wall("refuse");
+    const run11 = book();
+    const result = byId(await run(target.url, { ledger: run11.forEndpoint("paid") }), "X402-11");
+    assert.equal(result.pass, true, result.detail);
+    const entry = eleven(run11.entries);
+    assert.equal(entry.settlement, undefined);
+    assert.equal(entry.verdict, "pass");
+    assert.equal(run11.close({ after: { usdc: ledger.balance, native: 1n } }).result, "consistent");
+  });
+
+  it("the readings disagree (nonce used, no transfer): nothing recorded as verified, and the ledger does not explain it", async () => {
+    ledger.dropTransfers = true;
+    const target = await wall("settle-then-refuse");
+    const run11 = book();
+    const result = byId(await run(target.url, { ledger: run11.forEndpoint("paid") }), "X402-11");
+    assert.ok(result.error !== undefined, result.detail);
+    const entry = eleven(run11.entries);
+    assert.equal(entry.settlement, undefined);
+    assert.equal(entry.verdict, "no-verdict");
+    assert.equal(run11.close({ after: { usdc: ledger.balance, native: 1n } }).result, "inconsistent");
+  });
+
+  it("a lax service (B13 V6): X402-09 and X402-11 FAIL, both settlements verified, the ledger consistent", async () => {
+    const target = await wall("serve", { acceptUnderpayment: "with-response" });
+    const run11 = book();
+    const results = await run(target.url, { ledger: run11.forEndpoint("paid") });
+    assert.equal(byId(results, "X402-09").pass, false);
+    assert.equal(byId(results, "X402-09").error, undefined, byId(results, "X402-09").detail);
+    assert.equal(byId(results, "X402-11").pass, false);
+    const closed = run11.close({ after: { usdc: ledger.balance, native: 1n } });
+    assert.equal(closed.spentUsdc, 25_000n, "X402-06 10000, X402-09 5000, X402-11 10000");
+    assert.equal(closed.result, "consistent", closed.reasons.join("; "));
+  });
+
+  it("a lax service that names no settlement for the underpayment: the ledger is explained by X402-09's FAIL", async () => {
+    const target = await wall("serve", { acceptUnderpayment: "without-response" });
+    const run11 = book();
+    const results = await run(target.url, { ledger: run11.forEndpoint("paid") });
+    assert.equal(byId(results, "X402-09").pass, false);
+    const closed = run11.close({ after: { usdc: ledger.balance, native: 1n } });
+    assert.equal(closed.result, "explained", closed.reasons.join("; "));
+    assert.match(closed.reasons.join(" "), /X402-09 of paid, entry \d+, 5000/);
   });
 });
 

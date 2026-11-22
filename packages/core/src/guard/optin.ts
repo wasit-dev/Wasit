@@ -11,8 +11,11 @@
  * Its constructor takes a symbol only this module has, and every opt-in it
  * makes is kept in a set only this module reads, so an object that only looks
  * like one (a literal, a copy, `Object.create` of its prototype) is never taken
- * for one. That stops a mistake or a forged object; code that reaches into the
- * package's files holds the key itself and is outside every rule of Wasit.
+ * for one. The object and its prototype are frozen, and whether it is live is
+ * read from its private state, never from a property: no caller can reassign
+ * its RPC, payer, budget or methods, or make a stopped one read as live. That
+ * stops a mistake or a forged object; code that reaches into the package's
+ * files holds the key itself and is outside every rule of Wasit.
  */
 
 import { ConfigurationError } from "../errors.js";
@@ -29,6 +32,10 @@ const ISSUE = Symbol("mainnet opt-in");
 const issued = new WeakSet<object>();
 const anchors = new WeakMap<object, SigningAnchor>();
 const plans = new WeakMap<object, RunPlan>();
+
+/** The opt-in's private state, read by the module's own functions (set in the class's static block). */
+let stoppedOf: (optIn: MainnetOptIn) => string | undefined;
+let closedOf: (optIn: MainnetOptIn) => boolean;
 
 export interface MainnetOptInFields {
   readonly frontEnd: MainnetFrontEnd;
@@ -56,13 +63,15 @@ export type MainnetRunRefusal = "network" | "operated-by-me" | "key" | "rpc" | "
 /**
  * A mainnet run does not open, or a step of it is refused. A
  * `ConfigurationError`: it says nothing about the target. Nothing was started,
- * sent or signed by the step that threw it.
+ * sent or signed by the step that threw it. A stop of a run that is open
+ * (`during`) says that nothing more is signed in it: an earlier endpoint of
+ * the run may have paid.
  */
 export class MainnetRunRefusedError extends ConfigurationError {
   public readonly reason: MainnetRunRefusal;
 
-  public constructor(reason: MainnetRunRefusal, message: string) {
-    super(`${message} Nothing was started, sent or signed.`);
+  public constructor(reason: MainnetRunRefusal, message: string, options: { readonly during?: boolean } = {}) {
+    super(`${message} ${options.during === true ? "Nothing more is signed in this run." : "Nothing was started, sent or signed."}`);
     this.name = "MainnetRunRefusedError";
     this.reason = reason;
   }
@@ -89,6 +98,11 @@ export class MainnetOptIn {
   #stopped: string | undefined;
   #closed = false;
 
+  static {
+    stoppedOf = (optIn) => optIn.#stopped;
+    closedOf = (optIn) => optIn.#closed;
+  }
+
   /** Core only: `openMainnetOptIn`. */
   public constructor(key: symbol, fields: MainnetOptInFields) {
     if (key !== ISSUE) throw new TypeError("A mainnet opt-in is made by openMainnetOptIn only.");
@@ -102,6 +116,8 @@ export class MainnetOptIn {
     this.#lock = fields.lock;
     issued.add(this);
     anchors.set(this, new SigningAnchor());
+    // Its fields cannot be reassigned, nor a property added over its getters; its private state still moves.
+    Object.freeze(this);
   }
 
   /** The plan L1 made for this run, once it passed. */
@@ -165,6 +181,10 @@ export class MainnetOptIn {
   }
 }
 
+// Its methods and getters cannot be replaced for every opt-in at once.
+Object.freeze(MainnetOptIn.prototype);
+Object.freeze(MainnetOptIn);
+
 /** Core only: L1 records the plan that passed, once. Not a method, so no caller reaches it through an opt-in. */
 export function recordMainnetPlan(optIn: MainnetOptIn, plan: RunPlan): void {
   if (!issued.has(optIn) || plans.has(optIn)) throw refuse("The mainnet run already has a plan.");
@@ -199,8 +219,8 @@ export function isLiveOptIn(value: unknown, network: string): value is MainnetOp
     value !== null &&
     issued.has(value) &&
     (value as MainnetOptIn).network === network &&
-    (value as MainnetOptIn).stopped === undefined &&
-    !(value as MainnetOptIn).closed
+    stoppedOf(value as MainnetOptIn) === undefined &&
+    !closedOf(value as MainnetOptIn)
   );
 }
 
@@ -211,8 +231,9 @@ export function isLiveOptIn(value: unknown, network: string): value is MainnetOp
 export function whyNotLive(value: unknown, network: string): string | undefined {
   if (typeof value !== "object" || value === null || !issued.has(value)) return undefined;
   const optIn = value as MainnetOptIn;
-  if (optIn.stopped !== undefined) return `the mainnet run stopped, so nothing more is signed in it: ${optIn.stopped.replace(/\.\s*$/, "")}`;
-  if (optIn.closed) return "the mainnet run is closed, so nothing more is signed in it";
+  const stopped = stoppedOf(optIn);
+  if (stopped !== undefined) return `the mainnet run stopped, so nothing more is signed in it: ${stopped.replace(/\.\s*$/, "")}`;
+  if (closedOf(optIn)) return "the mainnet run is closed, so nothing more is signed in it";
   if (optIn.network !== network) return `the mainnet opt-in is for ${optIn.network}, not ${network}`;
   return undefined;
 }
