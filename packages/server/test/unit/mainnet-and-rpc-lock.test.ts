@@ -1,9 +1,12 @@
 /**
- * The MCP server's start-up switches and its RPC (spec B5, B12; D-023c option C).
+ * The MCP server's start-up settings and its RPC (spec B5, B18 O3; D-023c option C).
  *
- * - `WASIT_MAINNET_OPT_IN`, `WASIT_MAINNET_CONFIG` and `--mainnet` ask for the
- *   mainnet opt-in, which this version does not have: the server does not
- *   start, exit 2, and says why. Without them the tool list has no mainnet tool.
+ * - The mainnet opt-in is start-up only: `WASIT_MAINNET_OPT_IN=1`,
+ *   `WASIT_MAINNET_CONFIG` and `WASIT_MAINNET_ENVIRONMENT`, all three or none.
+ *   Any rule broken: the server does not start, exit 2, and says why. With
+ *   them it lists `wasit_x402_mainnet_test`, whose one argument is an endpoint
+ *   name of the config; without them the tool list has no mainnet tool.
+ *   `--mainnet` among its arguments is not read: the server does not start.
  * - `WASIT_RPC_URL`, read once at start-up, fixes the RPC of every tool call;
  *   the server then refuses the `rpcUrl` argument before anything is sent. A
  *   value that is not an http(s) URL stops the server, without being echoed.
@@ -17,7 +20,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import http from "node:http";
 import net from "node:net";
 import { tmpdir } from "node:os";
@@ -146,8 +149,11 @@ async function call(cwd: string, env: Record<string, string>, name: string, args
   });
 }
 
-describe("the MCP server's start-up switches (B12)", () => {
+describe("the MCP server's mainnet start-up (B5, B18 O3)", () => {
   let cwd: string;
+  const PUBNET_USDC = "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75";
+  const payer = Keypair.random();
+  const payTo = Keypair.random().publicKey();
   before(async () => {
     cwd = await mkdtemp(path.join(tmpdir(), "wasit-mcp-switch-"));
   });
@@ -155,31 +161,115 @@ describe("the MCP server's start-up switches (B12)", () => {
     await rm(cwd, { recursive: true, force: true });
   });
 
-  for (const [name, env, args] of [
-    ["WASIT_MAINNET_OPT_IN", { WASIT_MAINNET_OPT_IN: "1" }, []],
-    ["WASIT_MAINNET_OPT_IN", { WASIT_MAINNET_OPT_IN: "0" }, []],
-    ["WASIT_MAINNET_CONFIG", { WASIT_MAINNET_CONFIG: "/srv/wasit/mainnet.config.json" }, []],
-    ["--mainnet", {}, ["--mainnet"]],
-  ] as const) {
-    it(`does not start with ${name}${"WASIT_MAINNET_OPT_IN" in env ? `=${env.WASIT_MAINNET_OPT_IN}` : ""}: exit 2, and says why on stderr`, async () => {
-      const result = await startRaw(cwd, { ...env }, [...args]);
-      assert.equal(result.code, 2, result.stderr);
-      assert.equal(result.stdout, "", "nothing on the protocol channel");
-      assert.match(result.stderr, new RegExp(`^wasit MCP server: ${name.replace(/[-]/g, "\\-")} is (set|refused): the mainnet opt-in is not part of this version`));
-      assert.match(result.stderr, /Wasit pays on test networks only \(stellar:testnet, /);
-    });
+  /** A config in a folder of its own, with a pubnet environment `mainnet` whose RPC is `rpcUrl`. */
+  async function mainnetConfig(baseUrl: string, rpcUrl: string): Promise<{ file: string; folder: string }> {
+    const folder = await mkdtemp(path.join(cwd, "config-"));
+    const file = path.join(folder, "wasit.config.json");
+    await writeFile(
+      file,
+      JSON.stringify({
+        version: 1,
+        environments: { mainnet: { baseUrl, network: "stellar:pubnet", operatedByMe: true, pinned: { payTo, asset: PUBNET_USDC }, rpcUrl } },
+        endpoints: [
+          { name: "weather", protocol: "x402", path: "/paid", method: "GET" },
+          { name: "quote", protocol: "x402", path: "/quote", method: "GET" },
+        ],
+      }),
+    );
+    return { file, folder };
   }
 
-  it("names every switch that is set", async () => {
-    const result = await startRaw(cwd, { WASIT_MAINNET_OPT_IN: "1", WASIT_MAINNET_CONFIG: "/x.json" }, ["--mainnet"]);
-    assert.equal(result.code, 2);
-    for (const name of ["--mainnet", "WASIT_MAINNET_OPT_IN", "WASIT_MAINNET_CONFIG"]) assert.ok(result.stderr.includes(`${name} is`), name);
+  const mainnetEnv = (file: string): Record<string, string> => ({
+    WASIT_MAINNET_OPT_IN: "1",
+    WASIT_MAINNET_CONFIG: file,
+    WASIT_MAINNET_ENVIRONMENT: "mainnet",
+    WASIT_MAINNET_PAYER_SECRET: payer.secret(),
+  });
+
+  it("does not start with --mainnet among its arguments: exit 2, it is not read by this server", async () => {
+    const result = await startRaw(cwd, {}, ["--mainnet"]);
+    assert.equal(result.code, 2, result.stderr);
+    assert.equal(result.stdout, "", "nothing on the protocol channel");
+    assert.match(result.stderr, /^wasit MCP server: --mainnet is not read by this server: its mainnet opt-in is WASIT_MAINNET_OPT_IN=1 with WASIT_MAINNET_CONFIG and WASIT_MAINNET_ENVIRONMENT/);
+  });
+
+  it("does not start with only some of its variables, names what is missing, and never echoes a value", async () => {
+    const result = await startRaw(cwd, { WASIT_MAINNET_OPT_IN: "yes-value-7c1" });
+    assert.equal(result.code, 2, result.stderr);
+    assert.match(result.stderr, /WASIT_MAINNET_CONFIG and WASIT_MAINNET_ENVIRONMENT (are|is) not set/);
+    assert.match(result.stderr, /WASIT_MAINNET_OPT_IN must be 1/);
+    assert.ok(!result.stderr.includes("yes-value-7c1"), result.stderr);
+    assert.ok(!/not part of this version/.test(result.stderr));
   });
 
   it("starts without them, and its tool list has no mainnet tool", async () => {
     const names = await withClient(cwd, {}, async (client) => (await client.listTools()).tools.map((tool) => tool.name));
     assert.deepEqual(names.sort(), ["wasit_mpp_channel_test", "wasit_mpp_charge_test", "wasit_x402_test"]);
     assert.ok(!names.some((name) => /mainnet|pubnet/i.test(name)));
+  });
+
+  it("starts with the opt-in and lists wasit_x402_mainnet_test: one argument, an endpoint name of the config", async () => {
+    const { file } = await mainnetConfig("https://service.example", "https://rpc.example/key-path");
+    const tools = await withClient(cwd, mainnetEnv(file), async (client) => (await client.listTools()).tools);
+    assert.deepEqual(tools.map((tool) => tool.name).sort(), ["wasit_mpp_channel_test", "wasit_mpp_charge_test", "wasit_x402_mainnet_test", "wasit_x402_test"]);
+    const tool = tools.find((entry) => entry.name === "wasit_x402_mainnet_test")!;
+    const schema = tool.inputSchema as { properties?: Record<string, { enum?: string[] }>; required?: string[] };
+    assert.deepEqual(Object.keys(schema.properties ?? {}), ["endpoint"]);
+    assert.deepEqual(schema.properties?.["endpoint"]?.enum, ["weather", "quote"]);
+    assert.deepEqual(schema.required, ["endpoint"]);
+    assert.equal(tool.annotations?.destructiveHint, true);
+    assert.equal(tool.annotations?.idempotentHint, false);
+    assert.match(tool.description ?? "", /REAL FUNDS/);
+    assert.ok((tool.description ?? "").includes(payTo), "the description names the payee");
+    assert.ok(!(tool.description ?? "").includes("key-path"), "the RPC is named by origin only");
+  });
+
+  it("with the opt-in, the other tools still refuse stellar:pubnet: x402 and MPP charge (B13 V7)", async () => {
+    const paywall = await target();
+    const rpc = await countingRpc();
+    try {
+      const { file } = await mainnetConfig("https://service.example", "https://rpc.example/");
+      const env = { ...mainnetEnv(file), STELLAR_PRIVATE_KEY: Keypair.random().secret(), MPP_PAYER_SECRET: Keypair.random().secret() };
+      const x402 = await call(cwd, env, "wasit_x402_test", { target: paywall.url, network: "stellar:pubnet", rpcUrl: rpc.url });
+      const preflight = x402.structured?.results?.find((result) => result.id === "PREFLIGHT");
+      assert.equal(preflight?.status, "ERROR", x402.text);
+      assert.match(x402.text, /this run has no mainnet opt-in/);
+      const charge = await call(cwd, env, "wasit_mpp_charge_test", { target: paywall.url, network: "stellar:pubnet", rpcUrl: rpc.url });
+      assert.match(charge.text, /MPP stays on test networks/);
+      assert.equal(paywall.paid(), 0);
+      assert.equal(rpc.calls(), 0);
+    } finally {
+      await paywall.close();
+      await rpc.close();
+    }
+  });
+
+  it("a mainnet call whose RPC cannot be read is refused before the service is asked anything: no ledger, no lock", async () => {
+    const paywall = await target();
+    const drop = net.createServer((socket) => socket.destroy());
+    await new Promise<void>((resolve) => drop.listen(0, "127.0.0.1", resolve));
+    try {
+      const { port } = drop.address() as net.AddressInfo;
+      const { file, folder } = await mainnetConfig(paywall.url.replace(/\/paid$/, ""), `https://127.0.0.1:${port}/`);
+      const result = await call(cwd, mainnetEnv(file), "wasit_x402_mainnet_test", { endpoint: "weather" });
+      assert.equal(result.isError, true, result.text);
+      assert.match(result.text, /Nothing was signed|nothing was signed|Nothing was started, sent or signed/);
+      assert.equal(paywall.requests(), 0, "the service was asked");
+      const { readdir } = await import("node:fs/promises");
+      assert.deepEqual((await readdir(folder)).sort(), ["wasit.config.json"]);
+    } finally {
+      await paywall.close();
+      await new Promise<void>((resolve) => drop.close(() => resolve()));
+    }
+  });
+
+  it("refuses an endpoint name that is not in the config's list", async () => {
+    const { file } = await mainnetConfig("https://service.example", "https://rpc.example/");
+    const outcome = await call(cwd, mainnetEnv(file), "wasit_x402_mainnet_test", { endpoint: "summarize" }).catch((error: unknown) => ({
+      isError: true,
+      text: String(error instanceof Error ? error.message : error),
+    }));
+    assert.equal(outcome.isError, true, outcome.text);
   });
 
   it("does not start when WASIT_RPC_URL is not an http(s) URL, and never echoes the value", async () => {

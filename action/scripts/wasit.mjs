@@ -59,6 +59,18 @@ function writeSummary(env, text) {
   }
 }
 
+/**
+ * Says to later steps whether this is a mainnet run (`mainnet=true|false`), when
+ * the runner gives an output file: the ledger upload's condition (B18 O3). An
+ * output that cannot be written is an error: the upload would not run.
+ */
+function writeMainnetOutput(env, mainnet) {
+  const file = env["GITHUB_OUTPUT"];
+  if (typeof file !== "string" || file === "") return;
+  if (!path.isAbsolute(file)) throw new InputError("GITHUB_OUTPUT is not an absolute path.");
+  appendFileSync(file, `mainnet=${mainnet ? "true" : "false"}\n`);
+}
+
 /** Runs the CLI with `args`, passes signals on to it, and resolves to its exit code. */
 function runCli(args, env) {
   return new Promise((resolve) => {
@@ -84,8 +96,9 @@ export async function main(command, env = process.env, io = {}) {
   const stderr = io.stderr ?? ((line) => console.error(line));
   try {
     if (command === "check") {
-      parseInputs(env);
+      const inputs = parseInputs(env);
       mkdirSync(workDirectory(env), { recursive: true });
+      writeMainnetOutput(env, inputs.mainnet);
       return 0;
     }
 
@@ -99,6 +112,8 @@ export async function main(command, env = process.env, io = {}) {
         comment: path.join(work, "comment.md"),
         baselineOut: path.join(work, "baseline-next.json"),
         checkRun: path.join(work, "check-run.json"),
+        // A mainnet run's ledger and lock (B18 O3); the last step uploads the ledger.
+        ledgerDir: path.join(work, "ledger"),
         baseline: baselineFile(env, work),
         history: baselineFile(env, work, "HISTORY_PATH"),
         // A run id is digits only; anything else is not passed on.

@@ -12,10 +12,14 @@
  * Without it the tool is absent from the tool list entirely — an agent cannot
  * call what it cannot see.
  *
- * Mainnet is never a tool argument (spec B5). The start-up settings a later
- * version would read for its mainnet opt-in, `WASIT_MAINNET_OPT_IN`,
- * `WASIT_MAINNET_CONFIG` and `--mainnet`, stop this server before it starts:
- * this version has no opt-in (spec B12). `WASIT_RPC_URL`, read once at start-up,
+ * Mainnet is never a tool argument (spec B5): the existing tools refuse any
+ * network that is not a test network, always. The mainnet opt-in (beta, B18
+ * O3) is start-up only: `WASIT_MAINNET_OPT_IN=1` with `WASIT_MAINNET_CONFIG`
+ * and `WASIT_MAINNET_ENVIRONMENT`, read once (`mainnet.ts`); any rule broken
+ * stops this server before it starts, and with them it registers
+ * `wasit_x402_mainnet_test`, whose only argument is an endpoint name of that
+ * frozen config. `--mainnet` among its arguments is not read: the server does
+ * not start. `WASIT_RPC_URL`, read once at start-up,
  * fixes the RPC of every tool call, and the `rpcUrl` argument is then refused,
  * so an agent cannot point a run at another RPC (D-023c). A result that reads
  * the chain names its RPC by origin, and flags one that is not the default.
@@ -27,6 +31,15 @@ import { fileURLToPath } from "node:url";
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import {
+  MAINNET_TOOL,
+  mainnetToolDescription,
+  readMainnetStartup,
+  runMainnetEndpoint,
+  summarizeMainnetRun,
+  type MainnetSetup,
+  type MainnetToolResult,
+} from "./mainnet.js";
 import { SERVER_VERSION } from "./version.js";
 import {
   RPC_LOCK_VARIABLE,
@@ -34,11 +47,10 @@ import {
   deniedEnvValues,
   describeRpcInUse,
   fixFor,
-  mainnetStartupSwitches,
   paymentChainFor,
   readRpcLock,
+  readToolVersions,
   redactValue,
-  refuseMainnetSwitch,
   rpcInUse,
   runMppChannelSuite,
   runMppChargeSuite,
@@ -60,24 +72,23 @@ const DESTRUCTIVE_ENABLED =
   process.argv.includes("--allow-destructive");
 
 /**
- * Start-up, read once: a setting that asks for mainnet, or an RPC lock that is
- * not an http(s) URL, stops the server before it registers a tool. Each reason
- * goes to stderr (stdout is the protocol channel), and the exit code is 2.
+ * Start-up, read once: a mainnet opt-in that breaks a rule, `--mainnet` among
+ * the arguments, or an RPC lock that is not an http(s) URL, stops the server
+ * before it registers a tool. Each reason goes to stderr (stdout is the
+ * protocol channel), and the exit code is 2.
  */
 const startupRefusals: string[] = [];
-for (const name of mainnetStartupSwitches(process.env, process.argv.slice(2))) {
-  try {
-    refuseMainnetSwitch(name);
-  } catch (error) {
-    startupRefusals.push(error instanceof Error ? error.message : String(error));
-  }
-}
+const mainnetStartup = readMainnetStartup(process.env, process.argv.slice(2));
+if (mainnetStartup.kind === "refused") startupRefusals.push(...mainnetStartup.reasons);
 const rpcLock = readRpcLock(process.env);
 if (rpcLock !== undefined && "problem" in rpcLock) startupRefusals.push(`${rpcLock.problem}, so this server does not start.`);
 if (startupRefusals.length > 0) {
   for (const reason of startupRefusals) process.stderr.write(`wasit MCP server: ${reason}\n`);
   process.exit(2);
 }
+
+/** The mainnet tool's frozen setup, when the opt-in was set at start-up and every rule held. */
+const MAINNET_SETUP: MainnetSetup | undefined = mainnetStartup.kind === "on" ? mainnetStartup.setup : undefined;
 
 /** The RPC every tool call uses when `WASIT_RPC_URL` was set at start-up; the `rpcUrl` argument is then refused. */
 const LOCKED_RPC: string | undefined = rpcLock !== undefined && "url" in rpcLock ? rpcLock.url : undefined;
@@ -581,6 +592,102 @@ if (DESTRUCTIVE_ENABLED) {
       if (refused !== undefined) return refused;
       if (!process.env.COMMITMENT_SECRET_HEX) return missingKey("COMMITMENT_SECRET_HEX");
       return runChannel(input, true, destructiveChannel);
+    },
+  );
+}
+
+/** The mainnet tool's structured result: the run's shape, and what the run did with real funds. */
+const mainnetOutputShape = {
+  ...runOutputShape,
+  mainnet: z.object({
+    network: z.string(),
+    payTo: z.string(),
+    ledger: z.string(),
+    consistent: z.boolean(),
+    stopped: z.string().optional(),
+    spentUsd: z.string(),
+    processSpentUsd: z.string(),
+    processCapUsd: z.string(),
+  }),
+};
+
+/** The versions for a mainnet run's ledger header, flat: "wasit.server", "sdk.@x402/core" and so on. */
+function mainnetVersions(): Record<string, string> {
+  const versions: Record<string, string> = { "wasit.server": SERVER_VERSION };
+  for (const [group, entries] of Object.entries(readToolVersions())) {
+    for (const [name, value] of Object.entries(entries as Record<string, unknown>)) {
+      if (value !== undefined && `${group}.${name}` !== "wasit.cli") versions[`${group}.${name}`] = String(value);
+    }
+  }
+  return versions;
+}
+
+/**
+ * A mainnet call for both channels: its lines first (MAINNET RUN), then the
+ * checks as every tool shows them. A run that stopped, or whose ledger does
+ * not match the payer's balances, is no-verdict, as the CLI exits 2 for it.
+ */
+function presentMainnet(setup: MainnetSetup, result: MainnetToolResult) {
+  const secrets = deniedEnvValues(process.env);
+  if (result.refused !== undefined || result.ledgerPath === undefined) {
+    const text = sanitizeText([...result.lines, result.refused ?? "The mainnet run was refused. Nothing was signed."].join("\n"), { redact: secrets });
+    return { content: [{ type: "text" as const, text }], isError: true as const };
+  }
+  const rpcUrl = setup.run.rpcUrl ?? "";
+  const base = present([...result.results], "x402", {
+    network: setup.run.network,
+    rpc: { origin: urlOrigin(rpcUrl), source: "start-up", isDefault: false },
+  });
+  const summary = summarizeMainnetRun(setup, result);
+  const caveat = summary.caveat === "" ? "" : `\n\n${summary.caveat}`;
+  return {
+    content: [{ type: "text" as const, text: sanitizeText(`${result.lines.join("\n")}\n\n${base.content[0]!.text}${caveat}`, { redact: secrets }) }],
+    structuredContent: redactValue(
+      { ...base.structuredContent, ...(summary.trusted ? {} : { outcome: "no-verdict" }), mainnet: summary.fields },
+      secrets,
+    ) as Record<string, unknown>,
+  };
+}
+
+if (MAINNET_SETUP !== undefined) {
+  const setup = MAINNET_SETUP;
+  const names = setup.endpoints as unknown as [string, ...string[]];
+  server.registerTool(
+    MAINNET_TOOL,
+    {
+      title: "Test x402 compliance on Stellar mainnet, with real funds (beta)",
+      description: mainnetToolDescription(setup),
+      inputSchema: {
+        endpoint: z.enum(names).describe("The name of an x402 endpoint of the config this server read at start-up"),
+      },
+      outputSchema: mainnetOutputShape,
+      annotations: {
+        readOnlyHint: false,
+        // Real funds leave the payer's account and cannot be taken back.
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async ({ endpoint }, extra) => {
+      const token = extra._meta?.progressToken;
+      const secrets = deniedEnvValues(process.env);
+      let step = 0;
+      // The run goes to its end whatever the client does (B18 O3): its ledger is closed and its lock released.
+      const result = await runMainnetEndpoint(setup, endpoint, {
+        env: process.env,
+        versions: mainnetVersions(),
+        onLine: (line) => {
+          const clean = sanitizeText(line, { redact: secrets });
+          process.stderr.write(`wasit MCP server: ${clean}\n`);
+          if (token === undefined) return;
+          step += 1;
+          extra
+            .sendNotification({ method: "notifications/progress", params: { progressToken: token, progress: step, message: clean } })
+            .catch(() => undefined);
+        },
+      });
+      return presentMainnet(setup, result);
     },
   );
 }

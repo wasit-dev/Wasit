@@ -199,7 +199,7 @@ describe("the CLI on stellar:pubnet", () => {
       const results = checks(run);
       const preflight = results.find((result) => result.id === "PREFLIGHT");
       assert.equal(preflight?.errorKind, "configuration", run.stdout);
-      assert.match(preflight?.detail ?? "", /the mainnet opt-in is not part of this version/);
+      assert.match(preflight?.detail ?? "", /this run has no mainnet opt-in: Wasit pays there only through wasit run --mainnet, the Action's mainnet: true on workflow_dispatch, or the MCP server's wasit_x402_mainnet_test/);
       assert.equal(results.some((result) => /^X402-(0[6-9]|10)$/.test(result.id)), false);
       assert.equal(paywall.paid(), 0);
       assert.equal(rpc.calls(), 0);

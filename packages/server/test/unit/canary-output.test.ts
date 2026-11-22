@@ -106,7 +106,13 @@ describe("canary: no key and no RPC key in any MCP tool result or on the server'
     let stderr = "";
     transport.stderr?.on("data", (chunk: Buffer) => (stderr += chunk.toString("utf-8")));
     const client = new Client({ name: "wasit-mcp-canary", version: "0.0.0" });
-    await client.connect(transport);
+    try {
+      await client.connect(transport);
+    } catch (error) {
+      // A server that does not start: what it wrote is searched too.
+      scanned.push(stderr);
+      throw error;
+    }
     try {
       for (const [name, args] of calls) {
         try {
@@ -146,6 +152,38 @@ describe("canary: no key and no RPC key in any MCP tool result or on the server'
       ["wasit_x402_test", { target: paid(), rpcUrl: `http://127.0.0.1:${ports.drop}/v1/${RPC_KEY}?k=${RPC_KEY}` }],
       ["wasit_x402_test", { target: paid(), network: "stellar:pubnet", rpcUrl: `http://127.0.0.1:${ports.other}/${RPC_KEY}` }],
     ]);
+  });
+
+  it("with the mainnet opt-in (B18 O3): the key refused beside the same key elsewhere, then an RPC that drops every connection", async () => {
+    const { writeFile } = await import("node:fs/promises");
+    const file = path.join(cwd, "mainnet.config.json");
+    await writeFile(
+      file,
+      JSON.stringify({
+        version: 1,
+        environments: {
+          mainnet: {
+            baseUrl: `http://127.0.0.1:${ports.target}`,
+            network: "stellar:pubnet",
+            operatedByMe: true,
+            pinned: { payTo: Keypair.random().publicKey(), asset: "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75" },
+            // The config takes no query (an RPC key goes in WASIT_RPC_URL); the key is in the path here.
+            rpcUrl: `https://127.0.0.1:${ports.drop}/v1/${RPC_KEY}`,
+          },
+        },
+        endpoints: [{ name: "weather", protocol: "x402", path: "/paid", method: "GET" }],
+      }),
+    );
+    const optIn = { WASIT_MAINNET_OPT_IN: "1", WASIT_MAINNET_CONFIG: file, WASIT_MAINNET_ENVIRONMENT: "mainnet", WASIT_MAINNET_PAYER_SECRET: KEY };
+    await session({ ...KEYS, ...optIn }, [
+      ["wasit_x402_mainnet_test", { endpoint: "weather" }],
+      ["wasit_x402_test", { target: paid(), network: "stellar:pubnet" }],
+    ]);
+    await session(optIn, [["wasit_x402_mainnet_test", { endpoint: "weather" }]]);
+    await session({ ...optIn, WASIT_RPC_URL: `https://127.0.0.1:${ports.drop}/v1/${RPC_KEY}?apikey=${RPC_KEY}` }, [
+      ["wasit_x402_mainnet_test", { endpoint: "weather" }],
+    ]);
+    await session({ ...optIn, WASIT_MAINNET_OPT_IN: KEY }, []).catch((error: unknown) => scanned.push(String(error instanceof Error ? error.message : error)));
   });
 
   it("a server that does not start: a mainnet start-up switch and a lock that is not a url", async () => {

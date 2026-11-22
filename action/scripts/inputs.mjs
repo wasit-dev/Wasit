@@ -22,9 +22,9 @@ export class InputError extends Error {
 }
 
 /**
- * The input asked for mainnet (spec B5). This version has no mainnet opt-in, so
- * the input exists only to be refused, before Wasit is installed (spec B12). The
- * step that checks the inputs writes this message to the job summary too.
+ * The input asked for mainnet (spec B5) where it is not honoured: refused before
+ * Wasit is installed. The step that checks the inputs writes this message to the
+ * job summary too.
  */
 export class MainnetRefusedError extends InputError {
   constructor(message) {
@@ -48,34 +48,45 @@ function trimmed(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-/** Refuses `mainnet: true`, always; refuses a value that is not true or false. */
+/**
+ * Whether the run asked for mainnet: `mainnet: true` is honoured only on
+ * workflow_dispatch, on a GitHub-hosted runner, with the payment tier (spec B5,
+ * B17.4, B18 O3); each rule it breaks is named in one refusal. A value that is
+ * not true or false is refused. Every other rule of a mainnet run is the CLI's
+ * and core's (the default branch, the job, the key, the pin, the RPC, the plan).
+ */
 function checkMainnet(env) {
   const value = trimmed(env["INPUT_MAINNET"]).toLowerCase();
-  if (value === "" || value === "false") return;
+  if (value === "" || value === "false") return false;
   if (value !== "true") throw new InputError("mainnet must be true or false.");
+  const broken = [];
   const event = typeof env["GITHUB_EVENT_NAME"] === "string" ? env["GITHUB_EVENT_NAME"] : "";
-  const eventRule =
-    event === "workflow_dispatch"
-      ? ""
-      : ` The input is also refused on every event but workflow_dispatch, and this run's event is ${EVENT_NAME.test(event) ? event : "another event"}.`;
+  if (event !== "workflow_dispatch") {
+    broken.push(
+      `it is honoured only on workflow_dispatch (a run started by hand), and this run's event is ${EVENT_NAME.test(event) ? event : "another event"}`,
+    );
+  }
   // Spec B17.4: a self-hosted runner keeps files and processes between jobs.
-  const runnerRule =
-    env["RUNNER_ENVIRONMENT"] === "github-hosted"
-      ? ""
-      : " The input is also refused on a runner that is not GitHub-hosted: a self-hosted runner keeps files and processes between jobs.";
-  throw new MainnetRefusedError(
-    "mainnet: true is refused: the mainnet opt-in is not part of this version. Wasit pays on test networks only." +
-      `${eventRule}${runnerRule} Nothing was installed, started, sent or signed.`,
-  );
+  if (env["RUNNER_ENVIRONMENT"] !== "github-hosted") {
+    broken.push("it is refused on a runner that is not GitHub-hosted: a self-hosted runner keeps files and processes between jobs");
+  }
+  if (trimmed(env["INPUT_TIER"]) !== "payment") {
+    broken.push("it is a paying run on Stellar mainnet, so it needs tier: payment as well");
+  }
+  if (broken.length > 0) {
+    throw new MainnetRefusedError(`mainnet: true is refused: ${broken.join("; ")}. Nothing was installed, started, sent or signed.`);
+  }
+  return true;
 }
 
 /**
  * Reads and checks the inputs from the step's environment (`INPUT_CONFIG`,
- * `INPUT_ENVIRONMENT`, `INPUT_TIER`, `INPUT_ENDPOINTS`, `INPUT_MAINNET`, and the
- * event name). `mainnet: true` is refused here, so it never reaches the CLI.
+ * `INPUT_ENVIRONMENT`, `INPUT_TIER`, `INPUT_ENDPOINTS`, `INPUT_MAINNET`, the
+ * event name and `RUNNER_ENVIRONMENT`). `mainnet: true` where it is not
+ * honoured is refused here, so it never reaches the CLI.
  *
  * @param {Record<string, string | undefined>} env
- * @returns {{ config: string, environment: string | undefined, tier: "read-only" | "payment", endpoints: string[] }}
+ * @returns {{ config: string, environment: string | undefined, tier: "read-only" | "payment", endpoints: string[], mainnet: boolean }}
  */
 export function parseInputs(env) {
   // pull_request_target hands the base repository's token and secrets to a workflow that runs a pull request's code.
@@ -85,8 +96,8 @@ export function parseInputs(env) {
     );
   }
 
-  // B12: no mainnet opt-in in this version. Refused before anything else is read.
-  checkMainnet(env);
+  // B5, B18 O3: mainnet: true where it is not honoured is refused before anything else is read.
+  const mainnet = checkMainnet(env);
 
   // The events this action is built for. Others (issue_comment, workflow_run, ...) run with the
   // base repository's write token, and a workflow on them often checks out a pull request's code:
@@ -128,23 +139,34 @@ export function parseInputs(env) {
     throw new InputError("each entry of endpoints must be a name: letters, digits, dot, underscore and hyphen, at most 64 characters; separate them with commas or line breaks.");
   }
 
-  return { config, environment: environment === "" ? undefined : environment, tier, endpoints };
+  return { config, environment: environment === "" ? undefined : environment, tier, endpoints, mainnet };
 }
 
 /**
  * The one call that runs Wasit: `wasit run [--read-only] --start-if-local --json --out`: the CLI starts service.start only when it is set and the environment is on this machine.
- * The payment tier is the same call without --read-only. No flag that opts into mainnet or carries a key is offered.
+ * The payment tier is the same call without --read-only. No flag that carries a key is offered.
+ *
+ * A mainnet run (`mainnet: true`, already checked by {@link parseInputs}) is
+ * `wasit run --mainnet --ledger-dir <dir> --json --out`: never --read-only, and
+ * never --start-if-local, so the Action starts no service on mainnet (the CLI's
+ * job rules refuse one anyway, spec B17.4). The ledger folder must be absolute.
  *
  * @param {ReturnType<typeof parseInputs>} inputs
- * @param {{ cli: string, report: string, baseline?: string }} paths
+ * @param {{ cli: string, report: string, baseline?: string, ledgerDir?: string }} paths
  * @returns {string[]} the arguments after `node`
  */
 export function buildRunArgs(inputs, paths) {
+  if (inputs.mainnet === true && (typeof paths.ledgerDir !== "string" || !paths.ledgerDir.startsWith("/"))) {
+    throw new InputError("a mainnet run needs the folder of its ledger, as an absolute path: nothing was started, sent or signed.");
+  }
+  const tier =
+    inputs.mainnet === true
+      ? ["--mainnet", "--ledger-dir", paths.ledgerDir]
+      : [...(inputs.tier === "payment" ? [] : ["--read-only"]), "--start-if-local"];
   return [
     paths.cli,
     "run",
-    ...(inputs.tier === "payment" ? [] : ["--read-only"]),
-    "--start-if-local",
+    ...tier,
     "--json",
     "--out",
     paths.report,

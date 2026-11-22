@@ -6,7 +6,7 @@ Protocol-compliance testing for **x402** and **MPP** on Stellar, from your termi
 
 For both MPP charge payments and x402 payments it verifies the settlement independently — via Stellar RPC and the token contract's own on-chain transfer event, rather than the response the service returns.
 
-**Testnet only.** Several checks settle real transactions. The payment checks pay on test networks only: any other network, `stellar:pubnet` included, is refused before a key is read. Do not use production keys.
+**Testnet by default.** Several checks settle real transactions. The payment checks pay on test networks only: any other network, `stellar:pubnet` included, is refused before a key is read, but for `wasit run --mainnet` (beta, below). Do not use production keys.
 
 **This README describes 0.8.0-beta.1**, a pre-release on npm under the `beta` tag (`npm install -g @wasit-dev/cli@beta`). `latest` is still 0.7.0. New in the beta: `wasit run` for a whole service from a `wasit.config.json`, `wasit ci-report`, the GitHub Action, a seventeenth check (`X402-11`), and a cap on every payment Wasit signs.
 

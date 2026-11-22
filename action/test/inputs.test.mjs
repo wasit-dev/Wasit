@@ -1,7 +1,8 @@
 /**
  * The inputs of the Action and the command lines built from them (spec A4,
  * A8 #1, #8): every input reaches the CLI as one argument of an argument list,
- * never as shell text, and the tier that pays is refused in this version.
+ * never as shell text. `mainnet: true` (spec B5, B18 O3) is honoured only on
+ * workflow_dispatch, on a GitHub-hosted runner, with the payment tier.
  */
 
 import assert from "node:assert/strict";
@@ -9,6 +10,7 @@ import { describe, it } from "node:test";
 
 import {
   InputError,
+  MainnetRefusedError,
   TOKEN_VARIABLES,
   buildReportArgs,
   buildRunArgs,
@@ -20,7 +22,7 @@ const env = (overrides = {}) => ({ INPUT_CONFIG: "wasit.config.json", INPUT_ENVI
 
 describe("parseInputs", () => {
   it("takes the defaults: the config file in the working directory, read-only, every endpoint", () => {
-    assert.deepEqual(parseInputs(env()), { config: "wasit.config.json", environment: undefined, tier: "read-only", endpoints: [] });
+    assert.deepEqual(parseInputs(env()), { config: "wasit.config.json", environment: undefined, tier: "read-only", endpoints: [], mainnet: false });
   });
 
   it("reads an environment and a list of endpoints, separated by line breaks or commas", () => {
@@ -53,65 +55,80 @@ describe("parseInputs", () => {
     });
   });
 
-  describe("mainnet (spec B5, B12: an input that is refused in this version)", () => {
-    const SENTENCE = /^mainnet: true is refused: the mainnet opt-in is not part of this version\. Wasit pays on test networks only\./;
+  describe("mainnet (spec B5, B17.4, B18 O3)", () => {
+    const allowed = (overrides = {}) =>
+      env({ INPUT_MAINNET: "true", GITHUB_EVENT_NAME: "workflow_dispatch", RUNNER_ENVIRONMENT: "github-hosted", INPUT_TIER: "payment", ...overrides });
+    const refusedWith = (fragment) => (error) =>
+      error instanceof MainnetRefusedError &&
+      /^mainnet: true is refused: /.test(error.message) &&
+      error.message.includes(fragment) &&
+      /Nothing was installed, started, sent or signed\.$/.test(error.message) &&
+      !/not part of this version/.test(error.message);
 
     it("is off by default, and takes false", () => {
       for (const value of [undefined, "", "false", "False", " false "]) {
         assert.deepEqual(
           parseInputs(env(value === undefined ? {} : { INPUT_MAINNET: value })),
-          { config: "wasit.config.json", environment: undefined, tier: "read-only", endpoints: [] },
+          { config: "wasit.config.json", environment: undefined, tier: "read-only", endpoints: [], mainnet: false },
           String(value),
         );
       }
     });
 
-    it("refuses true on every event and every tier, and says nothing was installed, started, sent or signed", () => {
+    it("is honoured on workflow_dispatch, on a GitHub-hosted runner, with the payment tier", () => {
       for (const value of ["true", "TRUE", " true "]) {
-        for (const name of ["push", "pull_request", "schedule", "workflow_dispatch"]) {
-          for (const tier of ["read-only", "payment"]) {
-            assert.throws(
-              () => parseInputs(env({ INPUT_MAINNET: value, GITHUB_EVENT_NAME: name, INPUT_TIER: tier })),
-              (error) => error instanceof InputError && SENTENCE.test(error.message) && /Nothing was installed, started, sent or signed\.$/.test(error.message),
-              `${value} ${name} ${tier}`,
-            );
-          }
-        }
+        const inputs = parseInputs(allowed({ INPUT_MAINNET: value }));
+        assert.equal(inputs.mainnet, true, value);
+        assert.equal(inputs.tier, "payment", value);
       }
     });
 
-    it("adds the runner rule on a runner that is not GitHub-hosted", () => {
-      for (const runner of ["self-hosted", undefined]) {
+    it("is refused on every other event, and names the event", () => {
+      for (const name of ["push", "schedule", "pull_request", "merge_group"]) {
         assert.throws(
-          () => parseInputs(env({ INPUT_MAINNET: "true", GITHUB_EVENT_NAME: "workflow_dispatch", RUNNER_ENVIRONMENT: runner })),
-          (error) =>
-            SENTENCE.test(error.message) &&
-            error.message.includes("The input is also refused on a runner that is not GitHub-hosted: a self-hosted runner keeps files and processes between jobs."),
-          String(runner),
-        );
-      }
-      assert.throws(
-        () => parseInputs(env({ INPUT_MAINNET: "true", GITHUB_EVENT_NAME: "workflow_dispatch" })),
-        (error) => !/GitHub-hosted/.test(error.message),
-      );
-    });
-
-    it("adds the workflow_dispatch rule on any other event, and names the event", () => {
-      for (const name of ["push", "schedule", "pull_request"]) {
-        assert.throws(
-          () => parseInputs(env({ INPUT_MAINNET: "true", GITHUB_EVENT_NAME: name })),
-          (error) => error.message.includes(`The input is also refused on every event but workflow_dispatch, and this run's event is ${name}.`),
+          () => parseInputs(allowed({ GITHUB_EVENT_NAME: name })),
+          refusedWith(`it is honoured only on workflow_dispatch (a run started by hand), and this run's event is ${name}`),
           name,
         );
       }
       assert.throws(
-        () => parseInputs(env({ INPUT_MAINNET: "true", GITHUB_EVENT_NAME: "workflow_dispatch" })),
-        (error) => SENTENCE.test(error.message) && !/also refused/.test(error.message),
+        () => parseInputs(allowed({ GITHUB_EVENT_NAME: "push; id" })),
+        (error) => refusedWith("this run's event is another event")(error) && !error.message.includes("push; id"),
       );
+    });
+
+    it("is refused on a runner that is not GitHub-hosted", () => {
+      for (const runner of ["self-hosted", undefined, ""]) {
+        assert.throws(
+          () => parseInputs(allowed({ RUNNER_ENVIRONMENT: runner })),
+          refusedWith("it is refused on a runner that is not GitHub-hosted: a self-hosted runner keeps files and processes between jobs"),
+          String(runner),
+        );
+      }
+    });
+
+    it("is refused beside the read-only tier, given or by default: a mainnet run pays", () => {
+      for (const tier of ["read-only", ""]) {
+        assert.throws(
+          () => parseInputs(allowed({ INPUT_TIER: tier })),
+          refusedWith("it is a paying run on Stellar mainnet, so it needs tier: payment as well"),
+          JSON.stringify(tier),
+        );
+      }
+    });
+
+    it("names every rule it breaks, in one refusal", () => {
       assert.throws(
-        () => parseInputs(env({ INPUT_MAINNET: "true", GITHUB_EVENT_NAME: "push; id" })),
-        (error) => !error.message.includes("push; id") && /this run's event is another event\./.test(error.message),
+        () => parseInputs(allowed({ GITHUB_EVENT_NAME: "push", RUNNER_ENVIRONMENT: "self-hosted", INPUT_TIER: "read-only" })),
+        (error) =>
+          refusedWith("this run's event is push")(error) &&
+          error.message.includes("not GitHub-hosted") &&
+          error.message.includes("tier: payment as well"),
       );
+    });
+
+    it("is refused before any other input is read: a bad endpoint name beside it does not change the refusal", () => {
+      assert.throws(() => parseInputs(allowed({ GITHUB_EVENT_NAME: "push", INPUT_ENDPOINTS: "a b" })), MainnetRefusedError);
     });
 
     it("refuses any other value, without quoting it", () => {
@@ -186,7 +203,7 @@ describe("parseInputs", () => {
 
 describe("buildRunArgs", () => {
   const cli = "/opt/wasit/packages/cli/dist/index.js";
-  const paths = { cli, report: "/tmp/w/report.json" };
+  const paths = { cli, report: "/tmp/w/report.json", ledgerDir: "/tmp/w/ledger" };
 
   it("is one call: run --read-only --start --json --out, with the config", () => {
     assert.deepEqual(buildRunArgs(parseInputs(env()), paths), [cli, "run", "--read-only", "--start-if-local", "--json", "--out", "/tmp/w/report.json", "--config", "wasit.config.json"]);
@@ -201,10 +218,28 @@ describe("buildRunArgs", () => {
     ]);
   });
 
-  it("offers no flag that opts in or carries a key, on either tier", () => {
+  it("offers no flag that opts in or carries a key, on either tier, without mainnet: true", () => {
     for (const tier of ["read-only", "payment"]) {
       const joined = buildRunArgs(parseInputs(env({ INPUT_TIER: tier })), paths).join(" ");
-      assert.ok(!/--dry-run|--mainnet|--payer-key|--commitment-key|--allow-destructive/.test(joined), tier);
+      assert.ok(!/--dry-run|--mainnet|--ledger-dir|--payer-key|--commitment-key|--allow-destructive/.test(joined), tier);
+    }
+  });
+
+  it("with mainnet: true: run --mainnet --ledger-dir, never --read-only or --start-if-local, and no key flag (B18 O3)", () => {
+    const mainnet = parseInputs(env({ INPUT_MAINNET: "true", GITHUB_EVENT_NAME: "workflow_dispatch", INPUT_TIER: "payment", INPUT_ENVIRONMENT: "mainnet", INPUT_ENDPOINTS: "weather" }));
+    assert.deepEqual(buildRunArgs(mainnet, { ...paths, baseline: "/tmp/w/baseline/baseline.json" }), [
+      cli, "run", "--mainnet", "--ledger-dir", "/tmp/w/ledger", "--json", "--out", "/tmp/w/report.json",
+      "--baseline", "/tmp/w/baseline/baseline.json",
+      "--config", "wasit.config.json", "--env", "mainnet", "--endpoint", "weather",
+    ]);
+    const joined = buildRunArgs(mainnet, paths).join(" ");
+    assert.ok(!/--read-only|--start|--dry-run|--payer-key|--commitment-key|--allow-destructive/.test(joined), joined);
+  });
+
+  it("with mainnet: true and no ledger folder: refused, never a mainnet run that writes its ledger somewhere else", () => {
+    const mainnet = parseInputs(env({ INPUT_MAINNET: "true", GITHUB_EVENT_NAME: "workflow_dispatch", INPUT_TIER: "payment" }));
+    for (const ledgerDir of [undefined, "", "relative/ledger"]) {
+      assert.throws(() => buildRunArgs(mainnet, { cli, report: "/tmp/w/report.json", ledgerDir }), InputError, String(ledgerDir));
     }
   });
 
@@ -215,7 +250,7 @@ describe("buildRunArgs", () => {
   });
 
   it("keeps a value that looks like a flag a single argument after its option", () => {
-    const args = buildRunArgs({ config: "wasit.config.json", environment: "staging", tier: "read-only", endpoints: ["a"] }, paths);
+    const args = buildRunArgs({ config: "wasit.config.json", environment: "staging", tier: "read-only", endpoints: ["a"], mainnet: false }, paths);
     assert.equal(args[args.indexOf("--env") + 1], "staging");
   });
 });

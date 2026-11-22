@@ -7,10 +7,9 @@
  * as expected. Each rule here throws {@link MainnetPlanRefusedError} when it
  * does not hold; nothing was signed at that point.
  *
- * This version has no mainnet opt-in (spec B12): `stellar:pubnet` is refused
- * by L0 before any of this is reached, and nothing here says "allowed". The
- * opt-in calls these in L1, before anything is signed. The run budget does not
- * value {@link MAINNET_USDC} in this version, so no charge on mainnet passes.
+ * Nothing here says "allowed": the plan of a mainnet run (L1, with the opt-in)
+ * and its signatures (L2) call these before anything is signed, and the dry
+ * run on `stellar:pubnet` calls them with no key.
  *
  * Pure: no network, no key. The reads they judge are `horizon.ts` and the
  * chain adapter's.

@@ -51,7 +51,7 @@ const TEST_NETWORKS = [
 ];
 
 const REFUSED = /Nothing was sent and nothing was signed/;
-const NO_OPT_IN = /the mainnet opt-in is not part of this version/;
+const NO_OPT_IN = /this run has no mainnet opt-in: Wasit pays there only through wasit run --mainnet, the Action's mainnet: true on workflow_dispatch, or the MCP server's wasit_x402_mainnet_test/;
 const MPP_TEST_ONLY = /MPP stays on test networks/;
 
 /** Any HTTP target, counting every request that reaches it. */

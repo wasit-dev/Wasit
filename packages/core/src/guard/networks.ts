@@ -95,8 +95,10 @@ export function assertPaymentNetworkAllowed(protocol: PaymentProtocol, network: 
       network,
       kind,
       protocol === "x402"
-        ? `${network} is Stellar mainnet. This version of Wasit pays on test networks ` +
-            `only (${testNetworks()}); the mainnet opt-in is not part of this version.`
+        ? `${network} is Stellar mainnet, and this run has no mainnet opt-in: Wasit pays there only through ` +
+            `wasit run --mainnet, the Action's mainnet: true on workflow_dispatch, or the MCP server's ` +
+            `wasit_x402_mainnet_test, each with every rule of the opt-in. Without it Wasit pays on test ` +
+            `networks only (${testNetworks()}).`
         : `${network} is Stellar mainnet, and MPP stays on test networks: the MPP ` +
             `checks pay on stellar:testnet only.`,
     );

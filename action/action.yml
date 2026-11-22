@@ -2,8 +2,9 @@ name: Wasit
 description: >-
   Runs Wasit's x402 checks against your service inside the job, comments the
   result on the pull request, and compares it with main. The payment tier pays
-  on test networks only, on push to the default branch, schedule and
-  workflow_dispatch. Runs on pull_request, push, schedule, workflow_dispatch
+  on test networks, on push to the default branch, schedule and
+  workflow_dispatch; with mainnet: true (beta) it pays on Stellar mainnet, on
+  workflow_dispatch only. Runs on pull_request, push, schedule, workflow_dispatch
   and merge_group, and refuses any other event. Linux runners. Needs Node 22
   or later (add actions/setup-node before this step).
 
@@ -34,10 +35,16 @@ inputs:
     default: ""
   mainnet:
     description: >-
-      Refused in this version: the mainnet opt-in is not part of it. true stops
-      the job with exit 2 before Wasit is installed or your service starts, and
-      the job summary says so; nothing is sent or signed. The payment tier pays
-      on test networks only.
+      Beta. true pays on Stellar mainnet (stellar:pubnet), real funds, in USDC
+      only, at most $1.00 a payment and $5.00 a run: honoured only on
+      workflow_dispatch, on a GitHub-hosted runner, with tier: payment, and
+      every other rule of wasit run --mainnet holds (the default branch, a
+      deployed service, the key in WASIT_MAINNET_PAYER_SECRET only, the pin, an
+      https RPC). Anywhere else the job stops with exit 2 before anything is
+      sent or signed, and the job summary says why. Keep that key as the secret
+      of a GitHub environment limited to the default branch, with a required
+      reviewer. The run ledger is uploaded as the artifact wasit-mainnet-ledger:
+      it holds no key, and it holds the payer's address and balances.
     required: false
     default: "false"
 
@@ -101,6 +108,7 @@ runs:
         fi
 
     - name: Check the inputs
+      id: inputs
       shell: bash
       env:
         ACTION_PATH: ${{ github.action_path }}
@@ -309,4 +317,28 @@ runs:
       with:
         name: wasit-baseline
         path: ${{ runner.temp }}/wasit/baseline-next.json
+        if-no-files-found: warn
+
+    # A mainnet run's ledger (B18 O3): every signature, written before the key
+    # signed, and the balances before and after. Uploaded whatever the run's
+    # result, and only on a run the input check let through as mainnet.
+    - name: Upload the mainnet ledger
+      if: ${{ always() && steps.inputs.outputs.mainnet == 'true' && steps.run.conclusion != 'skipped' }}
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      env:
+        STELLAR_PRIVATE_KEY: ""
+        EVM_PRIVATE_KEY: ""
+        SVM_PRIVATE_KEY: ""
+        MPP_PAYER_SECRET: ""
+        COMMITMENT_SECRET_HEX: ""
+        WASIT_MAINNET_PAYER_SECRET: ""
+        NODE_OPTIONS: ""
+        BASH_ENV: ""
+        ENV: ""
+        LD_PRELOAD: ""
+        LD_LIBRARY_PATH: ""
+        LD_AUDIT: ""
+      with:
+        name: wasit-mainnet-ledger
+        path: ${{ runner.temp }}/wasit/ledger/wasit-ledger-*.json
         if-no-files-found: warn

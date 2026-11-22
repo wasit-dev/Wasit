@@ -143,16 +143,8 @@ export {
 } from "./guard/networks.js";
 export type { NetworkClass, PaymentProtocol } from "./guard/networks.js";
 
-// The mainnet opt-in switches of this version: each one refuses (spec B12).
-export {
-  MAINNET_OPT_IN_ABSENT,
-  MainnetOptInRefusedError,
-  mainnetStartupSwitches,
-  refuseMainnetSwitch,
-} from "./guard/mainnet-optin.js";
 export { MainnetJobRefusedError, assertMainnetJob, isLocalHost, mainnetJobRefusals, type MainnetJob } from "./guard/ci-mainnet.js";
-export type { MainnetSwitch } from "./guard/mainnet-optin.js";
-// The mainnet payer's $10 and the lock of a mainnet run (spec B17.5): rules that only refuse; nothing calls them yet.
+// The mainnet payer's $10 and the lock of a mainnet run (spec B17.5): rules that only refuse; the opt-in and its plan call them.
 export {
   MAINNET_PAYER_MAX_BASE_UNITS,
   MAINNET_PAYER_MAX_USD,
@@ -168,7 +160,7 @@ export {
   type LockHolder,
   type MainnetRunLock,
 } from "./guard/run-lock.js";
-// L1's mainnet rules and the two reads on public Horizon (spec B3, B4, B17.2): rules that only refuse; nothing calls them yet.
+// L1's mainnet rules and the two reads on public Horizon (spec B3, B4, B17.2): rules that only refuse; the plan and the close call them.
 export {
   MAINNET_ANCHOR_MAX_GAP_LEDGERS,
   MAINNET_MAX_TIMEOUT_SECONDS,

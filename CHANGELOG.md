@@ -35,17 +35,15 @@ All notable changes to Wasit are recorded here. Versions follow [Semantic Versio
 
 **Added.**
 - `@wasit-dev/core` exports `mainnetJobRefusals` and `assertMainnetJob`: the
-  rules a job in GitHub Actions has to meet for the mainnet opt-in, which this
-  version does not have. The run is started by hand (`workflow_dispatch`), on
+  rules a job in GitHub Actions has to meet for the mainnet opt-in. The run is
+  started by hand (`workflow_dispatch`), on
   the default branch, on a GitHub-hosted runner; it tests a deployed service
   (no `service.start`, no local `baseUrl`); nothing was installed in the job
   before Wasit (no `node_modules` in the workspace); and
   `WASIT_MAINNET_PAYER_SECRET` is the only key variable set. Outside GitHub
-  Actions none of them applies. `--mainnet` and the Action's `mainnet: true`
-  still refuse in this version, and now also name the runner rule on a runner
-  that is not GitHub-hosted.
-- `@wasit-dev/core` exports two more rules of the mainnet opt-in, which this
-  version does not have; nothing calls them yet. `assertMainnetPayerBalance`
+  Actions none of them applies.
+- `@wasit-dev/core` exports two more rules of the mainnet opt-in, which the
+  opt-in and its plan call. `assertMainnetPayerBalance`
   reads the payer's USDC balance on `stellar:pubnet` and refuses the run when
   the account holds more than $10 or the balance cannot be read: the $5 cap
   holds one run, not two at once on one account, so the account is the limit.
@@ -55,8 +53,8 @@ All notable changes to Wasit are recorded here. Versions follow [Semantic Versio
   (its authorizations may still be open, so a person reads its ledger and
   deletes the file), or a file that is not a lock. It does not see another
   machine.
-- `@wasit-dev/core` exports the plan rules of the mainnet opt-in, which this
-  version does not have; nothing calls them yet. `MAINNET_USDC` is Circle's
+- `@wasit-dev/core` exports the plan rules of the mainnet opt-in, which its
+  plan calls. `MAINNET_USDC` is Circle's
   USDC on Stellar mainnet (`CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75`,
   checked against Circle's issuer, the contract the SDK derives from it, and
   the x402 SDK's constant). A mainnet run would pay only that asset, to a
@@ -74,8 +72,7 @@ All notable changes to Wasit are recorded here. Versions follow [Semantic Versio
   settlement. The file (`wasit-ledger-<UTC time>.json`) is created new, never
   overwritten, and rewritten whole on every change so it stays valid JSON;
   closing it records the payer's balances and whether they moved as the
-  ledger says. No CLI option writes one yet: it is the record a mainnet run
-  will keep.
+  ledger says. Every mainnet run writes one.
 - `@wasit-dev/core` has the mainnet opt-in for x402 on `stellar:pubnet`:
   `openMainnetOptIn` is the one place it is made. It opens a run only when the
   environment is on `stellar:pubnet` with `operatedByMe: true`, the key is in
@@ -94,8 +91,7 @@ All notable changes to Wasit are recorded here. Versions follow [Semantic Versio
   on this machine), with no user name or password in it, and not through a
   redirect. The plan prints that URL (origin and path, never the query), and a
   payment the service sends anywhere else after the plan is refused. The run
-  budget values mainnet USDC (7 decimals). MPP never pays on mainnet. The
-  Action and the MCP server do not use it yet.
+  budget values mainnet USDC (7 decimals). MPP never pays on mainnet.
 - `wasit run --mainnet` pays real USDC on `stellar:pubnet` (x402 only), through
   that opt-in: every rule above is checked before a service starts or the
   target is asked anything, and a run that may not pay (a pull request, a run
@@ -114,6 +110,31 @@ All notable changes to Wasit are recorded here. Versions follow [Semantic Versio
   front ends share: `planMainnetDryRun`, `mainnetOpeningLine`, `closeMainnetRun`
   (the wait, the balances after, the ledger closed, the lock released) and
   `githubDefaultBranch`.
+- The Action's `mainnet: true` (beta) runs `wasit run --mainnet`. It is
+  honoured only on `workflow_dispatch`, on a GitHub-hosted runner, with
+  `tier: payment`; anywhere else the job stops with exit 2 before Wasit is
+  installed, and the job summary names every rule it broke. The Action never
+  starts a service on mainnet, and it uploads the run ledger as the artifact
+  `wasit-mainnet-ledger` (no key in it; the payer's address and balances are).
+  Every other rule is `wasit run --mainnet`'s.
+- The MCP server has a mainnet opt-in (beta), set when it starts and never by
+  an agent: `WASIT_MAINNET_OPT_IN=1`, `WASIT_MAINNET_CONFIG` (an absolute path)
+  and `WASIT_MAINNET_ENVIRONMENT`, all three or none, outside CI. The server
+  reads that config once and registers `wasit_x402_mainnet_test`, whose only
+  argument is the name of an x402 endpoint of it; a rule that does not hold
+  (the environment on `stellar:pubnet` with `operatedByMe`, the USDC pin, an
+  https RPC, `WASIT_MAINNET_PAYER_SECRET` set) stops the server at start with
+  exit 2. Each call opens its own mainnet run, one at a time, on one budget
+  for the whole process ($5.00, or the config's lower `maxRunUsd`; a restart
+  resets it), writes its ledger next to the config, and runs to its end even
+  when the client cancels it. The other tools still refuse `stellar:pubnet`,
+  and `--mainnet` among the server's arguments still stops it.
+
+**Removed.**
+- `@wasit-dev/core` no longer exports `refuseMainnetSwitch`,
+  `mainnetStartupSwitches`, `MainnetOptInRefusedError`, `MAINNET_OPT_IN_ABSENT`
+  and the type `MainnetSwitch` (0.8.0-beta.1): the switches that only refused.
+  A front end opens a mainnet run with `openMainnetOptIn`.
 
 **Fixed.**
 - On Stellar testnet the x402 client builds and simulates the payment through

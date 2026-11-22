@@ -229,7 +229,7 @@ describe("L1 then L2: a challenge that changes after the plan", () => {
   it("plans nothing on a network that is not a test network", async () => {
     await assert.rejects(
       planX402Run({ network: "stellar:pubnet", endpoints: [{ name: "weather", target: "http://127.0.0.1:9/x" }] }),
-      /mainnet opt-in is not part of this version/,
+      /this run has no mainnet opt-in: Wasit pays there only through wasit run --mainnet, the Action's mainnet: true on workflow_dispatch, or the MCP server's wasit_x402_mainnet_test/,
     );
   });
 });

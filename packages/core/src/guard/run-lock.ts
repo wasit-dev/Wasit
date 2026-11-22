@@ -17,8 +17,8 @@
  * ledger is in another folder (spec B4). The payer account's $10
  * (`mainnet-payer.ts`) is the limit there.
  *
- * This version has no mainnet opt-in (spec B12): nothing calls this yet. The
- * opt-in takes the lock before L1 and releases it when the run has ended.
+ * The opt-in (`openMainnetOptIn`) takes the lock before L1, and its close
+ * (`closeMainnetRun`) releases it when the run has ended.
  */
 
 import { randomUUID } from "node:crypto";
