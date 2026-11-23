@@ -476,6 +476,19 @@ describe("wasit run --mainnet", () => {
       assert.ok(!existsSync(path.join(ledgerDir, LOCK)));
     });
 
+    it("a plan refused for its cap: the funds line, but no warning that funds can be lost (nothing is signed)", async () => {
+      // B13 V2c: two endpoints at $1.00, the payer between the minimum ($3.00) and the worst case ($7.00 here).
+      wall = await pubnetWall({ "/a": [pubnetOption(payTo, 10_000_000n)], "/b": [pubnetOption(payTo, 10_000_000n)] });
+      world.state.rpcUsdc = 35_000_000n;
+      world.state.horizonUsdc = 35_000_000n;
+      const result = await run({ config: await config(["a", "b"]) });
+      assert.equal(result.code, 2, result.stderr);
+      assert.match(result.stderr, /could spend up to \$7\.00/);
+      assert.match(result.stderr, /^Mainnet: funds: the payer holds \$3\.50 in USDC; .*\$0\.50 above it; worst case \$7\.00\.$/m);
+      assert.doesNotMatch(result.stderr, /Warning:|funds can be lost/);
+      assert.equal(world.signed.length, 0);
+    });
+
     it("a payer holding more than $10 of USDC: refused at the plan, before the target is asked", async () => {
       wall = await pubnetWall({ "/weather": [pubnetOption(payTo, CENT)] });
       world.state.rpcUsdc = 100_000_001n;

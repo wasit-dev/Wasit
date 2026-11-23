@@ -195,6 +195,49 @@ describe("the payer's funds in a mainnet plan", () => {
     assert.match(plan.refusal ?? "", /^This run could spend up to \$7\.00/);
   });
 
+  it("does not warn on a run refused for its cap: nothing is signed, so no funds can be lost (B13 V2c)", async () => {
+    // Two endpoints at $1.00: minimum $3.00, worst case $7.00 here (above the $5.00 cap). $3.50 sits between the two.
+    holds(35_000_000n);
+    const two = [await wall(DOLLAR), await wall(DOLLAR)];
+    const plan = await planX402Run({
+      network: PUBNET,
+      endpoints: two.map((target, index) => ({ name: `e${index}`, target: target.url })),
+      mainnet: optIn,
+    });
+    assert.match(plan.refusal ?? "", /^This run could spend up to \$7\.00/);
+    assert.equal(plan.funding?.warning, undefined);
+    const lines = describePlan(plan);
+    assert.ok(!lines.some((line) => line.startsWith("Warning:")), lines.join("\n"));
+    assert.ok(
+      lines.includes(
+        "Mainnet: funds: the payer holds $3.50 in USDC; this run needs at least $3.00 to finish its checks (the prices, " +
+          "$2.00, plus the highest price again, $1.00): $0.50 above it; worst case $7.00.",
+      ),
+      lines.join("\n"),
+    );
+    assert.equal(lines.at(-1), `Refused: ${plan.refusal}`);
+  });
+
+  it("does not warn on a run refused for an endpoint it cannot plan", async () => {
+    // quote plans at $1.00 (minimum $2.00, worst case $3.50); dear is priced above $1.00 a payment and is refused.
+    holds(25_000_000n);
+    const quote = await wall(DOLLAR);
+    const dear = await wall(DOLLAR + 1n);
+    const plan = await planX402Run({
+      network: PUBNET,
+      endpoints: [
+        { name: "quote", target: quote.url },
+        { name: "dear", target: dear.url },
+      ],
+      mainnet: optIn,
+    });
+    assert.notEqual(plan.refusal, undefined);
+    assert.equal(world.signed.length, 0);
+    assert.equal(plan.funding?.warning, undefined);
+    const lines = describePlan(plan);
+    assert.ok(!lines.some((line) => line.startsWith("Warning:")), lines.join("\n"));
+  });
+
   it("is a refusal only of a paying run: the dry run reads no balance and says what a paying run will hold it to", async () => {
     const target = await wall(DOLLAR);
     const plan = await planMainnetDryRun({ pin: { payTo: PAY_TO, asset: PUBNET_USDC }, endpoints: [{ name: "quote", target: target.url }] });

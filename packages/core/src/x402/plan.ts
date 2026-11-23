@@ -157,7 +157,10 @@ export interface MainnetFunding {
   readonly decimals: number;
   /** The payer's USDC as the plan read it; absent in a dry run, which reads no balance. */
   readonly balance?: bigint;
-  /** Set when the balance is at or above the minimum but below the worst case. */
+  /**
+   * Set on a plan that passed when the balance is at or above the minimum but
+   * below the worst case. A refused plan signs nothing, so it has no warning.
+   */
   readonly warning?: string;
 }
 
@@ -467,8 +470,8 @@ function usdc(units: bigint, decimals: number): string {
 
 /**
  * What the planned endpoints need the payer to hold; undefined when no
- * endpoint is planned. With `balance` (a paying run) it also says whether to
- * warn: at or above the minimum but below the worst case.
+ * endpoint is planned. With `balance` (a paying run) it carries the balance;
+ * the warning is added only once the plan has passed ({@link warnedFunding}).
  */
 function mainnetFunding(endpoints: readonly EndpointPlan[], decimals: number, balance?: bigint): MainnetFunding | undefined {
   const prices = endpoints.flatMap((endpoint) => (endpoint.status === "planned" && endpoint.option !== undefined ? [endpoint.option.amount] : []));
@@ -477,7 +480,15 @@ function mainnetFunding(endpoints: readonly EndpointPlan[], decimals: number, ba
   const highestPrice = prices.reduce((highest, price) => (price > highest ? price : highest), 0n);
   const minimum = sum + highestPrice;
   const worstCase = endpoints.reduce((total, endpoint) => total + (endpoint.status === "planned" ? endpoint.worstCase : 0n), 0n);
-  const funding: MainnetFunding = { prices: sum, highestPrice, minimum, worstCase, decimals, ...(balance === undefined ? {} : { balance }) };
+  return { prices: sum, highestPrice, minimum, worstCase, decimals, ...(balance === undefined ? {} : { balance }) };
+}
+
+/**
+ * The funds of a paying plan that passed every refusal, with the warning when
+ * the balance is at or above the minimum but below the worst case.
+ */
+function warnedFunding(funding: MainnetFunding): MainnetFunding {
+  const { balance, decimals, minimum, worstCase } = funding;
   if (balance === undefined || balance < minimum || balance >= worstCase) return funding;
   return {
     ...funding,
@@ -618,11 +629,13 @@ async function planLiveMainnetRun(options: X402PlanOptions, optIn: MainnetOptIn)
   // payer's funds: a run that could not finish its checks does not start.
   const refusal = mainnetRefusal(endpoints, worstCaseUsd, budget, capLowered) ?? fundingRefusal(funding);
   if (refusal !== undefined) {
+    // A refused run signs nothing, so it carries no warning that funds can be lost.
     optIn.stop(refusal);
     return { ...plan, refusal };
   }
-  recordMainnetPlan(optIn, plan);
-  return plan;
+  const passed: RunPlan = funding === undefined ? plan : { ...plan, funding: warnedFunding(funding) };
+  recordMainnetPlan(optIn, passed);
+  return passed;
 }
 
 /**
