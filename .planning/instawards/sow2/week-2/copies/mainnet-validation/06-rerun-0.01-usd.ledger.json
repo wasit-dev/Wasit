@@ -1,0 +1,207 @@
+{
+  "format": "wasit-run-ledger",
+  "version": 1,
+  "openedAt": "2026-11-23T03:49:39.433Z",
+  "versions": {
+    "wasit.cli": "0.8.0-beta.1",
+    "wasit.core": "0.8.0-beta.1",
+    "sdk.x402Version": "2",
+    "sdk.@x402/core": "2.28.0",
+    "sdk.@x402/stellar": "2.28.0",
+    "sdk.@stellar/mpp": "0.7.1",
+    "sdk.mppx": "0.8.14",
+    "sdk.@stellar/stellar-sdk": "16.4.1"
+  },
+  "environment": "mainnet",
+  "network": "stellar:pubnet",
+  "payer": "GCJPZARVX662YFJXYNAXDJLOEVHJF5TU7TGQDV5Z4I2M65NZSL25AL7V",
+  "pin": {
+    "payTo": "GBFTF5QOLLBF34T6G4GZBOL7VLYQ4GBHNVS6LKFWIZV5F2N5Y35QL6OZ",
+    "asset": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75"
+  },
+  "caps": {
+    "perPaymentUsd": "$1.00",
+    "runUsd": "$5.00"
+  },
+  "rpc": "https://mainnet.sorobanrpc.com",
+  "plan": {
+    "network": "stellar:pubnet",
+    "pin": {
+      "payTo": "GBFTF5QOLLBF34T6G4GZBOL7VLYQ4GBHNVS6LKFWIZV5F2N5Y35QL6OZ",
+      "asset": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75"
+    },
+    "perPaymentCapUsd": "1000000000000000000",
+    "capUsd": "5000000000000000000",
+    "capLowered": false,
+    "endpoints": [
+      {
+        "name": "quote",
+        "status": "planned",
+        "option": {
+          "scheme": "exact",
+          "network": "stellar:pubnet",
+          "payTo": "GBFTF5QOLLBF34T6G4GZBOL7VLYQ4GBHNVS6LKFWIZV5F2N5Y35QL6OZ",
+          "asset": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+          "amount": "100000",
+          "maxTimeoutSeconds": 60
+        },
+        "signatures": [
+          {
+            "check": "X402-06",
+            "amount": "100000"
+          },
+          {
+            "check": "X402-07",
+            "amount": "100000"
+          },
+          {
+            "check": "X402-09",
+            "amount": "50000"
+          },
+          {
+            "check": "X402-10",
+            "amount": "100000"
+          },
+          {
+            "check": "X402-11",
+            "amount": "100000"
+          }
+        ],
+        "worstCase": "450000",
+        "worstCaseUsd": "45000000000000000",
+        "url": "http://127.0.0.1:4412/paid"
+      }
+    ],
+    "worstCaseUsd": "45000000000000000",
+    "mainnet": {
+      "payer": "GCJPZARVX662YFJXYNAXDJLOEVHJF5TU7TGQDV5Z4I2M65NZSL25AL7V",
+      "decimals": 7,
+      "usdc": "12384386",
+      "native": "509918892",
+      "rpcLatest": 65623945,
+      "horizonLatest": 65623946,
+      "rpc": "https://mainnet.sorobanrpc.com",
+      "horizon": "https://horizon.stellar.org",
+      "remainingUsd": "5000000000000000000"
+    },
+    "funding": {
+      "prices": "100000",
+      "highestPrice": "100000",
+      "minimum": "200000",
+      "worstCase": "450000",
+      "decimals": 7,
+      "balance": "12384386"
+    }
+  },
+  "balancesBefore": {
+    "usdc": "12384386",
+    "native": "509918892",
+    "source": "public Horizon (https://horizon.stellar.org)",
+    "at": "2026-11-23T03:49:39.439Z"
+  },
+  "entries": [
+    {
+      "id": 1,
+      "endpoint": "quote",
+      "check": "X402-06",
+      "network": "stellar:pubnet",
+      "asset": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "payTo": "GBFTF5QOLLBF34T6G4GZBOL7VLYQ4GBHNVS6LKFWIZV5F2N5Y35QL6OZ",
+      "amount": "100000",
+      "intentAt": "2026-11-23T03:49:39.703Z",
+      "state": "signed",
+      "signedAt": "2026-11-23T03:49:43.558Z",
+      "expiresAtLedger": 65623958,
+      "sent": {
+        "at": "2026-11-23T03:50:03.395Z",
+        "status": 200
+      },
+      "settlement": {
+        "reference": "12a1e20e1a70d6160c463c200946f6734e14c43938469cfd415f757ac8c15d8f",
+        "verified": true
+      },
+      "verdict": "pass"
+    },
+    {
+      "id": 2,
+      "endpoint": "quote",
+      "check": "X402-07",
+      "network": "stellar:pubnet",
+      "asset": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "payTo": "GBFTF5QOLLBF34T6G4GZBOL7VLYQ4GBHNVS6LKFWIZV5F2N5Y35QL6OZ",
+      "amount": "100000",
+      "intentAt": "2026-11-23T03:50:04.220Z",
+      "state": "signed",
+      "signedAt": "2026-11-23T03:50:09.471Z",
+      "expiresAtLedger": 65623963,
+      "sent": {
+        "at": "2026-11-23T03:50:14.407Z",
+        "status": 402
+      },
+      "verdict": "pass"
+    },
+    {
+      "id": 3,
+      "endpoint": "quote",
+      "check": "X402-09",
+      "network": "stellar:pubnet",
+      "asset": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "payTo": "GBFTF5QOLLBF34T6G4GZBOL7VLYQ4GBHNVS6LKFWIZV5F2N5Y35QL6OZ",
+      "amount": "50000",
+      "intentAt": "2026-11-23T03:50:14.722Z",
+      "state": "signed",
+      "signedAt": "2026-11-23T03:50:33.119Z",
+      "expiresAtLedger": 65623965,
+      "sent": {
+        "at": "2026-11-23T03:50:33.128Z",
+        "status": 402
+      },
+      "verdict": "pass"
+    },
+    {
+      "id": 4,
+      "endpoint": "quote",
+      "check": "X402-10",
+      "network": "stellar:pubnet",
+      "asset": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "payTo": "GBFTF5QOLLBF34T6G4GZBOL7VLYQ4GBHNVS6LKFWIZV5F2N5Y35QL6OZ",
+      "amount": "100000",
+      "intentAt": "2026-11-23T03:50:33.142Z",
+      "state": "signed",
+      "signedAt": "2026-11-23T03:50:39.291Z",
+      "expiresAtLedger": 65623958,
+      "sent": {
+        "at": "2026-11-23T03:51:00.287Z",
+        "status": 402
+      },
+      "verdict": "pass"
+    },
+    {
+      "id": 5,
+      "endpoint": "quote",
+      "check": "X402-11",
+      "network": "stellar:pubnet",
+      "asset": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+      "payTo": "GBFTF5QOLLBF34T6G4GZBOL7VLYQ4GBHNVS6LKFWIZV5F2N5Y35QL6OZ",
+      "amount": "100000",
+      "intentAt": "2026-11-23T03:51:00.307Z",
+      "state": "signed",
+      "signedAt": "2026-11-23T03:51:07.314Z",
+      "expiresAtLedger": 65623974,
+      "sent": {
+        "at": "2026-11-23T03:51:13.905Z",
+        "status": 400
+      },
+      "verdict": "pass"
+    }
+  ],
+  "balancesAfter": {
+    "usdc": "12284386",
+    "native": "509918892",
+    "source": "public Horizon (https://horizon.stellar.org)",
+    "at": "2026-11-23T03:52:07.920Z"
+  },
+  "result": "consistent",
+  "reasons": [],
+  "closedAt": "2026-11-23T03:52:07.920Z"
+}

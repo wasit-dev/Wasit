@@ -1,0 +1,98 @@
+Excerpts of the output of the mainnet validation runs, 2026-11-23, copied from the maintainer's terminal.
+Only the lines that carry the result are kept; nothing is edited inside a line. The ledger files next to this
+one and the linked transactions are the full record of the paid runs. A and B are the two addresses named in
+job 03. Commit 2e5ea94 for the first set, commit 9eff947 for the second set.
+
+=== First set (2e5ea94): dry run, no key ===
+Network: stellar:pubnet (mainnet)
+Pinned: payTo GBFTF5QOLLBF34T6G4GZBOL7VLYQ4GBHNVS6LKFWIZV5F2N5Y35QL6OZ, asset CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75.
+    X402-06 100000, X402-07 100000, X402-09 50000, X402-10 100000, X402-11 100000 (base units)
+Worst case: $0.045 of $5.00.
+
+=== First set: the six refusals, payer's key present ===
+no --mainnet:
+wasit run: stellar:pubnet is Stellar mainnet: a paying run there needs --mainnet, and every rule of the mainnet opt-in (see wasit run --help). Nothing was started, sent or signed.
+
+price $1.01:
+  quote at http://127.0.0.1:4412/paid: refused: it is priced at 10100000 base units of USDC ($1.01), above the $1.00 per payment fixed in Wasit. Nothing was signed. Test a route priced at $1.00 or less.
+
+two endpoints at $1.00:
+Worst case: $8.00 of $5.00.
+Refused: This run could spend up to $8.00 (quote $4.50, quote2 $3.50), above the $5.00 per run. Nothing was signed. Select fewer endpoints, or test a cheaper route.
+
+the pin on another address (an address nobody holds a key for):
+  quote at http://127.0.0.1:4412/paid: refused: Option 1 of the challenge (exact, stellar:pubnet) has payTo "GBFTF5QOLLBF34T6G4GZBOL7VLYQ4GBHNVS6LKFWIZV5F2N5Y35QL6OZ", not the pinned GBNTV5XIMYJJJQ4NINLXISU6GH26OP5WIV6YRWJ3MTLVYIZA5PX2EP3X. Nothing was signed.
+
+another asset:
+  quote at http://127.0.0.1:4412/paid: refused: Option 1 of the challenge (exact, stellar:pubnet) has asset "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA", not the pinned CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75. Nothing was signed.
+
+another network:
+  quote at http://127.0.0.1:4412/paid: not paid: the target offers no payment option on stellar:pubnet (it offers stellar:testnet), so no payment was attempted (see X402-05).
+
+After the six runs: no ledger file, no lock; the balances of A and B unchanged.
+
+=== First set: first paid run, $0.01 ===
+MAINNET RUN on stellar:pubnet: real funds. Payer GCJPZARVX662YFJXYNAXDJLOEVHJF5TU7TGQDV5Z4I2M65NZSL25AL7V; pays only GBFTF5QOLLBF34T6G4GZBOL7VLYQ4GBHNVS6LKFWIZV5F2N5Y35QL6OZ in USDC; at most $1.00 per payment; at most $5.00 this run. The plan is read next; nothing is signed before it passes.
+Ledger: consistent: the payer's USDC went down by exactly the settlements this run verified (100000 base units), and its XLM did not move.
+  PASS  X402-06  Signature Resubmit Accepted
+        Valid payment accepted (HTTP 200) and settled on-chain for exactly the advertised 100000 base units of CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75 to GBFTF5QOLLBF34T6G4GZBOL7VLYQ4GBHNVS6LKFWIZV5F2N5Y35QL6OZ, verified from the transfer event (tx 98d1b511f9726ca9833836cec4648808e9bdae571b7d96b2b2fe8957fc285288).
+Result: 1 graded (exit 0).
+
+=== First set: $1.00, first attempt (the facilitator's settlement did not reach a ledger) ===
+  FAIL  X402-06  Signature Resubmit Accepted
+        Expected 2xx after a valid payment, got 402 (settlement failed: settle_exact_stellar_transaction_failed).
+  SKIP  X402-07, X402-08, X402-09, X402-10, X402-11
+Ledger: consistent: the payer's USDC went down by exactly the settlements this run verified (0 base units), and its XLM did not move.
+Result: 1 endpoint is non-conformant (1 graded (1 non-conformant)) (exit 1).
+
+=== First set: $1.00, second attempt ===
+  PASS  X402-06  ... settled on-chain for exactly the advertised 10000000 base units ... (tx 379c7b7003582246b2f8c6ab45fe7cfbede15788890ccf0dedc0c326d12d1410).
+  ERROR  X402-07 / X402-09 / X402-10 / X402-11  Check could not run (harness): Stellar simulation failed with error message: HostError: Error(Contract, #10)
+Ledger: consistent: the payer's USDC went down by exactly the settlements this run verified (10000000 base units), and its XLM did not move.
+Result: nothing could be graded: 0 graded, 1 no verdict (exit 2).
+
+=== First set: lax service ===
+  FAIL  X402-09  Underpayment Rejected
+        A validly signed payment for 50000 of the advertised 100000 base units was accepted (HTTP 200) — security-relevant failure: the target served for less than its price. It settled on chain: 50000 base units moved from the payer to payTo in 788c08d0d8ca9b95c90191546f1084e3e53bc4de08243c6e60ae4967b522df7a, read back from the transfer event.
+  FAIL  X402-11  Rejected Request Not Settled
+        A request the config declares invalid was served (HTTP 200) with a valid payment for 100000 base units. The payment was taken: ad1f3ef57578a440148d7f30268750c8094c17f8a5beae4cb81e01aa68618682 (ledger 65623450).
+Ledger: consistent: the payer's USDC went down by exactly the settlements this run verified (250000 base units), and its XLM did not move.
+Result: 1 endpoint is non-conformant (1 graded (1 non-conformant)) (exit 1).
+
+=== First set: the MCP server's tools ===
+1. tools: wasit_x402_test, wasit_mpp_charge_test, wasit_mpp_channel_test, wasit_x402_mainnet_test
+  ERROR  PREFLIGHT  Run Preflight
+        Check could not run (configuration): stellar:pubnet is Stellar mainnet, and this run has no mainnet opt-in: Wasit pays there only through wasit run --mainnet, the Action's mainnet: true on workflow_dispatch, or the MCP server's wasit_x402_mainnet_test, each with every rule of the opt-in. ...
+  ERROR  MPP-01  Charge Settlement On-Chain
+        Check could not run (configuration): stellar:pubnet is Stellar mainnet, and MPP stays on test networks: the MPP checks pay on stellar:testnet only. Nothing was sent and nothing was signed.
+--- 4. wasit_x402_mainnet_test: isError=false outcome=conformant
+mainnet: {"network":"stellar:pubnet","payTo":"GBFTF5QOLLBF34T6G4GZBOL7VLYQ4GBHNVS6LKFWIZV5F2N5Y35QL6OZ","ledgerResult":"consistent","spentUsd":"$0.045","processSpentUsd":"$0.045","processCapUsd":"$5.00"}
+(tx 08b91199…e197)
+
+=== Second set (9eff947): dry run, new line ===
+Mainnet dry run: a paying run also refuses when the payer holds less than $0.02 in USDC (the prices, $0.01, plus the highest price again, $0.01: what it needs to finish its checks), and warns below the worst case of $0.045.
+
+=== Second set: $1.00 against a payer holding $1.2384386 ===
+Mainnet: funds: the payer holds $1.2384386 in USDC; this run needs at least $2.00 to finish its checks (the prices, $1.00, plus the highest price again, $1.00): $0.7615614 short; worst case $4.50.
+Refused: This mainnet run does not start: the payer holds $1.2384386 in USDC, and this run needs at least $2.00 to finish its checks (the prices, $1.00, plus the highest price again, $1.00): $0.7615614 short. Nothing was signed. Add USDC to the payer (it may hold at most $10.00), or select fewer or cheaper endpoints.
+
+=== Second set: paid run, $0.01 ===
+Mainnet: funds: the payer holds $1.2384386 in USDC; this run needs at least $0.02 to finish its checks (the prices, $0.01, plus the highest price again, $0.01): $1.2184386 above it; worst case $0.045.
+  PASS  X402-06 ... (tx 12a1e20e1a70d6160c463c200946f6734e14c43938469cfd415f757ac8c15d8f).
+Ledger: consistent: the payer's USDC went down by exactly the settlements this run verified (100000 base units), and its XLM did not move.
+Result: 1 graded (exit 0).
+
+=== Second set: paid run at exactly $1.00, payer holding $4.2246205 ===
+Mainnet: funds: the payer holds $4.2246205 in USDC; this run needs at least $2.00 to finish its checks (the prices, $1.00, plus the highest price again, $1.00): $2.2246205 above it; worst case $4.50.
+Warning: the payer holds $4.2246205, less than this run's worst case of $4.50. A service that settles payments it should refuse can take more than the $2.00 this run needs: funds can be lost that way, and the later checks may then have too little left to run.
+quote  x402  GET /paid: conformant
+  PASS  X402-06 ... (tx ca6c977926028a5afb7f6cad903174f67e516ce8bd428adf7b8656e3bcac76e9).
+  PASS  X402-07, X402-08, X402-09, X402-10, X402-11
+Ledger: consistent: the payer's USDC went down by exactly the settlements this run verified (10000000 base units), and its XLM did not move.
+Result: 1 graded (exit 0).
+
+=== Second set: the MCP server's mainnet tool, $0.01 ===
+--- 4. wasit_x402_mainnet_test: isError=false outcome=conformant
+  PASS  X402-06 ... (tx c403b83e…b29f).
+mainnet: {"network":"stellar:pubnet","payTo":"GBFTF5QOLLBF34T6G4GZBOL7VLYQ4GBHNVS6LKFWIZV5F2N5Y35QL6OZ","ledgerResult":"consistent","spentUsd":"$0.045","processSpentUsd":"$0.045","processCapUsd":"$5.00"}
+(the output of the client script is cut at 40 lines; the verdicts of X402-09 to X402-11 are in the ledger)
