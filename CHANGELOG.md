@@ -94,7 +94,14 @@ All notable changes to Wasit are recorded here. Versions follow [Semantic Versio
   reads the token's decimals, the payer's USDC through the RPC and on public
   Horizon ($10 at most, both equal) and the latest ledger on both, before the
   service is asked anything; any endpoint it cannot plan, or a worst case above
-  what is left of the cap, refuses the whole run. The payment checks then pay
+  what is left of the cap, refuses the whole run. So does a payer holding less
+  than the run needs to finish its checks: the prices of the endpoints plus the
+  highest price again (one settles at X402-06, and the later checks are still
+  signed for the price). The refusal says how much USDC is missing; a balance
+  at or above that minimum but below the run's worst case gets a warning that
+  a service settling what it should refuse can take more. The plan prints the
+  balance, the minimum, the worst case and the margin; the dry run, which reads
+  no balance, prints the minimum a paying run will hold the payer to. The payment checks then pay
   only through the opt-in's budget, pin, plan, ledger and RPC, with the mainnet
   rules held again on every fresh challenge, and any refusal stops the whole
   run: every later check is skipped with the reason and nothing more is

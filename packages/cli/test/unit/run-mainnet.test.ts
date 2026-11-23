@@ -485,6 +485,21 @@ describe("wasit run --mainnet", () => {
       assert.match(result.stderr, /\$10/);
     });
 
+    it("a payer holding less than the run needs to finish its checks: refused at the plan, says how much is missing", async () => {
+      // B13 V5 attempt 2: $1.27 against one endpoint at $1.00 (minimum $2.00: the price plus the highest price again).
+      wall = await pubnetWall({ "/weather": [pubnetOption(payTo, 10_000_000n)] });
+      world.state.rpcUsdc = 12_733_706n;
+      world.state.horizonUsdc = 12_733_706n;
+      const result = await run({ config: await config(["weather"]) });
+      assert.equal(result.code, 2, result.stderr);
+      assert.match(result.stderr, /the payer holds \$1\.2733706 in USDC, and this run needs at least \$2\.00 to finish its checks/);
+      assert.match(result.stderr, /\$0\.7266294 short\. Nothing was signed\./);
+      assert.match(result.stderr, /^Mainnet: funds: the payer holds \$1\.2733706 in USDC; .*\$0\.7266294 short; worst case \$3\.50\.$/m);
+      assert.equal(world.signed.length, 0);
+      assert.deepEqual(ledgers(), [], "a ledger was opened");
+      assert.ok(!existsSync(path.join(ledgerDir, LOCK)), "the lock was not released");
+    });
+
     it("a refusal during the run stops it: later checks and later endpoints are skipped with the reason, exit 2", async () => {
       wall = await pubnetWall({ "/a": [pubnetOption(payTo, CENT)], "/b": [pubnetOption(payTo, CENT)] });
       const other = Keypair.random().publicKey();

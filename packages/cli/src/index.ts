@@ -360,7 +360,9 @@ tier was asked for and did not pay: no payer key, or operatedByMe not true).
 The payment tier pays on test networks: at most $1.00 a payment and $5.00 a run
 (lower with maxRunUsd), only the pinned payTo and asset when the config pins them.
 On stellar:pubnet it pays only with --mainnet: the first line says MAINNET RUN; the
-plan reads the payer's balances on the RPC and public Horizon first; every signature
+plan reads the payer's balances on the RPC and public Horizon first, and refuses a
+payer holding less than the run needs to finish its checks (the prices plus the
+highest price again; a warning below the worst case); every signature
 is in the run ledger; one refusal stops the whole run (exit 2); at the end the run
 waits until every authorization it signed has expired (up to about five minutes),
 reads the payer's balances again and says whether they match the ledger: consistent;

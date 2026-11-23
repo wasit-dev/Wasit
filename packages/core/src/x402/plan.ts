@@ -137,6 +137,30 @@ export interface EndpointPlan {
   readonly worstCaseUsd: bigint;
 }
 
+/**
+ * What a mainnet run needs the payer to hold (the payer's funds), in USDC base
+ * units. Every endpoint settles once at X402-06 on a service that settles only
+ * what it should; its later checks are then still signed for its price, so the
+ * account must hold that much more. The minimum is the sum of the prices plus
+ * the highest price again. A service that settles what it should refuse can
+ * take up to the worst case.
+ */
+export interface MainnetFunding {
+  /** The prices of the planned endpoints, added up. */
+  readonly prices: bigint;
+  /** The highest of them. */
+  readonly highestPrice: bigint;
+  /** `prices` + `highestPrice`: below it the run is refused. */
+  readonly minimum: bigint;
+  /** The run's own worst case (every signature counted as settled). */
+  readonly worstCase: bigint;
+  readonly decimals: number;
+  /** The payer's USDC as the plan read it; absent in a dry run, which reads no balance. */
+  readonly balance?: bigint;
+  /** Set when the balance is at or above the minimum but below the worst case. */
+  readonly warning?: string;
+}
+
 export interface RunPlan {
   readonly network: string;
   readonly pin?: PinTerms;
@@ -153,6 +177,8 @@ export interface RunPlan {
   readonly mainnet?: MainnetReadings;
   /** The dry run of a mainnet run (`planMainnetDryRun`): no key, so nothing of the payer was read. */
   readonly mainnetDryRun?: true;
+  /** A mainnet plan, paying or dry run, with at least one planned endpoint: what the payer must hold. */
+  readonly funding?: MainnetFunding;
 }
 
 function message(error: unknown): string {
@@ -434,6 +460,54 @@ function mainnetRefusal(
   );
 }
 
+/** USDC base units as dollars, exactly ("$1.2733706"). */
+function usdc(units: bigint, decimals: number): string {
+  return formatUsd(usdFromBaseUnits(units, decimals));
+}
+
+/**
+ * What the planned endpoints need the payer to hold; undefined when no
+ * endpoint is planned. With `balance` (a paying run) it also says whether to
+ * warn: at or above the minimum but below the worst case.
+ */
+function mainnetFunding(endpoints: readonly EndpointPlan[], decimals: number, balance?: bigint): MainnetFunding | undefined {
+  const prices = endpoints.flatMap((endpoint) => (endpoint.status === "planned" && endpoint.option !== undefined ? [endpoint.option.amount] : []));
+  if (prices.length === 0) return undefined;
+  const sum = prices.reduce((total, price) => total + price, 0n);
+  const highestPrice = prices.reduce((highest, price) => (price > highest ? price : highest), 0n);
+  const minimum = sum + highestPrice;
+  const worstCase = endpoints.reduce((total, endpoint) => total + (endpoint.status === "planned" ? endpoint.worstCase : 0n), 0n);
+  const funding: MainnetFunding = { prices: sum, highestPrice, minimum, worstCase, decimals, ...(balance === undefined ? {} : { balance }) };
+  if (balance === undefined || balance < minimum || balance >= worstCase) return funding;
+  return {
+    ...funding,
+    warning:
+      `Warning: the payer holds ${usdc(balance, decimals)}, less than this run's worst case of ${usdc(worstCase, decimals)}. ` +
+      `A service that settles payments it should refuse can take more than the ${usdc(minimum, decimals)} this run needs: ` +
+      `funds can be lost that way, and the later checks may then have too little left to run.`,
+  };
+}
+
+/** The prices clause shared by the refusal, the funds line and the dry run's line. */
+function fundingTerms(funding: MainnetFunding): string {
+  const { decimals } = funding;
+  return (
+    `at least ${usdc(funding.minimum, decimals)} to finish its checks (the prices, ${usdc(funding.prices, decimals)}, ` +
+    `plus the highest price again, ${usdc(funding.highestPrice, decimals)})`
+  );
+}
+
+/** Why a paying mainnet run may not start for lack of funds, or undefined. */
+function fundingRefusal(funding: MainnetFunding | undefined): string | undefined {
+  if (funding?.balance === undefined || funding.balance >= funding.minimum) return undefined;
+  const { decimals, balance } = funding;
+  return (
+    `This mainnet run does not start: the payer holds ${usdc(balance, decimals)} in USDC, and this run needs ` +
+    `${fundingTerms(funding)}: ${usdc(funding.minimum - balance, decimals)} short. Nothing was signed. Add USDC to the ` +
+    `payer (it may hold at most $10.00), or select fewer or cheaper endpoints.`
+  );
+}
+
 export interface MainnetDryRunOptions {
   /** The config environment's pin: required, mainnet USDC to a valid payee. */
   readonly pin?: PinTerms;
@@ -477,7 +551,9 @@ export async function planMainnetDryRun(options: MainnetDryRunOptions): Promise<
   const worstCaseUsd = endpoints
     .filter((endpoint) => endpoint.status === "planned")
     .reduce((sum, endpoint) => sum + endpoint.worstCaseUsd, 0n);
-  const plan: RunPlan = { ...base, endpoints, worstCaseUsd };
+  // No key, so no balance: the plan says what a paying run will hold the payer to.
+  const funding = mainnetFunding(endpoints, MAINNET_USDC.decimals);
+  const plan: RunPlan = { ...base, endpoints, worstCaseUsd, ...(funding === undefined ? {} : { funding }) };
   const refusal = mainnetRefusal(endpoints, worstCaseUsd, budget, capLowered);
   return refusal === undefined ? plan : { ...plan, refusal };
 }
@@ -524,6 +600,8 @@ async function planLiveMainnetRun(options: X402PlanOptions, optIn: MainnetOptIn)
   const budget = optIn.budget;
   const remainingUsd = budget.capUsd - budget.spentUsd;
   const capLowered = budget.capUsd < usdFromDollars(PER_RUN_CAP_USD);
+  // The payer's funds: the balance the plan read, held to what the run needs to finish its checks.
+  const funding = mainnetFunding(endpoints, readings.decimals, readings.usdc);
   const plan: RunPlan = {
     network: options.network,
     pin: optIn.pin,
@@ -533,10 +611,12 @@ async function planLiveMainnetRun(options: X402PlanOptions, optIn: MainnetOptIn)
     endpoints,
     worstCaseUsd,
     mainnet: { ...readings, remainingUsd },
+    ...(funding === undefined ? {} : { funding }),
   };
 
-  // B4: on mainnet one endpoint that cannot be planned keeps the whole run from starting.
-  const refusal = mainnetRefusal(endpoints, worstCaseUsd, budget, capLowered);
+  // B4: on mainnet one endpoint that cannot be planned keeps the whole run from starting; then the cap; then the
+  // payer's funds: a run that could not finish its checks does not start.
+  const refusal = mainnetRefusal(endpoints, worstCaseUsd, budget, capLowered) ?? fundingRefusal(funding);
   if (refusal !== undefined) {
     optIn.stop(refusal);
     return { ...plan, refusal };
@@ -581,6 +661,28 @@ export function mainnetFirstLine(plan: RunPlan): string {
   );
 }
 
+/** The funds lines of a mainnet plan: the balance against the minimum and the worst case, and the warning. */
+function fundingLines(plan: RunPlan): string[] {
+  const funding = plan.funding;
+  if (funding === undefined) return [];
+  const { decimals, balance } = funding;
+  const worst = usdc(funding.worstCase, decimals);
+  if (balance === undefined) {
+    return [
+      `Mainnet dry run: a paying run also refuses when the payer holds less than ${usdc(funding.minimum, decimals)} in USDC ` +
+        `(the prices, ${usdc(funding.prices, decimals)}, plus the highest price again, ${usdc(funding.highestPrice, decimals)}: ` +
+        `what it needs to finish its checks), and warns below the worst case of ${worst}.`,
+    ];
+  }
+  const margin =
+    balance >= funding.minimum ? `${usdc(balance - funding.minimum, decimals)} above it` : `${usdc(funding.minimum - balance, decimals)} short`;
+  return [
+    `Mainnet: funds: the payer holds ${usdc(balance, decimals)} in USDC; this run needs ${fundingTerms(funding)}: ${margin}; ` +
+      `worst case ${worst}.`,
+    ...(funding.warning === undefined ? [] : [funding.warning]),
+  ];
+}
+
 /**
  * The plan for a terminal or a log: the network, the caps, and per endpoint
  * the destination, the asset, the amount of each signature and the worst case.
@@ -607,6 +709,7 @@ export function describePlan(plan: RunPlan): string[] {
             "token's decimals (7), and the RPC's latest ledger beside public Horizon's (12 apart at most).",
         ]
       : []),
+    ...fundingLines(plan),
   ];
   for (const endpoint of plan.endpoints) {
     const at = endpoint.url === undefined ? "" : ` at ${endpoint.url}`;

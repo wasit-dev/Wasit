@@ -368,6 +368,23 @@ describe("the MCP server's mainnet opt-in", () => {
       assert.equal((await call(setup, "weather")).result.refused, undefined);
     });
 
+    it("refuses a call whose payer holds less than the run needs to finish its checks: nothing signed, no lock on the tool", async () => {
+      wall = await pubnetWall({ "/weather": [pubnetOption(payTo, DOLLAR)] });
+      world.state.rpcUsdc = 12_733_706n;
+      world.state.horizonUsdc = 12_733_706n;
+      const setup = setupOf(await config(["weather"]));
+      const refused = await call(setup, "weather");
+      assert.match(refused.result.refused ?? "", /the payer holds \$1\.2733706 in USDC, and this run needs at least \$2\.00 to finish its checks .*\$0\.7266294 short\. Nothing was signed\./);
+      assert.ok(refused.lines.some((line) => /^Mainnet: funds: the payer holds \$1\.2733706 in USDC; /.test(line)), refused.lines.join("\n"));
+      assert.equal(world.signed.length, 0);
+      assert.equal(ledgers().length, 0);
+      assert.equal(existsSync(path.join(dir, LOCK)), false);
+      // A refusal before the ledger opens does not lock the tool: with enough funds, the next call runs.
+      world.state.rpcUsdc = 50_000_000n;
+      world.state.horizonUsdc = 50_000_000n;
+      assert.equal((await call(setup, "weather")).result.refused, undefined);
+    });
+
     it("is a verdict the result can carry only when the run did not stop and its ledger is consistent", async () => {
       wall = await pubnetWall({ "/weather": [pubnetOption(payTo, CENT)] });
       const setup = setupOf(await config(["weather"]));

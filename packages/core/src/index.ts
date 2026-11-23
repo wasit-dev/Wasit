@@ -222,6 +222,7 @@ export type {
   EndpointPlan,
   EndpointPlanStatus,
   MainnetDryRunOptions,
+  MainnetFunding,
   MainnetReadings,
   PlannedOption,
   RunPlan,
