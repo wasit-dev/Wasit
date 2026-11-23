@@ -32,7 +32,7 @@ down.
 
 ### What was run, and where
 
-The maintainer ran every command below in their own terminal; no agent held a mainnet key or ran a mainnet command. The service under test is a copy of the example project's seller with **our own facilitator** (the official SDK's facilitator, in process) and a **free public mainnet RPC**, listening on `127.0.0.1` only. Two accounts, both the maintainer's own and made only for this: the payer [A](https://stellar.expert/explorer/public/account/GCJPZARVX662YFJXYNAXDJLOEVHJF5TU7TGQDV5Z4I2M65NZSL25AL7V) (a small USDC balance, never above the $10 the plan allows) and the receiving address and facilitator [B](https://stellar.expert/explorer/public/account/GBFTF5QOLLBF34T6G4GZBOL7VLYQ4GBHNVS6LKFWIZV5F2N5Y35QL6OZ). Every payment went from A to B. The code is the local branch of the opt-in (it is not pushed before the validation is accepted, so the Action cannot build it from a ref anyone can name): commit `2e5ea94` for the first set of runs and, after one change made from what they showed (below), commit `9eff947` for the second set. Both commits are expected to become public with the release (the final report names the commit the last runs were made on); until then the ledger copies below are the readable record of each run.
+The maintainer ran every command below in their own terminal; no agent held a mainnet key or ran a mainnet command. The service under test is a copy of the example project's seller with **our own facilitator** (the official SDK's facilitator, in process) and a **free public mainnet RPC**, listening on `127.0.0.1` only. Two accounts, both the maintainer's own and made only for this: the payer [A](https://stellar.expert/explorer/public/account/GCJPZARVX662YFJXYNAXDJLOEVHJF5TU7TGQDV5Z4I2M65NZSL25AL7V) (a small USDC balance, never above the $10 the plan allows) and the receiving address and facilitator [B](https://stellar.expert/explorer/public/account/GBFTF5QOLLBF34T6G4GZBOL7VLYQ4GBHNVS6LKFWIZV5F2N5Y35QL6OZ). Every payment went from A to B. The code is the local branch of the opt-in (it is not pushed before the validation is accepted, so the Action cannot build it from a ref anyone can name): commit `2e5ea94` for the first set of runs and, after one change made from what they showed (below), commit `9eff947` for the second set, and, after a second, smaller change (below), commit `c8cf72a` for the third set. All three commits are expected to become public with the release (the final report names the commit the last runs were made on); until then the ledger copies below are the readable record of each run.
 
 Each paid run writes a **run ledger** before the key signs: one entry per signature, the answer's status, the settlement hash, and the payer's balances before and after (read on public Horizon). The copies are in [`week-2/copies/mainnet-validation/`](week-2/copies/mainnet-validation/) and name no key; each was compared with Stellar Expert and Horizon by hand.
 
@@ -65,19 +65,31 @@ In the $1.00 run the payer held less than the run needed to finish its checks, s
 | Paid run at exactly $1.00, payer holding $4.22 | **X402-01 to X402-11 all pass**, with the new warning (balance below the worst case of $4.50) | [`ca6c9779…76e9`](https://stellar.expert/explorer/public/tx/ca6c977926028a5afb7f6cad903174f67e516ce8bd428adf7b8656e3bcac76e9) · [ledger](week-2/copies/mainnet-validation/07-rerun-1.00-usd.ledger.json) |
 | The MCP server's mainnet tool, price $0.01 | `conformant`, ledger consistent | [`c403b83e…b29f`](https://stellar.expert/explorer/public/tx/c403b83e8901c61aa98ab119b24ad424c786358d62844572146a99bff779b29f) · [ledger](week-2/copies/mainnet-validation/08-rerun-mcp-tool-0.01-usd.ledger.json) |
 
+### One more change, and a third set, commit `c8cf72a`
+
+The warning described above also printed on a run refused for another reason, where nothing is signed and no funds can be lost. A refused plan now carries no warning; a plan that starts is unchanged. The change touches only the text of the plan.
+
+| Run | Result | Proof |
+| --- | --- | --- |
+| Dry run | worst case $0.045, exit 0 | [excerpts](week-2/copies/mainnet-validation/excerpts-of-the-runs.txt) |
+| Two endpoints at $1.00, payer holding $3.2146205 (above the minimum of $3.00, below the worst case of $8.00) | refused for the $5.00 run cap, "Nothing was signed", exit 2, the funds line printed and **no warning**; no ledger opened | [excerpts](week-2/copies/mainnet-validation/excerpts-of-the-runs.txt) |
+| Paid run, price $0.01 | X402-01 to X402-11 pass; ledger consistent | [`3cc8aac7…0382`](https://stellar.expert/explorer/public/tx/3cc8aac77606b023c6dd2f8c3ba85c30372a7c33224465bcbc45c985c45b0382) · [ledger](week-2/copies/mainnet-validation/09-rerun-c8cf72a-0.01-usd.ledger.json) |
+
+Read afterwards on public Horizon (no key): the payer's USDC went from 3.2146205 to 3.2046205 and its XLM did not move; the receiver's USDC rose by 0.01 and its XLM fell by the fee of 12103 stroops. The transaction has one operation, from the receiver's account, and moves 0.01 USDC from the payer to the receiver. The paid path of the warning on a run that starts was not repeated on this commit; it is covered by the offline tests and was seen on mainnet in the second set. The paid run of $1.00, lax mode and the MCP tool were not repeated on this commit: only the plan's text changed.
+
 ### What the runs show
 
 - **A payment within the cap is read back from the chain.** Each paid run's X402-06 names the settlement; the ledger and Stellar Expert agree on the transaction, the amount, the two addresses and the fee. A transfer of exactly $1.00 is accepted.
 - **A payment above the cap, a run that could spend above the run cap, another payee, another asset and another network are each refused before anything is signed.** No refusal opened a ledger or moved a balance.
 - **A service that settles what it should refuse is caught.** In lax mode the underpayment and the refused request were both settled; Wasit failed both checks, named both settlements, and the ledger still matched the chain.
 - **The payer's balances matched the ledger after every paid run.** Its USDC went down by exactly the settlements the run verified, and its XLM did not move during a run (the payer's XLM differs between runs because the account was topped up and swapped by hand between them).
-- **Spent in all:** 2.065 USDC moved from A to B in nine settlements (first set $1.045, second $1.02), and B paid nine network fees of 12103 stroops each (about 0.011 XLM).
+- **Spent in all:** 2.075 USDC moved from A to B in ten settlements (first set $1.045, second $1.02, third $0.01), and B paid ten network fees of 12103 stroops each (about 0.012 XLM).
 
 ### What went wrong or is open
 
 - **One facilitator failure.** The first $1.00 attempt: our facilitator's settlement transaction never reached a ledger. No funds moved (the chain and the balances show it), and the authorization had expired. Wasit reports this as a failed X402-06, with a hint that it may be the facilitator's or its RPC's failure: from the target's answer it cannot tell a target that refuses a valid payment from a facilitator that fails to send. The cause is not established; a raised inclusion fee was used afterwards, and the fee charged did not change, so it is not shown to be the cause.
 - **The free RPC timed out once** while Wasit checked which network it serves; Wasit stopped before anything was sent, as it should.
-- **One message is noisy:** the "funds can be lost" warning also prints when a run is refused for another reason. Planned to change.
+- **One message was noisy, and was changed:** the "funds can be lost" warning also printed when a run was refused for another reason (nothing is signed then). It is now added only to a run that starts. Commit `c8cf72a`; the third set shows the refused run without it.
 - **Not run:** the Action's paid path on mainnet (by design: our key never goes into GitHub secrets), a window of days (these runs are minutes), MPP (it stays on test networks), a service that is not ours, and a close that empties or rotates the accounts: the maintainer chose to keep both accounts as they are (see "The close").
 
 ### The close
@@ -86,6 +98,8 @@ After the last run the maintainer unset the two key variables in the shell they 
 
 Not found in the runs, by their own results and ledgers: a signature without a ledger entry, a transfer outside the plan, or a spend above the plan. This is a reading of the result files and ledgers by the maintainer's session, not a second check by another party.
 
+**After the third set (`c8cf72a`).** The maintainer reported unsetting the two key variables again, in both shells (not checked by this session). The ledger folder held no lock file. Read on public Horizon (no key): the latest transaction on both accounts is the third set's paid run (`3cc8aac7…0382`), and the two before it are the earlier settlements. The payer's USDC is 3.2046205, its XLM is unchanged, and it stayed below $10. The totals still reconcile: 3.2146205 before the run, minus the 0.01 spent, equals what Horizon showed after it. The accounts were again kept, not emptied or rotated.
+
 ### Copies
 
-[`week-2/copies/mainnet-validation/`](week-2/copies/mainnet-validation/): the eight run ledgers and [excerpts of the output](week-2/copies/mainnet-validation/excerpts-of-the-runs.txt) (the lines that carry each result, copied from the maintainer's terminal). The full terminal logs are kept by the maintainer. The linked transactions open on Stellar Expert without a login.
+[`week-2/copies/mainnet-validation/`](week-2/copies/mainnet-validation/): the nine run ledgers and [excerpts of the output](week-2/copies/mainnet-validation/excerpts-of-the-runs.txt) (the lines that carry each result, copied from the maintainer's terminal). The full terminal logs are kept by the maintainer. The linked transactions open on Stellar Expert without a login.

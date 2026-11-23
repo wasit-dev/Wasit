@@ -1,7 +1,7 @@
 Excerpts of the output of the mainnet validation runs, 2026-11-23, copied from the maintainer's terminal.
 Only the lines that carry the result are kept; nothing is edited inside a line. The ledger files next to this
 one and the linked transactions are the full record of the paid runs. A and B are the two addresses named in
-job 03. Commit 2e5ea94 for the first set, commit 9eff947 for the second set.
+job 03. Commit 2e5ea94 for the first set, commit 9eff947 for the second set, commit c8cf72a for the third set.
 
 === First set (2e5ea94): dry run, no key ===
 Network: stellar:pubnet (mainnet)
@@ -96,3 +96,20 @@ Result: 1 graded (exit 0).
   PASS  X402-06 ... (tx c403b83e…b29f).
 mainnet: {"network":"stellar:pubnet","payTo":"GBFTF5QOLLBF34T6G4GZBOL7VLYQ4GBHNVS6LKFWIZV5F2N5Y35QL6OZ","ledgerResult":"consistent","spentUsd":"$0.045","processSpentUsd":"$0.045","processCapUsd":"$5.00"}
 (the output of the client script is cut at 40 lines; the verdicts of X402-09 to X402-11 are in the ledger)
+
+=== Third set (c8cf72a): dry run ===
+Worst case: $0.045 of $5.00.
+exit 0
+
+=== Third set: two endpoints at $1.00, payer holding $3.2146205 (between the minimum $3.00 and the worst case $8.00) ===
+Mainnet: funds: the payer holds $3.2146205 in USDC; this run needs at least $3.00 to finish its checks (the prices, $2.00, plus the highest price again, $1.00): $0.2146205 above it; worst case $8.00.
+Refused: This run could spend up to $8.00 (quote $4.50, quote2 $3.50), above the $5.00 per run. Nothing was signed. Select fewer endpoints, or test a cheaper route.
+exit 2
+(no "Warning:" line; the ledger folder stayed empty)
+
+=== Third set: paid run, $0.01 ===
+Mainnet: funds: the payer holds $3.2146205 in USDC; this run needs at least $0.02 to finish its checks (the prices, $0.01, plus the highest price again, $0.01): $3.1946205 above it; worst case $0.045.
+  PASS  X402-06 ... (tx 3cc8aac77606b023c6dd2f8c3ba85c30372a7c33224465bcbc45c985c45b0382).
+  PASS  X402-01 to X402-05, X402-07 to X402-11
+Ledger: consistent: the payer's USDC went down by exactly the settlements this run verified (100000 base units), and its XLM did not move.
+Result: 1 graded (exit 0).
