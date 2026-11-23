@@ -24,7 +24,7 @@ down.
 - [ ] The line with recent failure counts in a run comment.
 - [ ] A run against a single-use test paywall shows "resource consumed".
 - [~] Our own facilitator and a free mainnet RPC are running for the example service. Partly: they ran for a copy of the example's seller on the maintainer's machine for the validation (not hosted); the example project itself still uses the hosted test-network facilitator.
-- [~] The validation is run and its written findings are published (or the reason the opt-in is not offered). Run, and its findings are written below; the last step (emptying or rotating the two accounts) and the change of the board's status wait for the maintainer.
+- [~] The validation is run and its written findings are published (or the reason the opt-in is not offered). Run, closed on 2026-11-23, and its findings are written below.
 
 ## Result
 
@@ -78,7 +78,13 @@ In the $1.00 run the payer held less than the run needed to finish its checks, s
 - **One facilitator failure.** The first $1.00 attempt: our facilitator's settlement transaction never reached a ledger. No funds moved (the chain and the balances show it), and the authorization had expired. Wasit reports this as a failed X402-06, with a hint that it may be the facilitator's or its RPC's failure: from the target's answer it cannot tell a target that refuses a valid payment from a facilitator that fails to send. The cause is not established; a raised inclusion fee was used afterwards, and the fee charged did not change, so it is not shown to be the cause.
 - **The free RPC timed out once** while Wasit checked which network it serves; Wasit stopped before anything was sent, as it should.
 - **One message is noisy:** the "funds can be lost" warning also prints when a run is refused for another reason. Planned to change.
-- **Not run:** the Action's paid path on mainnet (by design: our key never goes into GitHub secrets), a window of days (these runs are minutes), MPP (it stays on test networks), a service that is not ours, and the close of the validation (emptying or rotating the accounts), which is the maintainer's last step.
+- **Not run:** the Action's paid path on mainnet (by design: our key never goes into GitHub secrets), a window of days (these runs are minutes), MPP (it stays on test networks), a service that is not ours, and a close that empties or rotates the accounts: the maintainer chose to keep both accounts as they are (see "The close").
+
+### The close
+
+After the last run the maintainer unset the two key variables in the shell they had used (`WASIT_MAINNET_PAYER_SECRET` and the facilitator's); the variables read empty there (a terminal closed earlier cannot be checked). The ledger folder held no lock file. The maintainer did **not** empty or rotate the payer account: it was kept as it is, with its key in the maintainer's own terminal and backup. Read afterwards on public Horizon (no key): no transaction followed the last run (`c403b83e…b29f`) on either account, no payment left the payer for any address, and the payer's USDC stayed below the $10 the plan allows. The totals reconcile: the payer's USDC at the start, plus what the maintainer added, minus the 2.065 USDC spent, equals what Horizon showed after the last run; the receiver's USDC equals the 2.065 paid in minus the amount the maintainer sent back to the payer.
+
+Not found in the runs, by their own results and ledgers: a signature without a ledger entry, a transfer outside the plan, or a spend above the plan. This is a reading of the result files and ledgers by the maintainer's session, not a second check by another party.
 
 ### Copies
 
