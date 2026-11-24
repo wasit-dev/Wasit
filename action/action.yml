@@ -1,10 +1,10 @@
 name: Wasit
 description: >-
-  Runs Wasit's x402 checks against your service inside the job, comments the
-  result on the pull request, and compares it with main. The payment tier pays
-  on test networks, on push to the default branch, schedule and
-  workflow_dispatch; with mainnet: true (beta) it pays on Stellar mainnet, on
-  workflow_dispatch only. Runs on pull_request, push, schedule, workflow_dispatch
+  Runs Wasit's x402 and MPP checks against your service inside the job,
+  comments the result on the pull request, and compares it with main. The
+  payment tier pays on test networks, on push to the default branch, schedule
+  and workflow_dispatch; with mainnet: true (beta) it pays x402 on Stellar
+  mainnet, on workflow_dispatch only. Runs on pull_request, push, schedule, workflow_dispatch
   and merge_group, and refuses any other event. Linux runners. Needs Node 22
   or later (add actions/setup-node before this step).
 
@@ -22,8 +22,11 @@ inputs:
       read-only runs the unpaid challenge checks (X402-01 to X402-05): they send
       no payment and sign nothing. payment also runs the payment checks (X402-06
       to X402-11; X402-11 for an endpoint with a reject case, which can add up to
-      six minutes) on a test network, at most $1.00 a payment and $5.00 a run, on
-      push to the default branch, schedule and workflow_dispatch only; on a pull
+      six minutes) on a test network, and the MPP checks on stellar:testnet
+      (MPP-01 for charge with MPP_PAYER_SECRET; MPP-10, 11, 12 and 14 for
+      channel with COMMITMENT_SECRET_HEX; MPP-13, which closes a channel, never),
+      at most $1.00 a payment and $5.00 a run, x402 and MPP-01 together, on push
+      to the default branch, schedule and workflow_dispatch only; on a pull
       request it runs the read-only checks and says so. Give the payer key in the
       env: of this step only, and only to runs that may pay; a key given to a
       pull request run is refused before your service starts.

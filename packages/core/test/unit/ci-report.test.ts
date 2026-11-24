@@ -552,6 +552,29 @@ describe("the detailed comment", () => {
     }
   });
 
+  it("links MPP-01's transaction under an MPP charge endpoint, by the same rules, and nothing under a channel endpoint", () => {
+    const charge = (reference: string, pass = true): CheckResult => ({
+      id: "MPP-01",
+      name: "Charge Settlement On-Chain",
+      pass,
+      detail: pass ? "settled on chain" : "no settlement",
+      ...(pass ? { reference } : {}),
+    });
+    const proof = renderComment({ report: report([endpoint("chat", [charge(HASH)], "mpp-charge")]) });
+    assert.ok(proof.includes(`**Payment proof**: MPP-01 settled on stellar:testnet, [tx 0123…cdef on Stellar Expert](https://stellar.expert/explorer/testnet/tx/${HASH})`), proof);
+    for (const [label, text] of [
+      ["a failed MPP-01", renderComment({ report: report([endpoint("chat", [charge(HASH, false)], "mpp-charge")]) })],
+      ["not hex", renderComment({ report: report([endpoint("chat", [charge("z".repeat(64))], "mpp-charge")]) })],
+      ["another network", renderComment({ report: onNetwork("eip155:84532", [endpoint("chat", [charge(HASH)], "mpp-charge")]) })],
+      ["an X402-06 under a charge endpoint", renderComment({ report: report([endpoint("chat", [settled(HASH)], "mpp-charge")]) })],
+      ["an MPP-01 under an x402 endpoint", renderComment({ report: report([endpoint("weather", [charge(HASH)])]) })],
+      ["a channel endpoint", renderComment({ report: report([endpoint("stream", [{ ...charge(HASH), id: "MPP-11" }], "mpp-channel")]) })],
+    ] as const) {
+      assert.ok(!text.includes("Payment proof"), label);
+      assert.ok(!text.includes("stellar.expert"), label);
+    }
+  });
+
   it("keeps a reference in the report only for a PASS, and reads it back from a report file, cut short", () => {
     const failedWithReference: CheckResult = { ...fail("X402-07", "accepted"), reference: HASH };
     const built = report([endpoint("weather", [settled(HASH), failedWithReference])]);

@@ -302,7 +302,8 @@ program
   .option(
     "--dry-run",
     "Print what the payment checks would sign: per endpoint the payee, the asset, the amount of each signature and the worst case, " +
-      "against the caps ($1 a payment, $5 a run, lower with maxRunUsd). Reads each x402 endpoint's unpaid challenge; " +
+      "against the caps ($1 a payment, $5 a run, lower with maxRunUsd). Reads each x402 endpoint's unpaid challenge, and " +
+      "on stellar:testnet each MPP charge endpoint's; " +
       "uses no key, sends no payment, signs nothing. Exit 2 when a paying run would be refused. Not with --read-only.",
     false,
   )
@@ -350,6 +351,7 @@ Examples:
   $ wasit run --read-only --start-if-local --env mainnet
   $ wasit run --dry-run --start
   $ wasit run --start                     (payment tier: STELLAR_PRIVATE_KEY on stellar:testnet)
+  $ wasit run --start                     (MPP: MPP_PAYER_SECRET, COMMITMENT_SECRET_HEX on stellar:testnet)
   $ wasit run --dry-run --env mainnet      (the plan on stellar:pubnet: no key is read)
   $ wasit run --mainnet --env mainnet      (real funds: WASIT_MAINNET_PAYER_SECRET on stellar:pubnet)
 
@@ -377,6 +379,14 @@ X402-11 runs for an endpoint with a reject case, on Stellar: it sends a valid pa
 with the request the service must refuse, then reads the chain until that payment's
 authorization has expired, up to six minutes; a lifetime above 300 s or below 30 s is
 not signed, and an authorization signed to outlive 300 s is not sent.
+MPP endpoints are paid in the payment tier on stellar:testnet only, by the same rules:
+MPP-01 (charge) with MPP_PAYER_SECRET, planned from its unpaid challenge and held to the
+same caps, in the same budget as x402; MPP-10, 11, 12 and 14 (channel) with
+COMMITMENT_SECRET_HEX, with the channel and its expected terms from the config. MPP-13
+(close) is never run by wasit run. The network and the channel come from the config:
+MPP_STELLAR_NETWORK and CHANNEL_CONTRACT are not read. An MPP endpoint is sent a plain
+GET: one with a method, a body or headers is not sent anything. A mainnet run pays its
+x402 endpoints only.
 In CI (CI or GITHUB_ACTIONS set) a .env file in the working directory is not read.`,
   )
   .exitOverride(exitTwoOnUsageError)

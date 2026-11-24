@@ -24,6 +24,7 @@ import { Keypair } from "@stellar/stellar-sdk";
 
 import { type CheckResult } from "../check.js";
 import {
+  CheckSetupError,
   ConfigurationError,
   MalformedResponseError,
   assertHttpUrl,
@@ -31,6 +32,7 @@ import {
   fetchWithoutRedirects,
 } from "../errors.js";
 import { type MppNetwork, assertMppNetwork, isMppNetwork, resolveRpcUrl } from "./network.js";
+import { PaymentGuardRefusedError, shown, type RunBudget } from "../guard/budget.js";
 import { assertPaymentNetworkAllowed } from "../guard/networks.js";
 import { assertRpcServesNetwork } from "../guard/rpc-identity.js";
 import { verifySettlement } from "../settlement.js";
@@ -38,11 +40,33 @@ import { verifySettlement } from "../settlement.js";
 const CHECK_ID = "MPP-01";
 const CHECK_NAME = "Charge Settlement On-Chain";
 
+/** What the plan of a run (L1) allowed MPP-01 to pay, read from the unpaid challenge before anything was signed. */
+export interface PlannedCharge {
+  /** Base units of `currency`. */
+  readonly amount: bigint;
+  readonly currency: string;
+  readonly recipient: string;
+}
+
+/**
+ * The caps of a run, on MPP-01 (D-036, `wasit run`): the payment must be the
+ * one the plan read, and it is charged to the run's budget before the SDK
+ * signs it. Without `planned` the endpoint was not planned and MPP-01 pays
+ * nothing; `notPlanned` says why.
+ */
+export interface MppChargeGuard {
+  readonly budget: RunBudget;
+  readonly planned?: PlannedCharge;
+  readonly notPlanned?: string;
+}
+
 export interface MppChargeCheckOptions {
   readonly target: string;
   readonly network: string;
   readonly payerSecretKey: string;
   readonly rpcUrl?: string;
+  /** `wasit run` only: the plan's entry and the run's budget. The old command runs without it. */
+  readonly guard?: MppChargeGuard;
 }
 
 /** What the target advertised it wants paid, read from its own 402 challenge. */
@@ -79,7 +103,7 @@ function readString(
  * `toBaseUnits()` before building the challenge, so it is directly comparable
  * to the `i128` in the transfer event without any decimal handling.
  */
-async function fetchChargeChallenge(target: string): Promise<ChargeChallenge> {
+export async function readChargeChallenge(target: string): Promise<ChargeChallenge> {
   const response = await fetchTarget(target);
 
   if (response.status !== 402) {
@@ -176,7 +200,40 @@ function assertRunNetwork(asked: MppNetwork, network: MppNetwork): void {
 }
 
 /**
- * `method`, refusing to sign a challenge for any network but `network`.
+ * Refuses a charge that is not the one the plan read: another amount, currency
+ * or recipient. The service may change its challenge between the plan and the
+ * payment; L2 then refuses, rather than signing what the plan never saw.
+ */
+function assertPlanned(asked: { amount: unknown; currency: unknown; recipient: unknown }, planned: PlannedCharge): void {
+  const differs: string[] = [];
+  if (typeof asked.amount !== "string" || !/^\d{1,78}$/.test(asked.amount) || BigInt(asked.amount) !== planned.amount) {
+    differs.push(`amount ${shown(asked.amount)} (planned ${planned.amount})`);
+  }
+  if (asked.currency !== planned.currency) differs.push(`currency ${shown(asked.currency)} (planned ${planned.currency})`);
+  if (asked.recipient !== planned.recipient) differs.push(`recipient ${shown(asked.recipient)} (planned ${planned.recipient})`);
+  if (differs.length > 0) {
+    throw new PaymentGuardRefusedError(
+      "plan",
+      `MPP-01 would pay a charge the plan did not read before the run started: ${differs.join(", ")}. ` +
+        `The service changed its challenge after the plan.`,
+    );
+  }
+}
+
+/** Why a guarded MPP-01 pays nothing: the plan of the run did not plan a payment for the endpoint. */
+function notPlannedRefusal(guard: MppChargeGuard): PaymentGuardRefusedError {
+  const says = guard.notPlanned?.replace(/\s*Nothing was signed\.?\s*$/, "").trim();
+  return new PaymentGuardRefusedError(
+    "plan",
+    `The plan of this run did not plan a payment for this endpoint, so MPP-01 does not pay it.` +
+      (says === undefined || says === "" ? "" : ` The plan says: ${says.replace(/\.?$/, ".")}`),
+  );
+}
+
+/**
+ * `method`, refusing to sign a challenge for any network but `network` and,
+ * with a guard, any charge but the planned one, and charging the run's budget
+ * before the SDK signs.
  *
  * Checking the unpaid challenge is not enough on its own: mppx requests the
  * target again and pays the challenge in that answer, which the target is
@@ -184,11 +241,24 @@ function assertRunNetwork(asked: MppNetwork, network: MppNetwork): void {
  * be signed. Without it a target asking for `stellar:pubnet` gets a mainnet
  * transfer signed, sent through the SDK's own default pubnet RPC endpoint.
  */
-function onNetwork(method: ChargeClient, network: MppNetwork): ChargeClient {
+function onNetwork(method: ChargeClient, network: MppNetwork, guard?: MppChargeGuard): ChargeClient {
   return {
     ...method,
     createCredential: async (parameters) => {
-      assertRunNetwork(chargeNetwork(asRecord(parameters.challenge.request) ?? {}), network);
+      const request = asRecord(parameters.challenge.request) ?? {};
+      assertRunNetwork(chargeNetwork(request), network);
+      if (guard !== undefined) {
+        if (guard.planned === undefined) throw notPlannedRefusal(guard);
+        assertPlanned({ amount: request["amount"], currency: request["currency"], recipient: request["recipient"] }, guard.planned);
+        // Charged before the signature and never credited back: a payment that fails after it was signed may still settle.
+        guard.budget.charge({
+          check: CHECK_ID,
+          network,
+          asset: guard.planned.currency,
+          amount: String(guard.planned.amount),
+          planned: guard.planned.amount,
+        });
+      }
       return method.createCredential(parameters);
     },
   };
@@ -207,12 +277,13 @@ export async function payCharge(
   target: string,
   network: MppNetwork,
   method: ChargeClient,
+  guard?: MppChargeGuard,
 ): Promise<Response> {
   // L0 again at the signing call itself: it is exported, so a caller can
   // reach it without going through runMppChargeChecks.
   assertPaymentNetworkAllowed("mpp-charge", network);
   const mppx = Mppx.create({
-    methods: [onNetwork(method, network)],
+    methods: [onNetwork(method, network, guard)],
     polyfill: false,
     maxPaymentRetries: 1,
     // Every request mppx makes here refuses a redirect (D-022c): it pays at the
@@ -226,8 +297,9 @@ function fail(detail: string): CheckResult[] {
   return [{ id: CHECK_ID, name: CHECK_NAME, pass: false, detail }];
 }
 
-function pass(detail: string): CheckResult[] {
-  return [{ id: CHECK_ID, name: CHECK_NAME, pass: true, detail }];
+function pass(detail: string, reference: string): CheckResult[] {
+  // Read back from the chain and found to be this payment: a report may link it.
+  return [{ id: CHECK_ID, name: CHECK_NAME, pass: true, detail, reference }];
 }
 
 /**
@@ -247,7 +319,7 @@ function pass(detail: string): CheckResult[] {
 export async function runMppChargeChecks(
   options: MppChargeCheckOptions,
 ): Promise<CheckResult[]> {
-  const { target, network, payerSecretKey, rpcUrl } = options;
+  const { target, network, payerSecretKey, rpcUrl, guard } = options;
 
   assertHttpUrl(target);
   const runNetwork = assertMppNetwork(network);
@@ -288,17 +360,25 @@ export async function runMppChargeChecks(
   // must serve the run's network before the target is asked anything (D-023).
   await assertRpcServesNetwork(runNetwork, endpoint);
 
-  const advertised = await fetchChargeChallenge(target);
+  const advertised = await readChargeChallenge(target);
   assertRunNetwork(advertised.network, runNetwork);
+  if (guard !== undefined) {
+    // A guarded run pays only what its plan read. An endpoint it did not plan still has its unpaid challenge read
+    // above, so a service that does not answer with one gets its verdict; one that does is not paid.
+    if (guard.planned === undefined) throw notPlannedRefusal(guard);
+    // The challenge the check judges against is the planned one, or nothing is paid.
+    assertPlanned({ ...advertised, amount: String(advertised.amount) }, guard.planned);
+  }
 
   let paid: Response;
   try {
     // The payment goes through the run's endpoint too. Left to itself the SDK
     // picks its own per network, so `--rpc-url` would cover only the
     // settlement read, and pubnet would get a default endpoint after all.
-    paid = await payCharge(target, runNetwork, charge({ secretKey: payerSecretKey, rpcUrl: endpoint }));
+    paid = await payCharge(target, runNetwork, charge({ secretKey: payerSecretKey, rpcUrl: endpoint }), guard);
   } catch (error) {
-    if (error instanceof ConfigurationError) throw error;
+    // A refusal of the run's own rules (network, plan, budget) is not the target's failure: no verdict.
+    if (error instanceof ConfigurationError || error instanceof CheckSetupError) throw error;
     // The target was reachable moments ago, so this is the payment path
     // failing, not the network. Report it as a conformance failure.
     throw new MalformedResponseError(
@@ -333,6 +413,6 @@ export async function runMppChargeChecks(
   });
   // Same sentence MPP-01 has always printed, capitalised and closed.
   return verdict.pass
-    ? pass(`${verdict.detail.charAt(0).toUpperCase()}${verdict.detail.slice(1)}.`)
+    ? pass(`${verdict.detail.charAt(0).toUpperCase()}${verdict.detail.slice(1)}.`, reference)
     : fail(verdict.detail);
 }

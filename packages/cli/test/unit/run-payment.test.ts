@@ -346,7 +346,7 @@ describe("wasit run, payment tier", () => {
     });
   });
 
-  it("skips the MPP endpoints with the reason: wasit run does not pay MPP in this version", async () => {
+  it("skips the MPP endpoints as unsupported on a network that is not stellar:testnet (W3-1), and pays the x402 ones", async () => {
     paywall = await multiPaywall({ "/weather": [option("10000")] });
     const config = await writePaymentConfig(dir, paywall.base, {}, [
       { name: "weather", protocol: "x402", path: "/weather", method: "GET" },
@@ -355,7 +355,9 @@ describe("wasit run, payment tier", () => {
     const run = await pay({ config }, KEY);
     const mpp = result(run.report, "MPP-01", "chat");
     assert.equal(mpp.status, "SKIP");
-    assert.match(mpp.detail, /wasit mpp-charge/);
+    assert.equal(mpp.skipKind, "unsupported");
+    assert.match(mpp.detail, /the MPP checks run on stellar:testnet only, and environment local is on eip155:84532/);
+    assert.equal(result(run.report, "X402-06").status, "PASS", run.stderr);
   });
 
   describe("in GitHub Actions", () => {

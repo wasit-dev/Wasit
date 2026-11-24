@@ -63,7 +63,7 @@ export interface CheckResult {
   /**
    * The settlement a check read back from the chain and found to be this
    * payment (X402-06's transaction: a Stellar or EVM transaction hash, a Solana
-   * signature). Set only on a PASS whose settlement was verified on chain; a
+   * signature; MPP-01's Stellar transaction hash). Set only on a PASS whose settlement was verified on chain; a
    * report may link it to an explorer after checking its shape.
    */
   reference?: string;

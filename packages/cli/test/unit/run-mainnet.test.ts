@@ -83,7 +83,7 @@ describe("wasit run --mainnet", () => {
   async function config(
     paths: string[],
     shape: EnvironmentShape = {},
-    extra: { service?: { start: string; ready: { url: string; timeoutSeconds: number } }; reject?: boolean } = {},
+    extra: { service?: { start: string; ready: { url: string; timeoutSeconds: number } }; reject?: boolean; mpp?: string[] } = {},
   ): Promise<string> {
     const file = path.join(dir, `config-${Math.random().toString(36).slice(2)}.json`);
     const environment: Record<string, unknown> = {
@@ -107,7 +107,7 @@ describe("wasit run --mainnet", () => {
           path: `/${name}`,
           method: "GET",
           ...(extra.reject === true ? { reject: { headers: { "x-lang": "xx" } } } : {}),
-        })),
+        })).concat((extra.mpp ?? []).map((name) => ({ name, protocol: "mpp-charge", path: `/${name}`, method: "GET" }) as never)),
       }),
     );
     return file;
@@ -369,6 +369,22 @@ describe("wasit run --mainnet", () => {
       // The plan read the payer and the chain before the target was asked anything.
       assert.ok(world.reads.includes("payerBalance") && world.reads.includes("assetDecimals"));
     });
+    it("skips an MPP endpoint, asking it nothing: a mainnet run pays its x402 endpoints, MPP stays on test networks (W3-1)", async () => {
+      wall = await pubnetWall({ "/weather": [pubnetOption(payTo, CENT)], "/chat": [pubnetOption(payTo, CENT)] });
+      const asked: string[] = [];
+      wall.onChallenge = (at) => asked.push(at);
+      const result = await run({ config: await config(["weather"], {}, { mpp: ["chat"] }), json: true });
+      const report = JSON.parse(result.stdout);
+      const chat = report.endpoints.find((entry: { name: string }) => entry.name === "chat");
+      assert.deepEqual(chat.results.map((entry: { id: string }) => entry.id), ["MPP-01"]);
+      assert.equal(chat.results[0].status, "SKIP");
+      assert.equal(chat.results[0].skipKind, "not-applicable");
+      assert.match(chat.results[0].detail, /MPP pays on test networks only: a mainnet run pays its x402 endpoints/);
+      assert.ok(!asked.includes("/chat"), "the MPP endpoint was asked");
+      assert.equal(wall.paid.get("/chat") ?? 0, 0);
+      assert.ok(world.signed.every((signed) => signed.network === "stellar:pubnet" && signed.payTo === payTo));
+    });
+
     it("with --start, the MAINNET RUN line comes before the service's own lines", async () => {
       wall = await pubnetWall({ "/weather": [pubnetOption(payTo, CENT)] });
       // The service prints first and answers its ready URL only later: its line is in before the run goes on.

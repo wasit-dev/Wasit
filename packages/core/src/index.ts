@@ -246,6 +246,17 @@ export * from "./mpp/channel.js";
 export * from "./mpp/charge.js";
 export * from "./mpp/charge-suite.js";
 export * from "./mpp/suite.js";
+export {
+  MPP_CHARGE_SCHEME,
+  assertMppPaymentRpc,
+  combinePaymentPlan,
+  describePaymentPlan,
+  planMppChargeEndpoint,
+  planPaymentRun,
+  plannedChargeOf,
+  type MppChargePlanInput,
+  type PaymentRunPlanOptions,
+} from "./mpp/plan.js";
 // Wallet tooling is exported by name rather than with `export *`: it is a
 // convenience layer for setting up testnet keys, not part of the check
 // surface, and naming each entry keeps the rest of wallet.ts free to change

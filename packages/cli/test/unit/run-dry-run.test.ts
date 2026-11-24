@@ -183,7 +183,7 @@ describe("wasit run --dry-run", () => {
     assert.match(result.stdout, /operatedByMe/);
   });
 
-  it("names MPP endpoints as not planned, and sends them nothing", async () => {
+  it("plans an MPP charge endpoint with the x402 ones (W3-1), unpaid: one whose challenge cannot be read is not paid", async () => {
     paywall = await startPaywall(priced("100000"));
     const config = await writeConfig(dir, {
       baseUrl: paywall.base,
@@ -194,8 +194,13 @@ describe("wasit run --dry-run", () => {
     });
     const result = await dryRun({ config });
     assert.equal(result.code, 0, result.stderr);
-    assert.match(result.stdout, /metered: not planned/);
-    assert.ok(paywall.received.every((request) => request.url === "/weather"));
+    assert.match(result.stdout, /^Plan \(dry run\): x402 payment checks and MPP-01 on stellar:testnet\./m);
+    // This paywall answers x402 only, so the MPP charge challenge cannot be read: not paid, and no refusal.
+    assert.match(result.stdout, /metered: not paid: Challenge could not be parsed from the WWW-Authenticate header/);
+    for (const request of paywall.received) {
+      assert.equal(request.headers["payment-signature"], undefined, "a dry run sent a payment");
+      assert.equal(request.headers["authorization"], undefined, "a dry run sent an MPP credential");
+    }
   });
 
   it("takes neither --read-only nor --json, --out or --baseline", async () => {

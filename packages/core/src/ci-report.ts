@@ -179,20 +179,28 @@ function verdictOf(input: CiReportInput): {
   return { baseline, note, code: verdict.code, word };
 }
 
+/** The check whose settlement a protocol's payment proof links: the one that pays once and is read back from the chain. */
+const PROOF_CHECK: Readonly<Partial<Record<EndpointReport["protocol"], string>>> = {
+  x402: "X402-06",
+  "mpp-charge": "MPP-01",
+};
+
 /**
- * The payment proof under an endpoint: a link to X402-06's transaction on
- * Stellar Expert, and only when every part is Wasit's own and checked: the run
- * is on `stellar:testnet`, X402-06 passed, and its reference (read back from the
- * chain by the check) is a 64-character lower-case hex hash. Never a link built
- * from a service's text.
+ * The payment proof under an endpoint: a link to the transaction of X402-06
+ * (x402) or MPP-01 (MPP charge) on Stellar Expert, and only when every part is
+ * Wasit's own and checked: the run is on `stellar:testnet`, that check passed,
+ * and its reference (read back from the chain by the check) is a 64-character
+ * lower-case hex hash. Never a link built from a service's text.
  */
 function paymentProof(endpoint: EndpointReport, network: string): string | undefined {
   if (network !== "stellar:testnet") return undefined;
-  const honest = endpoint.results.find((result) => result.id === "X402-06" && result.status === "PASS");
+  const check = PROOF_CHECK[endpoint.protocol];
+  if (check === undefined) return undefined;
+  const honest = endpoint.results.find((result) => result.id === check && result.status === "PASS");
   const reference = honest?.reference;
   if (reference === undefined || !STELLAR_TX.test(reference)) return undefined;
   return (
-    `**Payment proof**: X402-06 settled on stellar:testnet, ` +
+    `**Payment proof**: ${check} settled on stellar:testnet, ` +
     `[tx ${reference.slice(0, 4)}…${reference.slice(-4)} on Stellar Expert](https://stellar.expert/explorer/testnet/tx/${reference}).`
   );
 }

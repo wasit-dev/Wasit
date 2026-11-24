@@ -98,7 +98,14 @@ import {
   type SkipKind,
   RpcIdentityError,
   UnsupportedPaymentNetworkError,
+  assertMppPaymentRpc,
   assertX402PaymentRpc,
+  describePaymentPlan,
+  planPaymentRun,
+  plannedChargeOf,
+  runMppChannelSuite,
+  runMppChargeSuite,
+  type MppChargePlanInput,
 } from "@wasit-dev/core";
 
 import { formatRun } from "./run-format.js";
@@ -154,8 +161,34 @@ const TIER_NOTE = "Tier: read-only. The payment checks were not run, and nothing
 
 const STELLAR_PUBNET = "stellar:pubnet";
 
-const MPP_NOT_IN_RUN =
-  "wasit run does not pay MPP in this version: run wasit mpp-charge or wasit mpp-channel against this endpoint";
+/** MPP pays on this network only (L0; D-036). The network is the config's: `MPP_STELLAR_NETWORK` is not read. */
+const MPP_NETWORK = "stellar:testnet";
+
+/** The key variables of the MPP checks: MPP-01's payer, and the channel's commitment key. */
+const MPP_PAYER_KEY_ENV = "MPP_PAYER_SECRET";
+const MPP_COMMITMENT_KEY_ENV = "COMMITMENT_SECRET_HEX";
+
+const MPP_NOT_ON_MAINNET =
+  "MPP pays on test networks only: a mainnet run pays its x402 endpoints, so this endpoint's MPP checks were not run";
+
+const MPP_CHANNEL_NOTE =
+  "MPP channel: the commitments MPP-11, MPP-12 and MPP-14 sign are off-chain, and Wasit sends no transaction for " +
+  "them, so they are not charged to the cap. MPP-13 (close) is never run by wasit run.";
+
+/** What one MPP mode's checks do in a run of the payment tier on an event that may pay. */
+type MppStep =
+  | { readonly pay: false; readonly kind: SkipKind; readonly reason?: string }
+  | { readonly pay: true; readonly key: string };
+
+/** The MPP side of such a run: a step per mode, the network and RPC, and for MPP-01 the run's plan and budget. */
+interface MppRun {
+  readonly network: string;
+  readonly rpcUrl?: string;
+  readonly charge: MppStep;
+  readonly channel: MppStep;
+  readonly budget?: RunBudget;
+  readonly plan?: RunPlan;
+}
 
 /** What one endpoint's payment checks do in this run. */
 type PaymentStep =
@@ -192,8 +225,96 @@ function everyCheckSkipped(protocol: ResolvedEndpoint["protocol"], reason: strin
   );
 }
 
-/** What the run does for one endpoint. */
-async function runEndpoint(endpoint: ResolvedEndpoint, step: PaymentStep): Promise<CheckResult[]> {
+/**
+ * Why an MPP endpoint is not sent anything: the MPP checks send a plain GET in
+ * this version, so a method, a body or headers the config gives it (from the
+ * file or `WASIT_HEADER_*`) would not reach the service, and a verdict on what
+ * it then answers would be about another request. Undefined when it is a plain GET.
+ * Names no header and no value: header values are secrets.
+ */
+function mppShapeProblem(endpoint: ResolvedEndpoint): string | undefined {
+  const parts = [
+    ...(endpoint.method === "GET" ? [] : [`the method ${endpoint.method}`]),
+    ...(endpoint.body === undefined ? [] : ["a body"]),
+    ...(Object.keys(endpoint.headers).length === 0 ? [] : ["headers"]),
+  ];
+  if (parts.length === 0) return undefined;
+  return (
+    `wasit run sends MPP requests as a plain GET in this version, and this endpoint has ${parts.join(", ")} ` +
+    `(from the config or WASIT_HEADER_*): nothing was sent to it`
+  );
+}
+
+/** The MPP charge endpoints a run can plan and pay: plain GET requests. */
+function mppChargeInputs(resolved: ResolvedRun): MppChargePlanInput[] {
+  return resolved.endpoints
+    .filter((endpoint) => endpoint.protocol === "mpp-charge" && mppShapeProblem(endpoint) === undefined)
+    .map((endpoint) => ({ name: endpoint.name, target: endpoint.url }));
+}
+
+/**
+ * The step of one MPP mode in the payment tier on an event that may pay: the
+ * rules of x402 (operatedByMe, the key variable) and a test network that MPP
+ * pays on.
+ */
+function mppStep(
+  resolved: ResolvedRun,
+  env: Readonly<Record<string, string | undefined>>,
+  keyEnv: string,
+  keyLabel: string,
+  operatorRefusal: string | undefined,
+): MppStep {
+  if (operatorRefusal !== undefined) return { pay: false, kind: "read-only", reason: `payment checks not run: ${operatorRefusal}` };
+  if (resolved.network !== MPP_NETWORK) {
+    return {
+      pay: false,
+      kind: "unsupported",
+      reason: `the MPP checks run on ${MPP_NETWORK} only, and environment ${resolved.environment} is on ${resolved.network}`,
+    };
+  }
+  const value = env[keyEnv];
+  if (value === undefined || value.trim() === "") {
+    return { pay: false, kind: "needs-payer", reason: `payment checks not run: no ${keyLabel}: set ${keyEnv} on the Wasit step` };
+  }
+  return { pay: true, key: value.trim() };
+}
+
+/** One MPP endpoint of a run of the payment tier on an event that may pay. */
+async function runMppEndpoint(endpoint: ResolvedEndpoint, mpp: MppRun): Promise<CheckResult[]> {
+  const own = endpoint.protocol === "mpp-charge" ? mpp.charge : mpp.channel;
+  if (!own.pay) return skippedFor(endpoint.protocol, own);
+  const shape = mppShapeProblem(endpoint);
+  if (shape !== undefined) return paymentChecksSkipped(endpoint.protocol, "unsupported", shape);
+  const rpc = mpp.rpcUrl === undefined ? {} : { rpcUrl: mpp.rpcUrl };
+  if (endpoint.protocol === "mpp-charge") {
+    // Every plain MPP charge endpoint was planned; one that is not in the plan is not paid.
+    const entry = mpp.plan?.endpoints.find((planned) => planned.name === endpoint.name);
+    if (mpp.budget === undefined || entry === undefined) throw new Error(`the plan of this run has no entry for ${endpoint.name}`);
+    const planned = plannedChargeOf(entry);
+    return runMppChargeSuite({
+      target: endpoint.url,
+      network: mpp.network,
+      payerSecretKey: own.key,
+      ...rpc,
+      guard: { budget: mpp.budget, ...(planned === undefined ? { notPlanned: entry.reason ?? entry.status } : { planned }) },
+    });
+  }
+  const results = await runMppChannelSuite({
+    target: endpoint.url,
+    commitmentSecretHex: own.key,
+    network: mpp.network,
+    ...rpc,
+    // The channel and its expected terms come from the config only, never from CHANNEL_CONTRACT.
+    ...(endpoint.channel === undefined ? {} : { channelOverride: endpoint.channel }),
+    ...(endpoint.expect === undefined ? {} : { expected: endpoint.expect }),
+    allowDestructive: false,
+  });
+  // MPP-13 closes a channel for good: wasit run never runs it, and does not list it (report.ts).
+  return results.filter((result) => result.id !== "MPP-13");
+}
+
+/** What the run does for one endpoint. `mpp`: the MPP side of a run of the payment tier that may pay. */
+async function runEndpoint(endpoint: ResolvedEndpoint, step: PaymentStep, mpp?: MppRun): Promise<CheckResult[]> {
   // B3: once a mainnet run is stopped, every remaining check is skipped with the reason, the unpaid ones too.
   const stopped = step.pay ? step.mainnet?.stopped : undefined;
   if (stopped !== undefined) return everyCheckSkipped(endpoint.protocol, stopped);
@@ -225,9 +346,11 @@ async function runEndpoint(endpoint: ResolvedEndpoint, step: PaymentStep): Promi
       });
       return [...challenge, ...payment];
     }
-    // Every MPP check pays or signs. The read-only tier has none to run, and the
-    // payment tier of wasit run does not run them in this version.
-    if (step.pay) return paymentChecksSkipped(endpoint.protocol, "not-applicable", MPP_NOT_IN_RUN);
+    // Every MPP check pays or signs: the payment tier on an event that may pay runs them on a test network.
+    if (mpp !== undefined) return await runMppEndpoint(endpoint, mpp);
+    // A mainnet run pays x402 only; MPP stays on test networks (L0).
+    if (step.pay) return paymentChecksSkipped(endpoint.protocol, "not-applicable", MPP_NOT_ON_MAINNET);
+    // The read-only tier, or an event that may not pay: none to run.
     return skippedFor(endpoint.protocol, step);
   } catch (error) {
     // A check that throws is a defect in Wasit, not a finding about the service.
@@ -298,6 +421,12 @@ function payerAddress(chain: PaymentChain, key: string): string {
   }
 }
 
+/** MPP-01's payer for the first line of a paying run: a Stellar secret, read by core's Stellar adapter. */
+function mppPayerAddress(key: string): string {
+  const stellar = paymentChainFor(MPP_NETWORK);
+  return stellar === undefined ? "(not read)" : payerAddress(stellar, key);
+}
+
 /** The baseline file, read; the reason when it cannot be. A file that is not there is the first run on main: no reason. */
 function readBaselineFile(path: string): BaselineResult | undefined {
   try {
@@ -323,6 +452,8 @@ async function printPlan(
 ): Promise<number> {
   let plan;
   const mainnet = resolved.network === STELLAR_PUBNET;
+  // MPP-01 is planned on the network MPP pays on, for the plain GET endpoints (D-036).
+  const mppCharge = resolved.network === MPP_NETWORK ? mppChargeInputs(resolved) : [];
   try {
     // B5: the dry run of a mainnet run needs no opt-in, because it signs nothing, and reads no key.
     plan = mainnet
@@ -331,11 +462,12 @@ async function printPlan(
           ...(resolved.maxRunUsd === undefined ? {} : { maxRunUsd: resolved.maxRunUsd }),
           endpoints: planEndpoints(resolved),
         })
-      : await planX402Run({
+      : await planPaymentRun({
           network: resolved.network,
           ...(resolved.pinned === undefined ? {} : { pin: resolved.pinned }),
           ...(resolved.maxRunUsd === undefined ? {} : { maxRunUsd: resolved.maxRunUsd }),
-          endpoints: planEndpoints(resolved),
+          x402: planEndpoints(resolved),
+          mppCharge,
         });
   } catch (error) {
     // L0: a network that is not a test network, refused before any request.
@@ -343,11 +475,22 @@ async function printPlan(
     throw error;
   }
 
-  const lines = [...describeRun(resolved).split("\n"), ...describePlan(plan)];
+  const has = { x402: resolved.endpoints.some((endpoint) => endpoint.protocol === "x402"), mppCharge: mppCharge.length > 0 };
+  const lines = [...describeRun(resolved).split("\n"), ...(mainnet ? describePlan(plan) : describePaymentPlan(plan, has))];
   for (const endpoint of resolved.endpoints) {
-    if (endpoint.protocol !== "x402") {
-      lines.push(`  ${endpoint.name}: not planned: the dry run plans the x402 payment checks; ${endpoint.protocol} is not planned in this version.`);
-    }
+    if (endpoint.protocol === "x402") continue;
+    const why = mainnet
+      ? "MPP pays on test networks only; a mainnet run pays its x402 endpoints."
+      : resolved.network !== MPP_NETWORK
+        ? `the MPP checks run on ${MPP_NETWORK} only, and this run is on ${resolved.network}.`
+        : mppShapeProblem(endpoint) !== undefined
+          ? `${mppShapeProblem(endpoint)}.`
+          : endpoint.protocol === "mpp-channel"
+            ? "the channel checks sign commitments off-chain, and Wasit sends no transaction for them, so they are not " +
+              "charged to the cap. MPP-13 (close) is never run by wasit run."
+            : undefined;
+    // A plain MPP charge endpoint on the MPP network is in the plan above.
+    if (why !== undefined) lines.push(`  ${endpoint.name}: not planned: ${why}`);
   }
   const refused = plan.refusal !== undefined || plan.endpoints.some((endpoint) => endpoint.status === "refused");
   if (!resolved.operatedByMe) {
@@ -470,14 +613,36 @@ export async function executeRun(options: RunCommandOptions, context: RunContext
   const keyValue = keyEnv === undefined ? undefined : context.env[keyEnv];
   const key = keyValue === undefined || keyValue.trim() === "" ? undefined : keyValue;
   const hasX402 = resolved.endpoints.some((endpoint) => endpoint.protocol === "x402");
-  /** Why the payment tier that was asked for does not pay, on an event that may pay. */
+  const operatorRefusal =
+    paying && !resolved.operatedByMe
+      ? `operatedByMe is not true for environment ${resolved.environment}: Wasit pays only a service its operator runs`
+      : undefined;
+  /** Why the x402 payment checks that were asked for do not pay, on an event that may pay. */
   const notPaid: string | undefined = !paying
     ? undefined
-    : !resolved.operatedByMe
-      ? `operatedByMe is not true for environment ${resolved.environment}: Wasit pays only a service its operator runs`
-      : chain !== undefined && key === undefined
-        ? `no payer key: set ${keyEnv} on the Wasit step`
-        : undefined;
+    : (operatorRefusal ?? (hasX402 && chain !== undefined && key === undefined ? `no payer key: set ${keyEnv} on the Wasit step` : undefined));
+
+  // The MPP side (W3-1, D-036): each mode by the same rules, on the network MPP pays on, with its own key variable.
+  const mppSteps = paying
+    ? {
+        charge: mppStep(resolved, context.env, MPP_PAYER_KEY_ENV, "payer key", operatorRefusal),
+        channel: mppStep(resolved, context.env, MPP_COMMITMENT_KEY_ENV, "commitment key", operatorRefusal),
+      }
+    : undefined;
+  const mppChargePays = mppSteps?.charge.pay === true && mppChargeInputs(resolved).length > 0;
+  const mppChannelPays =
+    mppSteps?.channel.pay === true &&
+    resolved.endpoints.some((endpoint) => endpoint.protocol === "mpp-channel" && mppShapeProblem(endpoint) === undefined);
+  // D-023 for MPP: the payments are built, the commitments prepared and the settlements read through the RPC, so
+  // it is checked before the service starts or any endpoint is asked anything.
+  if (mppChargePays || mppChannelPays) {
+    try {
+      await assertMppPaymentRpc(MPP_NETWORK, resolved.rpcUrl, { charge: mppChargePays });
+    } catch (error) {
+      if (error instanceof ConfigurationError) return fail(`wasit run: ${error.message} The service was not started.`);
+      throw error;
+    }
+  }
 
   // D-023a+b: a run that will pay checks its RPC before the service starts or
   // anything is sent to it: the payments are built and the settlements read
@@ -513,6 +678,7 @@ export async function executeRun(options: RunCommandOptions, context: RunContext
     let step: PaymentStep;
     let tierNote: string;
     let budget: RunBudget | undefined;
+    let mpp: MppRun | undefined;
     if (!paymentAsked) {
       step = { pay: false, kind: "read-only" };
       tierNote = TIER_NOTE;
@@ -520,49 +686,78 @@ export async function executeRun(options: RunCommandOptions, context: RunContext
       const reason = gate.reason ?? "payment checks not run";
       step = { pay: false, kind: "read-only", reason };
       tierNote = `Tier: read-only (${reason}). Nothing was signed.`;
-    } else if (notPaid !== undefined) {
-      step = { pay: false, kind: resolved.operatedByMe ? "needs-payer" : "read-only", reason: `payment checks not run: ${notPaid}` };
-      tierNote = `Tier: payment on ${resolved.network}, and the payment checks were not run: ${notPaid}. Nothing was signed.`;
-    } else if (chain === undefined || key === undefined) {
-      // No payment adapter for this network: the payment group is unsupported (spec A3), so the
-      // endpoint has no verdict (Najmi, 2026-11-15). Nothing is fetched for it beyond the challenge.
-      step = { pay: false, kind: "unsupported", reason: new UnsupportedPaymentNetworkError(resolved.network).message };
-      tierNote = `Tier: payment on ${resolved.network}, a network Wasit does not pay on. Nothing was signed.`;
     } else {
-      // L1: the plan, read before anything is signed. A run above its cap does not start.
-      const plan = await planX402Run({
-        network: resolved.network,
-        ...(resolved.pinned === undefined ? {} : { pin: resolved.pinned }),
-        ...(resolved.maxRunUsd === undefined ? {} : { maxRunUsd: resolved.maxRunUsd }),
-        endpoints: planEndpoints(resolved),
-      });
-      if (plan.refusal !== undefined) {
-        for (const line of describePlan(plan)) stderr(line);
-        return fail(`wasit run: ${plan.refusal}`);
+      // The payment tier on an event that may pay. L1 first: one plan of everything the run may sign (the x402
+      // payment checks it can pay, and MPP-01), read before anything is signed. A run above its cap does not start.
+      const x402Pays = hasX402 && notPaid === undefined && chain !== undefined && key !== undefined;
+      const charges = mppChargePays ? mppChargeInputs(resolved) : [];
+      let plan: RunPlan | undefined;
+      if (x402Pays || charges.length > 0) {
+        plan = await planPaymentRun({
+          network: resolved.network,
+          ...(resolved.pinned === undefined ? {} : { pin: resolved.pinned }),
+          ...(resolved.maxRunUsd === undefined ? {} : { maxRunUsd: resolved.maxRunUsd }),
+          x402: x402Pays ? planEndpoints(resolved) : [],
+          mppCharge: charges,
+        });
+        const has = { x402: x402Pays, mppCharge: charges.length > 0 };
+        if (plan.refusal !== undefined) {
+          for (const line of describePaymentPlan(plan, has)) stderr(line);
+          return fail(`wasit run: ${plan.refusal}`);
+        }
+        budget = new RunBudget(resolved.maxRunUsd === undefined ? {} : { maxRunUsd: resolved.maxRunUsd });
+        const payers = [
+          ...(x402Pays && chain !== undefined && key !== undefined ? [`Payer ${payerAddress(chain, key)}`] : []),
+          ...(mppSteps?.charge.pay === true && charges.length > 0 ? [`MPP-01 payer ${mppPayerAddress(mppSteps.charge.key)}`] : []),
+        ];
+        say(
+          `Payment tier on ${resolved.network} (test network): test funds. ${payers.join("; ")}; ` +
+            `at most ${formatUsd(plan.perPaymentCapUsd)} per payment; this run could spend up to ` +
+            `${formatUsd(plan.worstCaseUsd)} of the ${formatUsd(budget.capUsd)} cap.`,
+        );
+        for (const line of describePaymentPlan(plan, has).slice(1)) say(line);
       }
-      budget = new RunBudget(resolved.maxRunUsd === undefined ? {} : { maxRunUsd: resolved.maxRunUsd });
-      say(
-        `Payment tier on ${resolved.network} (test network): test funds. Payer ${payerAddress(chain, key)}; ` +
-          `at most ${formatUsd(plan.perPaymentCapUsd)} per payment; this run could spend up to ` +
-          `${formatUsd(plan.worstCaseUsd)} of the ${formatUsd(budget.capUsd)} cap.`,
-      );
-      for (const line of describePlan(plan).slice(1)) say(line);
-      step = {
-        pay: true,
-        network: resolved.network,
-        key,
-        ...(resolved.rpcUrl === undefined ? {} : { rpcUrl: resolved.rpcUrl }),
-        budget,
-        ...(resolved.pinned === undefined ? {} : { pin: resolved.pinned }),
-        plan,
-        progress: say,
-      };
-      tierNote = "";
+
+      if (notPaid !== undefined) {
+        step = { pay: false, kind: resolved.operatedByMe ? "needs-payer" : "read-only", reason: `payment checks not run: ${notPaid}` };
+        tierNote = `Tier: payment on ${resolved.network}, and the payment checks were not run: ${notPaid}. Nothing was signed.`;
+      } else if (!hasX402) {
+        // No x402 endpoint: the step is never used for one.
+        step = { pay: false, kind: "not-applicable", reason: "payment checks not run: no x402 endpoint" };
+        tierNote = "";
+      } else if (chain === undefined || key === undefined || plan === undefined || budget === undefined) {
+        // No payment adapter for this network: the payment group is unsupported (spec A3), so the
+        // endpoint has no verdict (Najmi, 2026-11-15). Nothing is fetched for it beyond the challenge.
+        step = { pay: false, kind: "unsupported", reason: new UnsupportedPaymentNetworkError(resolved.network).message };
+        tierNote = `Tier: payment on ${resolved.network}, a network Wasit does not pay on. Nothing was signed.`;
+      } else {
+        step = {
+          pay: true,
+          network: resolved.network,
+          key,
+          ...(resolved.rpcUrl === undefined ? {} : { rpcUrl: resolved.rpcUrl }),
+          budget,
+          ...(resolved.pinned === undefined ? {} : { pin: resolved.pinned }),
+          plan,
+          progress: say,
+        };
+        tierNote = "";
+      }
+      if (mppSteps !== undefined) {
+        mpp = {
+          network: resolved.network,
+          ...(resolved.rpcUrl === undefined ? {} : { rpcUrl: resolved.rpcUrl }),
+          charge: mppSteps.charge,
+          channel: mppSteps.channel,
+          ...(budget === undefined ? {} : { budget }),
+          ...(plan === undefined ? {} : { plan }),
+        };
+      }
     }
 
     const endpoints = [];
     for (const endpoint of resolved.endpoints) {
-      const results = await runEndpoint(endpoint, step);
+      const results = await runEndpoint(endpoint, step, mpp);
       endpoints.push(
         buildEndpointReport({
           name: endpoint.name,
@@ -579,14 +774,38 @@ export async function executeRun(options: RunCommandOptions, context: RunContext
       tierNote =
         `Tier: payment on ${resolved.network}. The run charged ${formatUsd(budget.spentUsd)} of the ` +
         `${formatUsd(budget.capUsd)} cap, at most $${PER_PAYMENT_CAP_USD}.00 a payment; every signature is counted as if it settled.`;
+    } else if (tierNote === "") {
+      tierNote = `Tier: payment on ${resolved.network}. No payment was planned, so nothing was charged to the cap.`;
     }
 
-    return writeReport({ options, context, resolved, startedAt, endpoints, notes: [tierNote], secrets, clean, fail }, (verdict) =>
-      // The payment tier was asked for on an event that may pay and did not pay:
-      // not green (a FAIL still outranks it).
-      notPaid !== undefined && hasX402 && verdict.code === 0
-        ? { ...verdict, code: 2, reason: `the payment tier was asked for and its payment checks were not run: ${notPaid}` }
-        : verdict,
+    // The MPP side: what it signed beside the cap, and why a mode the run has did not run.
+    const hasCharge = resolved.endpoints.some((endpoint) => endpoint.protocol === "mpp-charge");
+    const hasChannel = resolved.endpoints.some((endpoint) => endpoint.protocol === "mpp-channel");
+    const mppNotes: string[] = [];
+    /** Why a mode the run has did not pay on an event that may pay, for lack of a key or of operatedByMe: not green. */
+    const unpaid = new Set<string>(notPaid !== undefined && hasX402 ? [notPaid] : []);
+    for (const [has, label, own] of [
+      [hasCharge, "MPP charge", mpp?.charge],
+      [hasChannel, "MPP channel", mpp?.channel],
+    ] as const) {
+      if (!has || own === undefined || own.pay) continue;
+      if (own.kind === "needs-payer" || own.kind === "read-only") {
+        const why = (own.reason ?? "").replace(/^payment checks not run: /, "");
+        unpaid.add(why);
+        if (notPaid !== why) mppNotes.push(`${label}: the payment checks were not run: ${why}.`);
+      }
+    }
+    if (hasChannel && mpp?.channel.pay === true) mppNotes.push(MPP_CHANNEL_NOTE);
+    const firstUnpaid = [...unpaid][0];
+
+    return writeReport(
+      { options, context, resolved, startedAt, endpoints, notes: [tierNote, ...mppNotes], secrets, clean, fail },
+      (verdict) =>
+        // The payment tier was asked for on an event that may pay and did not pay:
+        // not green (a FAIL still outranks it).
+        firstUnpaid !== undefined && verdict.code === 0
+          ? { ...verdict, code: 2, reason: `the payment tier was asked for and its payment checks were not run: ${firstUnpaid}` }
+          : verdict,
     );
   } finally {
     await service?.stop();
