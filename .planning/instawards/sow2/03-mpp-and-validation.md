@@ -1,6 +1,6 @@
 # Job 03 — MPP, recent failures, own facilitator, validation of the opt-in
 
-Status: 🟡 **IN PROGRESS** — the validation of the opt-in was run on 2026-11-23 (week 2, ahead of its week); MPP in the Action, the recent-failures line and "resource consumed" are not started · Deliverable: **D2** · Week: **3** · Depends on: #2
+Status: 🟡 **IN PROGRESS** — the validation of the opt-in was run on 2026-11-23 and MPP in `wasit run` on 2026-11-24, on the maintainer's machine (week 2, ahead of its week); MPP in the example project's Action comes with the release; the recent-failures line and "resource consumed" are not started · Deliverable: **D2** · Week: **3** · Depends on: #2
 
 ## Goal
 
@@ -20,7 +20,7 @@ down.
 
 ## Acceptance criteria
 
-- [ ] MPP charge and channel runs in the example project, in the same comment format.
+- [~] MPP charge and channel runs in the example project, in the same comment format. Partly: run through `wasit run` on the maintainer's machine on 2026-11-24, and the comment written from those runs (below); the run in the example project, through the Action, comes with the release, when the code is public.
 - [ ] The line with recent failure counts in a run comment.
 - [ ] A run against a single-use test paywall shows "resource consumed".
 - [~] Our own facilitator and a free mainnet RPC are running for the example service. Partly: they ran for a copy of the example's seller on the maintainer's machine for the validation (not hosted); the example project itself still uses the hosted test-network facilitator.
@@ -28,7 +28,22 @@ down.
 
 ## Result
 
-**Part 3 of this job (the validation of the opt-in on our own service) was run on 2026-11-23 on Stellar mainnet. MPP in the Action, the recent-failures line and "resource consumed" are not started.**
+**Part 1 of this job (MPP) was run on 2026-11-24 on the maintainer's machine, on the Stellar test network; part 3 (the validation of the opt-in on our own service) on 2026-11-23 on Stellar mainnet. The recent-failures line and "resource consumed" are not started.**
+
+### MPP through `wasit run`, on the maintainer's machine (2026-11-24)
+
+`wasit run`, the command the Action runs, now runs the MPP checks in the payment tier, on `stellar:testnet` only and by the same rules as x402: the event, `operatedByMe` and the key variable. MPP-01 (charge) is planned from the service's unpaid answer before anything is signed and held to the same caps as x402, at most $1.00 a payment and one $5.00 budget for the run; the payment it signs must be the planned one. The channel checks (MPP-10, 11, 12 and 14) sign commitments off-chain and send no transaction. MPP-13, which closes a channel for good, is never run by `wasit run`. The maintainer ran it in their own terminal against the local MPP test services of Wasit's repository; the keys came from their local environment file and are in no output.
+
+| Run | Result | Proof |
+| --- | --- | --- |
+| MPP charge, one endpoint | The plan printed first ("MPP-01 10000 (base units)", "could spend up to $0.001 of the $5.00 cap"); MPP-01 passed: the payment settled for exactly the advertised amount, read from the transfer event; exit 0. Read afterwards on Horizon: one successful operation, the payer debited and the receiver credited 0.0010000 USDC | [`4349…bf83`](https://stellar.expert/explorer/testnet/tx/43499f50af379f20467b31645815e4d31db250bef4315ce98d5ed22eb83cbf83) · [excerpts](week-2/copies/mpp-local-run/excerpts-of-the-runs.txt) · [comment](week-2/copies/mpp-local-run/charge-comment.md) |
+| MPP channel, one endpoint | MPP-11, MPP-12 and MPP-14 passed, MPP-10 skipped (the channel's expected terms were not in the config), MPP-13 not listed; nothing charged to the cap; exit 0 | [excerpts](week-2/copies/mpp-local-run/excerpts-of-the-runs.txt) · [comment](week-2/copies/mpp-local-run/channel-comment.md) |
+
+The two comments were written by `wasit ci-report` from the reports of these runs, the same command the Action runs: the charge comment links the payment on Stellar Expert, as the x402 comment does for X402-06. No pull request was involved: this is the comment format, not yet a run in the example project.
+
+The code is commit `bd9209a` on a local branch of the week 3 work, which becomes public with the release; until then the copies are the readable record. The comments' version line reads 0.8.0-beta.1 because the local build keeps the pre-release's version number: the published 0.8.0-beta.1 does not have this code. Not run yet: MPP in the example project through the Action (with the release), and a service that is not ours.
+
+### Part 3: the validation of the opt-in (2026-11-23)
 
 ### What was run, and where
 
