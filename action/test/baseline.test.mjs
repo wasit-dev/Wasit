@@ -169,7 +169,10 @@ describe("findBaseline", () => {
       const { gh, calls } = fakeGh({ runs: [forged, trusted], artifacts: { 777: [artifact(777)], 200: [artifact(200)] } });
       const result = await findBaseline({ ...base(), gh, log: () => {} });
       assert.ok(result.path !== undefined);
-      assert.ok(calls.every((args) => !args.join(" ").includes("777")), "run 777 was never mentioned to gh");
+      // By argument or API path segment, not as a substring: the download folder's random name can hold "777"
+      // (CI run 45189237177 on d924284, 2026-11-23, failed that way).
+      const namesRun = (args, id) => args.some((arg) => arg === String(id) || new RegExp(`/runs/${id}(/|\\?|$)`).test(arg));
+      assert.ok(calls.every((args) => !namesRun(args, 777)), "run 777 was never mentioned to gh");
       assert.equal(calls.find((args) => args[0] === "run")[2], "200");
     });
 
