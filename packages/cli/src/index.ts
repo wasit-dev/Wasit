@@ -20,6 +20,7 @@ import { note, report } from "./output.js";
 import { liveX402Test } from "./test-live.js";
 import { colorDepth, colorEnabled, lineWidth, styler } from "./style.js";
 import { executeRun } from "./run.js";
+import { DEFAULT_CONFIG_FILE, executeInit } from "./init-command.js";
 import {
   CHECK_CATALOGUE,
   PROTOCOL_IDS,
@@ -89,6 +90,7 @@ program
     `
 Examples:
   $ wasit checks
+  $ wasit init --url http://127.0.0.1:3000/api/weather --operated-by-me
   $ wasit test --target https://api.example.com/paid-endpoint --read-only
   $ wasit mpp-charge --target https://api.example.com/paid-endpoint --payer-key S...
   $ wasit mpp-channel --target https://api.example.com/paid-endpoint
@@ -413,6 +415,80 @@ In CI (CI or GITHUB_ACTIONS set) a .env file in the working directory is not rea
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(sanitizeText(`wasit run: unexpected error: ${message}`, { redact: deniedEnvValues(process.env) }));
+      code = 2;
+    }
+    await flushOutput();
+    process.exit(code);
+  });
+
+program
+  .command("init")
+  .description("Write a wasit.config.json for one paid route of a service you operate")
+  .option("--url <url>", "The URL of one paid route, e.g. http://127.0.0.1:3000/api/weather")
+  .option(
+    "--operated-by-me",
+    "Confirm that you operate the service. Wasit tests only services their operator runs: without it nothing is written",
+    false,
+  )
+  .option("--name <name>", "The endpoint's name (default: the last part of the path)")
+  .option("--method <method>", "The route's HTTP method (default: GET)")
+  .option("--body-file <file>", "A JSON file with the request body, written into the config as a JSON value (not with GET)")
+  .option("--network <id>", "The route's test network, a CAIP-2 id (default: stellar:testnet)")
+  .option("--env <name>", "The environment's name (default: local, for a URL on this machine)")
+  .option("--start <command>", "The command that starts the service, for wasit run --start")
+  .option("--ready-url <url>", "With --start: the address on this machine to wait for (default: the route's URL, on this machine)")
+  .option("--ready-timeout <seconds>", "With --start: how long to wait, 1 to 600 (default: 60)")
+  .option(
+    "--reject-header <header>",
+    'A header of the request the route must refuse (X402-11), as "Name: value". Repeatable.',
+    (value: string, previous: string[]) => [...previous, value],
+    [] as string[],
+  )
+  .option("--reject-body-file <file>", "A JSON file with the body of the request the route must refuse (X402-11)")
+  .option("--reject-note <text>", "One line on why the route must refuse that request")
+  .option("--config <path>", "The config file", DEFAULT_CONFIG_FILE)
+  .option("--force", "Replace the config file instead of adding the endpoint to it", false)
+  .addHelpText(
+    "after",
+    `
+Examples:
+  $ wasit init --url http://127.0.0.1:3000/api/weather --operated-by-me
+  $ wasit init --url http://127.0.0.1:3000/api/chat --method POST --body-file body.json --operated-by-me --start "npm start"
+
+An existing config is added to (one more endpoint), never overwritten: --force
+replaces it. Mainnet is not written in this version, and neither is a header of
+the route: send a credential in a WASIT_HEADER_<NAME> variable. After writing,
+init prints what you gave, what it filled in by default and what it did not read
+from your service, then the next command.
+Exit codes: 0 the config was written; 2 nothing was written.`,
+  )
+  .exitOverride(exitTwoOnUsageError)
+  .action(async (opts) => {
+    let code: number;
+    try {
+      code = await executeInit(
+        {
+          ...(opts.url === undefined ? {} : { url: opts.url as string }),
+          operatedByMe: opts.operatedByMe === true,
+          ...(opts.name === undefined ? {} : { name: opts.name as string }),
+          ...(opts.method === undefined ? {} : { method: opts.method as string }),
+          ...(opts.bodyFile === undefined ? {} : { bodyFile: opts.bodyFile as string }),
+          ...(opts.network === undefined ? {} : { network: opts.network as string }),
+          ...(opts.env === undefined ? {} : { env: opts.env as string }),
+          ...(opts.start === undefined ? {} : { start: opts.start as string }),
+          ...(opts.readyUrl === undefined ? {} : { readyUrl: opts.readyUrl as string }),
+          ...(opts.readyTimeout === undefined ? {} : { readyTimeout: opts.readyTimeout as string }),
+          rejectHeader: opts.rejectHeader as string[],
+          ...(opts.rejectBodyFile === undefined ? {} : { rejectBodyFile: opts.rejectBodyFile as string }),
+          ...(opts.rejectNote === undefined ? {} : { rejectNote: opts.rejectNote as string }),
+          config: opts.config as string,
+          force: opts.force === true,
+        },
+        { env: process.env, stdout: (line) => console.log(line), stderr: (line) => console.error(line) },
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(sanitizeText(`wasit init: unexpected error: ${message}`, { redact: deniedEnvValues(process.env) }));
       code = 2;
     }
     await flushOutput();
