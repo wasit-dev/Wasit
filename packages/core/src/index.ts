@@ -54,6 +54,17 @@ export type {
   ServiceConfig,
   WasitConfig,
 } from "./config.js";
+// The config writer of `wasit init`: data that is certain in, a config `wasit run` accepts out.
+export { ConfigWriteError, writeConfigText } from "./config-writer.js";
+export type {
+  ConfigWriteInput,
+  ConfigWriteOptions,
+  ConfigWriteResult,
+  InitEndpointInput,
+  InitEnvironmentInput,
+  InitRejectInput,
+  InitServiceInput,
+} from "./config-writer.js";
 
 // The run report, the endpoint outcome and the versions a result names.
 export {
