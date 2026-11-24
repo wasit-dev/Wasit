@@ -224,7 +224,7 @@ export async function assertMppPaymentRpc(network: string, rpcUrl: string | unde
  */
 export function describePaymentPlan(plan: RunPlan, has: { readonly x402: boolean; readonly mppCharge: boolean }): string[] {
   const lines = describePlan(plan);
-  if (!has.mppCharge) return lines;
-  const what = has.x402 ? "x402 payment checks and MPP-01" : "MPP-01";
+  if (has.x402 && !has.mppCharge) return lines;
+  const what = has.x402 ? "x402 payment checks and MPP-01" : has.mppCharge ? "MPP-01" : "no payment to plan (no x402 or MPP charge endpoint)";
   return [sanitizeText(`Plan (dry run): ${what} on ${plan.network}. Nothing is signed or sent.`), ...lines.slice(1)];
 }

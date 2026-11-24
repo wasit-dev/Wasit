@@ -146,7 +146,7 @@ describe("the plan of MPP-01 (planMppChargeEndpoint)", () => {
     const target = await chargeTarget();
     try {
       const plan = await planMppChargeEndpoint("stellar:testnet", { name: "chat", target: target.url });
-      assert.equal(plan.status, "planned", plan.reason);
+      assert.equal(plan.status, "planned", plan.reason ?? "");
       assert.equal(plan.option?.scheme, MPP_CHARGE_SCHEME);
       assert.equal(plan.option?.payTo, RECIPIENT);
       assert.equal(plan.option?.asset, USDC_SAC);
@@ -206,7 +206,7 @@ describe("the plan of MPP-01 (planMppChargeEndpoint)", () => {
       assert.equal(currency.status, "refused");
       assert.match(currency.reason ?? "", /currency "C[A-Z2-7]{55}", not the pinned/);
       const pinned = await planMppChargeEndpoint("stellar:testnet", { name: "chat", target: target.url }, { payTo: RECIPIENT, asset: USDC_SAC });
-      assert.equal(pinned.status, "planned", pinned.reason);
+      assert.equal(pinned.status, "planned", pinned.reason ?? "");
     } finally {
       await target.close();
     }
@@ -304,6 +304,9 @@ describe("one plan and one cap for x402 and MPP-01 (combinePaymentPlan)", () => 
     assert.equal(mppOnly[0], "Plan (dry run): MPP-01 on stellar:testnet. Nothing is signed or sent.");
     const x402Only = describePaymentPlan(x402Plan(1), { x402: true, mppCharge: false });
     assert.equal(x402Only[0], "Plan (dry run): x402 payment checks on stellar:testnet. Nothing is signed or sent.");
+    // A run of channel endpoints only: nothing it signs is a payment, and the first line does not name x402.
+    const channelOnly = describePaymentPlan({ ...x402Plan(0), endpoints: [], worstCaseUsd: 0n }, { x402: false, mppCharge: false });
+    assert.equal(channelOnly[0], "Plan (dry run): no payment to plan (no x402 or MPP charge endpoint) on stellar:testnet. Nothing is signed or sent.");
   });
 });
 
