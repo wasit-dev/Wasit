@@ -1,0 +1,61 @@
+MPP charge and channel through `wasit run`, on the maintainer's machine, 2026-11-24
+
+Run by the maintainer in their own terminal, against the local MPP test services of Wasit's repository (the charge
+service on 127.0.0.1:3002 and the channel service on 127.0.0.1:3003, both on the Stellar test network). Keys came from
+the maintainer's local environment file and are in no output below. Code: commit bd9209a on a local branch of the week 3
+work, which becomes public with the release; the version line of the comment reads 0.8.0-beta.1 because the local build
+keeps the pre-release's version number (the published 0.8.0-beta.1 does not have this code). The output below is copied
+from the terminal as it was, with the shell prompt removed and the commands shortened: the local build was run as
+`node <build>/index.js run ...` with full file paths, shown here as `wasit run ...` with file names only.
+
+$ wasit run --config wasit.mpp-fixtures.json --env charge --endpoint chat --out charge-report.json
+
+Payment tier on stellar:testnet (test network): test funds. MPP-01 payer GDHQTUA2P5OO7EXSZ5MAUID4HUFM3H7XP6B5GJNQSRX3N675KCFNAFVK; at most $1.00 per payment; this run could spend up to $0.001 of the $5.00 cap.
+Caps: $1.00 a payment, $5.00 this run.
+  chat: pays "GALVZ57VAY6BE33WYPJMUJ27PFAUDRQ6ATTVMIIF4STTGQTXDBEIBXUI" in "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA", up to $0.001
+    MPP-01 10000 (base units)
+Worst case: $0.001 of $5.00.
+Environment charge: http://127.0.0.1:3002
+Network: stellar:testnet (test network)
+Endpoints: 1
+  chat  mpp-charge  GET /data
+Tier: payment on stellar:testnet. The run charged $0.001 of the $5.00 cap, at most $1.00 a payment; every signature is counted as if it settled.
+
+chat  mpp-charge  GET /data: conformant
+  PASS  MPP-01  Charge Settlement On-Chain
+        Settled on-chain for exactly the advertised 10000 base units of CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA to GALVZ57VAY6BE33WYPJMUJ27PFAUDRQ6ATTVMIIF4STTGQTXDBEIBXUI, verified from the transfer event (tx 43499f50af379f20467b31645815e4d31db250bef4315ce98d5ed22eb83cbf83).
+
+Summary: 1 graded.
+Result: 1 graded (exit 0).
+
+$ wasit run --config wasit.mpp-fixtures.json --env channel --endpoint stream --out channel-report.json
+
+Environment channel: http://127.0.0.1:3003
+Network: stellar:testnet (test network)
+Endpoints: 1
+  stream  mpp-channel  GET /data
+Tier: payment on stellar:testnet. No payment was planned, so nothing was charged to the cap.
+
+stream  mpp-channel  GET /data: conformant
+  SKIP  MPP-10  Channel Deploy
+        Skipped: expected on-chain parameters not supplied (token, from, to, refundWaitingPeriod).
+  PASS  MPP-11  Cumulative Commitment Ordering
+        Both ordering rules enforced: a commitment equal to the cumulative (10000) and one that under-covers the price (19999) were each rejected with HTTP 402.
+  PASS  MPP-12  Challenge Replay Rejection
+        Byte-identical credential correctly rejected on replay (HTTP 402).
+  PASS  MPP-14  Commitment Replay Rejection
+        Captured commitment (30000) correctly rejected when re-presented against a fresh challenge (HTTP 402).
+
+Summary: 1 graded.
+Note: MPP channel: the commitments MPP-11, MPP-12 and MPP-14 sign are off-chain, and Wasit sends no transaction for them, so they are not charged to the cap. MPP-13 (close) is never run by wasit run.
+Result: 1 graded (exit 0).
+
+Read afterwards on Horizon for the Stellar test network (no key), transaction
+43499f50af379f20467b31645815e4d31db250bef4315ce98d5ed22eb83cbf83:
+  successful: true, ledger 5894520, created 2026-11-24T04:57:22Z, one operation,
+  source and fee account GDHQTUA2P5OO7EXSZ5MAUID4HUFM3H7XP6B5GJNQSRX3N675KCFNAFVK (the MPP-01 payer)
+  effects: GDHQTUA2P5OO7EXSZ5MAUID4HUFM3H7XP6B5GJNQSRX3N675KCFNAFVK debited 0.0010000 USDC
+           GALVZ57VAY6BE33WYPJMUJ27PFAUDRQ6ATTVMIIF4STTGQTXDBEIBXUI credited 0.0010000 USDC
+
+The two comments in this folder were written by `wasit ci-report` from the two reports above, the same command the
+Action runs after `wasit run`. No pull request was involved.
