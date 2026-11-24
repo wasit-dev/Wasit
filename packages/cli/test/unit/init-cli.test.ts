@@ -1,13 +1,15 @@
 /**
  * `wasit init` as the built binary (`npm run build` first): the flags as
  * commander reads them, and the exit codes a script sees. Runs in an empty
- * temporary directory with an empty HOME; no service, no request.
+ * temporary directory with an empty HOME; the one route it reads is on
+ * 127.0.0.1.
  */
 
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
+import http from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -48,13 +50,14 @@ afterEach(async () => {
 });
 
 describe("wasit init (built binary)", () => {
-  it("writes the example project's config from its flags, exit 0", async () => {
+  it("writes the example project's config from its flags with --no-read, exit 0", async () => {
     const { code, stdout, stderr } = await wasit(
       [
         "init",
         "--url",
         "http://127.0.0.1:4402/paid",
         "--operated-by-me",
+        "--no-read",
         "--name",
         "quote-of-the-day",
         "--start",
@@ -91,6 +94,45 @@ describe("wasit init (built binary)", () => {
     assert.equal(notMine.code, 2);
     assert.match(notMine.stderr, /Wasit tests only services their operator runs/);
     assert.ok(!existsSync(path.join(dir, "wasit.config.json")));
+  });
+
+  it("reads the route by default: one unpaid request, exit 0; --protocol is checked before it", async () => {
+    let requests = 0;
+    const accepts = [
+      {
+        scheme: "exact",
+        network: "stellar:testnet",
+        amount: "10000",
+        asset: "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
+        payTo: "GDQ2NVWFGVLUCCGCFGWUWDA75EZ2KYNWUQAPEJKFQGMW5UOA7DAM5JD5",
+        maxTimeoutSeconds: 60,
+      },
+    ];
+    const server = http.createServer((_request, response) => {
+      requests += 1;
+      response.writeHead(402, { "payment-required": Buffer.from(JSON.stringify({ x402Version: 2, accepts })).toString("base64") });
+      response.end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as { port: number };
+    try {
+      const bogus = await wasit(["init", "--url", `http://127.0.0.1:${port}/paid`, "--operated-by-me", "--protocol", "lightning"], dir);
+      assert.equal(bogus.code, 2);
+      assert.match(bogus.stderr, /--protocol "lightning" is not one of x402, mpp-charge, mpp-channel/);
+      assert.equal(requests, 0);
+
+      const { code, stdout, stderr } = await wasit(["init", "--url", `http://127.0.0.1:${port}/paid`, "--operated-by-me"], dir);
+      assert.equal(code, 0, stderr);
+      assert.equal(requests, 1);
+      assert.match(stdout, /written: protocol x402, network stellar:testnet/);
+      const config = JSON.parse(await readFile(path.join(dir, "wasit.config.json"), "utf-8")) as {
+        environments: Record<string, { pinned?: unknown }>;
+      };
+      assert.deepEqual(config.environments["local"]?.pinned, { payTo: accepts[0]!.payTo, asset: accepts[0]!.asset });
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
   });
 
   it("exit 2 on a flag it does not know", async () => {

@@ -1,8 +1,9 @@
 /**
- * `wasit init` with flags only (spec C; W3-2 slice 2; init-skeleton-plan.md
- * section 6, Najmi's fallback table of 2026-11-15). In-process, in a
- * temporary directory. Without reading the route, init sends no request:
- * every test here runs with a `fetch` that fails the test when called.
+ * `wasit init --no-read`: the flags only (spec C; W3-2 slice 2;
+ * init-skeleton-plan.md section 6, Najmi's fallback table of 2026-11-15).
+ * In-process, in a temporary directory. Without reading the route, init sends
+ * no request: every test here runs with a `fetch` that fails the test when
+ * called. Reading the route (slice 3) is in init-read.test.ts.
  */
 
 import assert from "node:assert/strict";
@@ -73,7 +74,7 @@ async function init(flags: Partial<InitCommandOptions>, env: Record<string, stri
   const out: string[] = [];
   const err: string[] = [];
   const code = await executeInit(
-    { operatedByMe: true, rejectHeader: [], config: "wasit.config.json", force: false, ...flags },
+    { operatedByMe: true, rejectHeader: [], config: "wasit.config.json", force: false, read: false, ...flags },
     { env, stdout: (line) => out.push(line), stderr: (line) => err.push(line), cwd: dir },
   );
   return { code, stdout: out.join("\n"), stderr: err.join("\n") };

@@ -423,7 +423,9 @@ In CI (CI or GITHUB_ACTIONS set) a .env file in the working directory is not rea
 
 program
   .command("init")
-  .description("Write a wasit.config.json for one paid route of a service you operate")
+  .description(
+    "Write a wasit.config.json for one paid route of a service you operate, from one unpaid request to the route",
+  )
   .option("--url <url>", "The URL of one paid route, e.g. http://127.0.0.1:3000/api/weather")
   .option(
     "--operated-by-me",
@@ -433,7 +435,12 @@ program
   .option("--name <name>", "The endpoint's name (default: the last part of the path)")
   .option("--method <method>", "The route's HTTP method (default: GET)")
   .option("--body-file <file>", "A JSON file with the request body, written into the config as a JSON value (not with GET)")
-  .option("--network <id>", "The route's test network, a CAIP-2 id (default: stellar:testnet)")
+  .option(
+    "--network <id>",
+    "Choose this test network (CAIP-2) among the ones the route offers; with --no-read, the network written (default: stellar:testnet)",
+  )
+  .option("--protocol <name>", "Choose this protocol among the ones the route offers: x402, mpp-charge or mpp-channel")
+  .option("--no-read", "Do not ask the route anything: write it as x402 from the flags alone")
   .option("--env <name>", "The environment's name (default: local, for a URL on this machine)")
   .option("--start <command>", "The command that starts the service, for wasit run --start")
   .option("--ready-url <url>", "With --start: the address on this machine to wait for (default: the route's URL, on this machine)")
@@ -454,12 +461,19 @@ program
 Examples:
   $ wasit init --url http://127.0.0.1:3000/api/weather --operated-by-me
   $ wasit init --url http://127.0.0.1:3000/api/chat --method POST --body-file body.json --operated-by-me --start "npm start"
+  $ wasit init --url http://127.0.0.1:3000/mpp/chat --operated-by-me --protocol mpp-charge
 
+init sends the route one unpaid request (its method and body, and the
+WASIT_HEADER_* headers wasit run sends), follows at most one redirect inside its
+origin, and pays and signs nothing. Its 402 tells x402 from MPP and gives the
+protocol, the network, the receiving address and asset (pinned) and an MPP
+channel. A route that answers 200, 500 or 503, or does not answer, writes
+nothing: --no-read writes it from the flags alone, as x402.
 An existing config is added to (one more endpoint), never overwritten: --force
 replaces it. Mainnet is not written in this version, and neither is a header of
 the route: send a credential in a WASIT_HEADER_<NAME> variable. After writing,
-init prints what you gave, what it filled in by default and what it did not read
-from your service, then the next command.
+init prints what it read from your service, what you gave, what it filled in by
+default and what it did not read, then the next command.
 Exit codes: 0 the config was written; 2 nothing was written.`,
   )
   .exitOverride(exitTwoOnUsageError)
@@ -474,6 +488,7 @@ Exit codes: 0 the config was written; 2 nothing was written.`,
           ...(opts.method === undefined ? {} : { method: opts.method as string }),
           ...(opts.bodyFile === undefined ? {} : { bodyFile: opts.bodyFile as string }),
           ...(opts.network === undefined ? {} : { network: opts.network as string }),
+          ...(opts.protocol === undefined ? {} : { protocol: opts.protocol as string }),
           ...(opts.env === undefined ? {} : { env: opts.env as string }),
           ...(opts.start === undefined ? {} : { start: opts.start as string }),
           ...(opts.readyUrl === undefined ? {} : { readyUrl: opts.readyUrl as string }),
@@ -483,6 +498,7 @@ Exit codes: 0 the config was written; 2 nothing was written.`,
           ...(opts.rejectNote === undefined ? {} : { rejectNote: opts.rejectNote as string }),
           config: opts.config as string,
           force: opts.force === true,
+          read: opts.read !== false,
         },
         { env: process.env, stdout: (line) => console.log(line), stderr: (line) => console.error(line) },
       );

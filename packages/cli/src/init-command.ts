@@ -1,6 +1,6 @@
 /**
  * `wasit init`: a `wasit.config.json` for one paid route of a service its
- * operator runs (spec C; W3-2 slice 2, the flags).
+ * operator runs (spec C; W3-2 slices 2 and 3).
  *
  * Every answer is a flag, so the same command works in a script, in
  * PowerShell and in cmd.exe: no answer needs shell quoting (a body comes from
@@ -8,14 +8,24 @@
  * that is certain and checks the result with the validator `wasit run` reads
  * the file with (Najmi, 2026-11-15). What the writer is not given, this
  * command fills from a fixed fallback table (init-skeleton-plan.md section 6),
- * and says so: after writing it prints what was given, what was filled in by
- * default, and what was NOT read from the service.
+ * and says so: after writing it prints what it read from the service, what was
+ * given, what was filled in by default, and what was NOT read.
+ *
+ * Reading the route (C2, slice 3) is the default: one unpaid request with the
+ * route's method and body (and the `WASIT_HEADER_*` headers `wasit run` would
+ * send), one redirect inside the origin at most, no payment, no signature, no
+ * key. Its 402 tells x402 from MPP and fills in the protocol, the network, the
+ * pin (receiving address and asset) and an MPP channel. A route that answers
+ * 200, 500 or 503, or nothing, is said in plain words and nothing is written;
+ * `--no-read` writes the route from the flags alone, as x402 (slice 2).
  *
  * Nothing is sent and nothing is written without `--operated-by-me`: Wasit
- * tests only services their operator runs. An existing config is added to,
- * never overwritten silently; `--force` replaces it. Mainnet is not written in
- * this version, and nothing that could hold a secret is: an endpoint's headers
- * are not written (a credential goes in `WASIT_HEADER_*`).
+ * tests only services their operator runs. Every flag is checked before the
+ * route is asked anything. An existing config is added to, never overwritten
+ * silently; `--force` replaces it. Mainnet is not written in this version, and
+ * nothing that could hold a secret is: an endpoint's headers are not written (a
+ * credential goes in `WASIT_HEADER_*`). What the service answered is data:
+ * printed through the sanitiser, never followed or run.
  *
  * `executeInit` does not call `process.exit` and does not read the process:
  * the environment and the output are passed in, so it can be tested in-process.
@@ -25,12 +35,18 @@ import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import {
+  ConfigError,
   ConfigWriteError,
+  ConfigurationError,
   NETWORK_CLASSES,
+  chooseOffer,
   deniedEnvValues,
+  describeOffer,
+  headersFromEnv,
   isLoopbackUrl,
   networkClass,
   parseConfig,
+  readRoute,
   sanitizeText,
   writeConfigText,
   type EnvironmentConfig,
@@ -39,11 +55,14 @@ import {
   type InitRejectInput,
   type InitServiceInput,
   type JsonValue,
+  type PinConfig,
+  type RouteOffer,
+  type RouteProtocol,
 } from "@wasit-dev/core";
 
 export const DEFAULT_CONFIG_FILE = "wasit.config.json";
 
-/** The network written when none is given (the fallback table). */
+/** The network written when none is given or read (the fallback table). */
 const DEFAULT_NETWORK = "stellar:testnet";
 
 /** The environment written for a URL on this machine when none is given. */
@@ -57,13 +76,23 @@ const NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 
 const HTTP_METHODS: readonly string[] = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];
 
+const PROTOCOLS: readonly RouteProtocol[] = ["x402", "mpp-charge", "mpp-channel"];
+
+/** The most offers printed: the rest is counted. */
+const MAX_OFFER_LINES = 10;
+
+const NO_READ_HINT = "To write the route without reading it, run this again with --no-read.";
+
 export interface InitCommandOptions {
   readonly url?: string;
   readonly operatedByMe: boolean;
   readonly name?: string;
   readonly method?: string;
   readonly bodyFile?: string;
+  /** Chooses among the ways the route offers to pay; without reading, the network written. */
   readonly network?: string;
+  /** Chooses among the ways the route offers to pay. */
+  readonly protocol?: string;
   readonly env?: string;
   readonly start?: string;
   readonly readyUrl?: string;
@@ -74,16 +103,20 @@ export interface InitCommandOptions {
   readonly rejectNote?: string;
   readonly config: string;
   readonly force: boolean;
+  /** Read the route's 402 (the default); false is `--no-read`: no request, x402 from the flags. */
+  readonly read: boolean;
 }
 
 export interface InitContext {
-  /** For the values kept out of every printed line. */
+  /** The `WASIT_HEADER_*` variables the read sends, and the values kept out of every printed line. */
   readonly env: Readonly<Record<string, string | undefined>>;
   /** One line at a time, the line break added by the caller. */
   readonly stdout: (line: string) => void;
   readonly stderr: (line: string) => void;
   /** Where relative paths are read from and the config is written. Default: the working directory. */
   readonly cwd?: string;
+  /** Tests only: how long the read waits for the route. Index never sets it. */
+  readonly readTimeoutMs?: number;
 }
 
 /** A refusal: printed, exit 2, nothing written. */
@@ -172,8 +205,9 @@ function rejectHeaders(values: readonly string[]): Record<string, string> | unde
   return headers;
 }
 
-/** What the command was given, filled in, and did not read: printed after the file is written. */
+/** What the command read, was given, filled in, and did not read: printed after the file is written. */
 interface Account {
+  readonly read: string[];
   readonly given: string[];
   readonly defaulted: string[];
   readonly notRead: string[];
@@ -189,42 +223,53 @@ function existingText(file: string): string | undefined {
   }
 }
 
-/** The environment the file already has under `name`, as the loader reads it and as the file writes it. */
+/**
+ * The environment the file already has under `name`, as the loader reads it
+ * and as the file writes it. A file that is not a valid config is refused here,
+ * before the route is asked anything, in the writer's words.
+ */
 function existingEnvironment(
   text: string | undefined,
   name: string,
 ): { readonly parsed: EnvironmentConfig; readonly rawBaseUrl: string } | undefined {
   if (text === undefined) return undefined;
+  let parsed: EnvironmentConfig | undefined;
   try {
-    const parsed = parseConfig(text).environments[name];
-    if (parsed === undefined) return undefined;
-    const raw = JSON.parse(text.charCodeAt(0) === 0xfeff ? text.slice(1) : text) as {
-      environments: Record<string, { baseUrl: string }>;
-    };
-    return { parsed, rawBaseUrl: raw.environments[name]!.baseUrl };
-  } catch {
-    // Not a valid config: the writer refuses it and says why.
-    return undefined;
+    parsed = parseConfig(text).environments[name];
+  } catch (error) {
+    const why = error instanceof ConfigError ? error.message : "it is not valid JSON";
+    refuse(
+      `The config already there is not valid, so init does not change it (${sanitizeText(why).replace(/\s+/g, " ")}). ` +
+        "Fix it, or replace it (--force). Nothing was sent and nothing was written.",
+    );
   }
+  if (parsed === undefined) return undefined;
+  const raw = JSON.parse(text.charCodeAt(0) === 0xfeff ? text.slice(1) : text) as {
+    environments: Record<string, { baseUrl: string }>;
+  };
+  return { parsed, rawBaseUrl: raw.environments[name]!.baseUrl };
 }
 
 /**
- * The environment and the endpoint's path. A new environment's base URL is
- * the route's origin. An environment the file already has is used as it is:
- * the route must be under its base URL and on its network, and nothing in it
- * changes.
+ * The environment, the endpoint's path, and what became of the pin. A new
+ * environment's base URL is the route's origin, and it takes the pin read
+ * from the route. An environment the file already has is used as it is: the
+ * route must be under its base URL and on its network, its pin (or the lack of
+ * one) stays, and a route that pays another address than it pins is refused.
  */
 function environmentFor(
   name: string,
   url: URL,
   network: string,
+  pin: PinConfig | undefined,
   existing: ReturnType<typeof existingEnvironment>,
-): { readonly environment: InitEnvironmentInput; readonly path: string } {
+): { readonly environment: InitEnvironmentInput; readonly path: string; readonly pinLine?: string } {
   const full = url.origin + url.pathname + url.search;
   if (existing === undefined) {
     return {
-      environment: { name, baseUrl: url.origin, network, operatedByMe: true },
+      environment: { name, baseUrl: url.origin, network, operatedByMe: true, ...(pin === undefined ? {} : { pinned: pin }) },
       path: url.pathname + url.search,
+      ...(pin === undefined ? {} : { pinLine: `pinned: payTo ${pin.payTo}, asset ${pin.asset} (wasit run pays only these)` }),
     };
   }
   const { parsed, rawBaseUrl } = existing;
@@ -246,6 +291,19 @@ function environmentFor(
         `on ${shown(network)}. Name another environment (--env), or replace the file (--force). Nothing was written.`,
     );
   }
+  let pinLine: string | undefined;
+  if (parsed.pinned !== undefined) {
+    if (pin !== undefined && (pin.payTo !== parsed.pinned.payTo || pin.asset !== parsed.pinned.asset)) {
+      refuse(
+        `The config's environment ${shown(name)} pins payTo ${shown(parsed.pinned.payTo)} and asset ` +
+          `${shown(parsed.pinned.asset)}, and this route asks to be paid to ${shown(pin.payTo)} in ${shown(pin.asset)}. ` +
+          "init does not change a pin: name another environment (--env), or replace the file (--force). Nothing was written.",
+      );
+    }
+    pinLine = `pin: the environment's own (payTo ${parsed.pinned.payTo}, asset ${parsed.pinned.asset})`;
+  } else if (pin !== undefined) {
+    pinLine = `no pin added: the environment ${name} is in the config without one, and init does not change it`;
+  }
   return {
     environment: {
       name,
@@ -255,6 +313,7 @@ function environmentFor(
       ...(parsed.pinned === undefined ? {} : { pinned: parsed.pinned }),
     },
     path: full.slice(parsed.baseUrl.length),
+    ...(pinLine === undefined ? {} : { pinLine }),
   };
 }
 
@@ -320,13 +379,233 @@ function rejectFor(options: InitCommandOptions, cwd: string, account: Account): 
   };
 }
 
+/** `--protocol` and `--network`, checked before anything is sent. */
+function wantedFlags(options: InitCommandOptions): { readonly protocol?: RouteProtocol; readonly network?: string } {
+  if (options.protocol !== undefined && !PROTOCOLS.includes(options.protocol as RouteProtocol)) {
+    refuse(`--protocol ${shown(options.protocol)} is not one of ${PROTOCOLS.join(", ")}. Nothing was written.`);
+  }
+  if (options.network !== undefined) {
+    const kind = networkClass(options.network);
+    if (kind !== "test") {
+      refuse(
+        `--network ${shown(options.network)} is ${kind === "mainnet-optin" ? "Stellar mainnet, which init does not write in this version" : "not on Wasit's list of test networks"}. ` +
+          `init writes one of: ${testNetworks()}. Nothing was written.`,
+      );
+    }
+  }
+  return {
+    ...(options.protocol === undefined ? {} : { protocol: options.protocol as RouteProtocol }),
+    ...(options.network === undefined ? {} : { network: options.network }),
+  };
+}
+
+/** The way to pay written for the route, and the URL it answered on. */
+interface Route {
+  readonly protocol: RouteProtocol;
+  readonly network: string;
+  readonly url: URL;
+  readonly pin?: PinConfig;
+  readonly channel?: string;
+}
+
+/** The network of an x402 route whose network was not read: the flag, the environment's, or the default. */
+function unreadNetwork(
+  options: InitCommandOptions,
+  existing: ReturnType<typeof existingEnvironment>,
+  environmentName: string,
+  account: Account,
+  why: string,
+): string {
+  if (options.network !== undefined) {
+    account.given.push(`network: ${options.network}`);
+    return options.network;
+  }
+  if (existing !== undefined) {
+    account.defaulted.push(`network: ${existing.parsed.network} (the environment ${environmentName} in the config is on it)`);
+    return existing.parsed.network;
+  }
+  account.defaulted.push(`network: ${DEFAULT_NETWORK} (default; ${why})`);
+  return DEFAULT_NETWORK;
+}
+
+/** `--no-read` (slice 2): no request; x402 on the network the flags, the environment or the default give. */
+function routeFromFlags(
+  options: InitCommandOptions,
+  url: URL,
+  existing: ReturnType<typeof existingEnvironment>,
+  environmentName: string,
+  account: Account,
+): Route {
+  if (options.protocol !== undefined && options.protocol !== "x402") {
+    refuse(
+      "Without reading the route (--no-read), init writes x402 only: an MPP route is written from its challenge. " +
+        "Leave out --no-read. Nothing was written.",
+    );
+  }
+  account.given.push("read the route: no (--no-read)");
+  const network = unreadNetwork(options, existing, environmentName, account, "init does not read the network from your service");
+  if (options.protocol === undefined) account.defaulted.push("protocol: x402 (without reading the route, init writes x402 only)");
+  else account.given.push("protocol: x402");
+  account.notRead.push(
+    "whether the route answers 402, and its protocol, network, price, asset and receiving address: " +
+      "wasit run --read-only reads them",
+  );
+  return { protocol: "x402", network, url };
+}
+
+function offerLines(label: string, offers: readonly RouteOffer[], room: number): string[] {
+  const lines = offers.slice(0, Math.max(0, room)).map((offer) => `${label}: ${describeOffer(offer)}`);
+  const more = offers.length - lines.length;
+  return more > 0 ? [...lines, `${label}: ${more} more`] : lines;
+}
+
+/** Why a status that is not 402 is not a paywall, in plain words. */
+function statusMessage(status: number): string {
+  if (status === 200) return "The paywall is not switched on: the route answered 200 without asking for payment.";
+  if (status === 500 || status === 503) {
+    return (
+      `The paywall is not switched on or is misconfigured: the route answered ${status} instead of 402. A missing ` +
+      "payee or facilitator setting often answers this way: check the service's payment settings and its log."
+    );
+  }
+  const hint =
+    status === 404
+      ? ": check the path, and the method (--method)"
+      : status === 405
+        ? ": check the method (--method)"
+        : status === 401 || status === 403
+          ? ": it may need a credential, which init sends from a WASIT_HEADER_<NAME> variable, as wasit run does"
+          : "";
+  return `The route answered ${status}, not 402${hint}.`;
+}
+
+/** Slice 3: one unpaid request, and the way to pay its 402 offers. */
+async function routeFromReading(
+  options: InitCommandOptions,
+  context: InitContext,
+  url: URL,
+  method: string,
+  body: JsonValue | undefined,
+  existing: ReturnType<typeof existingEnvironment>,
+  environmentName: string,
+  wanted: { readonly protocol?: RouteProtocol; readonly network?: string },
+  account: Account,
+): Promise<Route> {
+  let headers: Record<string, string>;
+  try {
+    headers = headersFromEnv(context.env);
+  } catch (error) {
+    if (error instanceof ConfigError) refuse(`${error.message} Nothing was sent and nothing was written.`);
+    throw error;
+  }
+  const headerNames = Object.keys(headers);
+  const sent = `${method} ${url.href}`;
+
+  let reading;
+  try {
+    reading = await readRoute(
+      url.href,
+      {
+        method,
+        ...(body === undefined ? {} : { body: typeof body === "string" ? body : JSON.stringify(body) }),
+        ...(headerNames.length === 0 ? {} : { headers }),
+      },
+      context.readTimeoutMs === undefined ? {} : { timeoutMs: context.readTimeoutMs },
+    );
+  } catch (error) {
+    if (error instanceof ConfigurationError) refuse(`${error.message} Nothing was written.`);
+    throw error;
+  }
+
+  switch (reading.kind) {
+    case "unreachable":
+      refuse(`init sent ${sent} and got no answer. ${reading.message} Start the service and run this again. ${NO_READ_HINT} Nothing was written.`);
+    case "redirect":
+      refuse(`init sent ${sent}. ${reading.message} Nothing was written.`);
+    case "status":
+      refuse(`init sent ${sent}. ${statusMessage(reading.status)} Nothing was written. ${NO_READ_HINT}`);
+    case "unreadable":
+      refuse(
+        [
+          `init sent ${sent}. The route answered 402, and init could not read how it asks to be paid:`,
+          ...reading.notes.map((note) => `  ${note}`),
+          `${NO_READ_HINT} It is then written as x402, and wasit run --read-only reports what it finds. Nothing was written.`,
+        ].join("\n"),
+      );
+    default:
+      break;
+  }
+
+  account.read.push(
+    `one unpaid request: ${sent}` +
+      `${headerNames.length === 0 ? "" : ` with the WASIT_HEADER_* headers ${headerNames.join(", ")} (values not shown)`}` +
+      "; nothing was paid or signed",
+  );
+  const answered = new URL(reading.url);
+  if (answered.href !== url.href) {
+    account.read.push(`the route redirected once inside its origin, to ${answered.pathname}${answered.search}: init wrote that path`);
+  }
+  if (wanted.protocol !== undefined) account.given.push(`protocol: ${wanted.protocol}`);
+
+  if (reading.kind === "x402-v1") {
+    if (wanted.protocol !== undefined && wanted.protocol !== "x402") {
+      refuse(`init sent ${sent}. The route answered with an x402 v1 challenge, not ${wanted.protocol}. Nothing was written.`);
+    }
+    account.read.push(
+      "answer: 402 with an x402 v1 challenge in the body. Wasit grades x402 v2 only: wasit run reports this route " +
+        "as unsupported, not failed, and says how to move it to v2",
+      "written: protocol x402",
+    );
+    const network = unreadNetwork(options, existing, environmentName, account, "init does not read the network from an x402 v1 challenge");
+    return { protocol: "x402", network, url: answered };
+  }
+
+  // A network the environment in the file is on chooses among the offers, when the route offers it.
+  const envNetwork = existing?.parsed.network;
+  const network =
+    wanted.network ?? (envNetwork !== undefined && reading.offers.some((offer) => offer.network === envNetwork) ? envNetwork : undefined);
+  const choice = chooseOffer(reading.offers, { ...(wanted.protocol === undefined ? {} : { protocol: wanted.protocol }), ...(network === undefined ? {} : { network }) });
+  if (!choice.ok) {
+    refuse(
+      [
+        `init sent ${sent}. ${choice.reason}`,
+        ...offerLines("  offered", reading.offers, MAX_OFFER_LINES),
+        "Nothing was written.",
+      ].join("\n"),
+    );
+  }
+  if (wanted.network !== undefined) account.given.push(`network: ${wanted.network}`);
+
+  const headersSeen = [
+    ...(reading.offers.some((offer) => offer.protocol === "x402") ? ["a PAYMENT-REQUIRED header (x402)"] : []),
+    ...(reading.offers.some((offer) => offer.protocol !== "x402") ? ["a WWW-Authenticate challenge (MPP)"] : []),
+  ];
+  account.read.push(
+    `answer: 402 with ${headersSeen.join(" and ")}`,
+    ...offerLines("offered", choice.offers, MAX_OFFER_LINES),
+    ...offerLines("also offered, not written", choice.left, MAX_OFFER_LINES - choice.offers.length),
+    ...reading.notes.map((note) => `note: ${note}`),
+    `written: protocol ${choice.protocol}, network ${choice.network}`,
+    ...(choice.channel === undefined ? [] : [`channel: ${choice.channel}`]),
+    ...(choice.noPin === undefined ? [] : [`no pin: ${choice.noPin}`]),
+  );
+  return {
+    protocol: choice.protocol,
+    network: choice.network,
+    url: answered,
+    ...(choice.pin === undefined ? {} : { pin: choice.pin }),
+    ...(choice.channel === undefined ? {} : { channel: choice.channel }),
+  };
+}
+
 /** The shortest value of a secret variable the file check looks for: a shorter one would match by chance. */
 const MIN_SECRET_LENGTH = 8;
 
 /**
  * Whether the new text holds the value of a variable Wasit keeps secret (a
  * key, a `WASIT_HEADER_*` value, `WASIT_RPC_URL`) that the file did not hold
- * before. The config is committed: a value of those must never reach it.
+ * before. The config is committed: a value of those must never reach it, from
+ * a flag or from the route's challenge.
  */
 function writesSecret(text: string, before: string | undefined, env: Readonly<Record<string, string | undefined>>): boolean {
   return deniedEnvValues(env).some((value) => {
@@ -343,8 +622,8 @@ function commandArgument(value: string): string {
 
 /**
  * Runs `wasit init`. Returns the exit code: 0 the file was written; 2 nothing
- * was written (a flag is missing or wrong, the service is not yours, or the
- * writer refused the data).
+ * was written (a flag is missing or wrong, the service is not yours, the route
+ * is not a paywall init can read, or the writer refused the data).
  */
 export async function executeInit(options: InitCommandOptions, context: InitContext): Promise<number> {
   const secrets = deniedEnvValues(context.env);
@@ -359,7 +638,12 @@ export async function executeInit(options: InitCommandOptions, context: InitCont
           "with --operated-by-me. Nothing was sent and nothing was written.",
       );
     }
-    const account: Account = { given: [`url: ${url.href}`, "operated by you: yes (--operated-by-me)"], defaulted: [], notRead: [] };
+    const account: Account = {
+      read: [],
+      given: [`url: ${url.href}`, "operated by you: yes (--operated-by-me)"],
+      defaulted: [],
+      notRead: [],
+    };
 
     const method = (options.method ?? "GET").toUpperCase();
     if (!HTTP_METHODS.includes(method)) {
@@ -411,43 +695,49 @@ export async function executeInit(options: InitCommandOptions, context: InitCont
 
     const service = serviceFor(options, url, account);
     const reject = rejectFor(options, cwd, account);
+    const wanted = wantedFlags(options);
 
     const configPath = path.resolve(cwd, options.config);
     const before = existingText(configPath);
     const existing = options.force ? undefined : existingEnvironment(before, environmentName);
 
-    let network: string;
-    if (options.network !== undefined) {
-      const kind = networkClass(options.network);
-      if (kind !== "test") {
+    // Every flag has been checked: only now is the route asked anything.
+    const route = options.read
+      ? await routeFromReading(options, context, url, method, body, existing, environmentName, wanted, account)
+      : routeFromFlags(options, url, existing, environmentName, account);
+
+    if (route.protocol !== "x402") {
+      if (method !== "GET") {
         refuse(
-          `--network ${shown(options.network)} is ${kind === "mainnet-optin" ? "Stellar mainnet, which init does not write in this version" : "not on Wasit's list of test networks"}. ` +
-            `init writes one of: ${testNetworks()}. Nothing was written.`,
+          `The route answers with an MPP challenge, and wasit run sends an MPP endpoint a plain GET in this version: ` +
+            `this route was read with ${method}. Nothing was written.`,
         );
       }
-      network = options.network;
-      account.given.push(`network: ${network}`);
-    } else if (existing !== undefined) {
-      network = existing.parsed.network;
-      account.defaulted.push(`network: ${network} (the environment ${environmentName} in the config is on it)`);
-    } else {
-      network = DEFAULT_NETWORK;
-      account.defaulted.push(`network: ${network} (default; init does not read the network from your service)`);
+      if (reject !== undefined) {
+        refuse("--reject-header and --reject-body-file are for x402 (X402-11): an MPP endpoint has no request to refuse. Nothing was written.");
+      }
+      if (Object.keys(headersFromEnv(context.env)).length > 0) {
+        account.notRead.push(
+          "wasit run sends an MPP endpoint a plain GET without headers: while a WASIT_HEADER_* variable is set, it sends this endpoint nothing",
+        );
+      }
+      if (route.protocol === "mpp-channel") {
+        account.notRead.push("the channel's on-chain terms (expect: token, from, to, refundWaitingPeriod), which its challenge does not carry");
+      }
+    } else if (reject === undefined) {
+      account.notRead.push("a request this route must refuse: X402-11 runs only with one (--reject-header or --reject-body-file)");
     }
-    account.defaulted.push("protocol: x402 (without reading the route, init writes x402 only)");
-    account.notRead.push(
-      "whether the route answers 402, and its protocol, network, price, asset and receiving address: " +
-        "wasit run --read-only reads them",
-    );
 
-    const { environment, path: endpointPath } = environmentFor(environmentName, url, network, existing);
+    const { environment, path: endpointPath, pinLine } = environmentFor(environmentName, route.url, route.network, route.pin, existing);
+    if (pinLine !== undefined) account.read.push(pinLine);
     const endpoint: InitEndpointInput = {
       name,
-      protocol: "x402",
+      protocol: route.protocol,
       path: endpointPath,
       method,
       ...(body === undefined ? {} : { body }),
       ...(reject === undefined ? {} : { reject }),
+      ...(route.channel === undefined ? {} : { channel: route.channel }),
     };
 
     let result;
@@ -464,8 +754,8 @@ export async function executeInit(options: InitCommandOptions, context: InitCont
     if (writesSecret(result.text, before, context.env)) {
       refuse(
         "init would write the value of a variable Wasit keeps secret (a key, a WASIT_HEADER_* value or WASIT_RPC_URL) " +
-          "into the config, which is committed. It came from a flag (--start, --reject-header, a body file). " +
-          "Nothing was written.",
+          "into the config, which is committed. It came from a flag (--start, --reject-header, a body file) or from " +
+          "the route's challenge. Nothing was written.",
       );
     }
 
@@ -488,6 +778,7 @@ export async function executeInit(options: InitCommandOptions, context: InitCont
           `${service !== undefined && !result.serviceAdded ? " (its start command was already there)" : ""}.`,
       );
     }
+    if (account.read.length > 0) lines.push("Read from your service:", ...account.read.map((line) => `  ${line}`));
     lines.push("You gave:", ...account.given.map((line) => `  ${line}`));
     if (account.defaulted.length > 0) lines.push("Filled in by default:", ...account.defaulted.map((line) => `  ${line}`));
     if (account.notRead.length > 0) lines.push("Not read from your service:", ...account.notRead.map((line) => `  ${line}`));
@@ -497,11 +788,14 @@ export async function executeInit(options: InitCommandOptions, context: InitCont
       written.defaultEnvironment === environmentName ||
       (written.defaultEnvironment === undefined && Object.keys(written.environments).length === 1);
     const next = [
-      "wasit run --read-only",
+      route.protocol === "x402" ? "wasit run --read-only" : "wasit run --dry-run",
       ...(options.config === DEFAULT_CONFIG_FILE ? [] : [`--config ${commandArgument(options.config)}`]),
       ...(runsByDefault ? [] : [`--env ${environmentName}`]),
     ].join(" ");
     lines.push(`Next: ${next}`);
+    if (route.protocol !== "x402") {
+      lines.push("  (MPP has no read-only checks: the dry run prints what the payment tier would do, and signs nothing.)");
+    }
     for (const line of lines) context.stdout(clean(line));
     return 0;
   } catch (error) {
