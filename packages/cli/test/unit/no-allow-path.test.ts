@@ -268,12 +268,21 @@ describe("no allow path for stellar:pubnet (B11, B12), through wasit run", () =>
         assert.equal(result.code, 2, label);
         assert.equal(target.requests(), 0, `${label}: --mainnet let a request through`);
         // Refused before anything: by the flags, the config's loader, the event, or a rule of the opt-in.
-        assert.match(result.stderr, /^(wasit run|Invalid wasit\.config\.json)/, label);
+        // A run whose opt-in opened is refused at its plan; with --json its first line goes to stderr
+        // (lines about money go where the report is not) before the refusal (seed 1004, round 11).
+        assert.match(
+          result.stderr,
+          options.json
+            ? /^(wasit run|Invalid wasit\.config\.json|MAINNET RUN on stellar:pubnet: [^\n]*\nwasit run --mainnet: )/
+            : /^(wasit run|Invalid wasit\.config\.json)/,
+          label,
+        );
         assert.ok(!existsSync(path.join(dir, "wasit-mainnet.lock")), `${label}: the lock was left`);
       }
       // A run that asks to pay on pubnet exits 2. On a pull request the payment tier is the
-      // read-only tier (D-022a), which may pass: it pays nothing. A dry run signs nothing and may pass.
-      if (mainnet || (!readOnly && !dryRun && event !== "pull_request")) {
+      // read-only tier (D-022a), which may pass: it pays nothing. A dry run signs nothing and may pass,
+      // with --mainnet too: it plans by the mainnet rules and reads no key (seed 201719827, round 38).
+      if ((mainnet && !dryRun) || (!readOnly && !dryRun && event !== "pull_request")) {
         assert.equal(result.code, 2, `${label}: a run that asked to pay on pubnet did not exit 2\n${result.stderr}`);
       }
       if (options.json && result.stdout.startsWith("{")) {
