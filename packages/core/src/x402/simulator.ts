@@ -88,8 +88,10 @@ const KNOWN_METHODS = new Set([
  *
  * A bad method, or a body on a verb that cannot carry one, is a configuration
  * error rather than a finding: nothing has been learned about the target.
+ * Exported for `wasit init`'s unpaid request (route-reader.ts), which sends
+ * the route what the read checks send it.
  */
-function buildInit(shape: RequestShape): RequestInit {
+export function buildInit(shape: RequestShape): RequestInit {
   const method = (shape.method ?? "GET").toUpperCase();
 
   if (!KNOWN_METHODS.has(method)) {

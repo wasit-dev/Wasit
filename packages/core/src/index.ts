@@ -65,6 +65,17 @@ export type {
   InitRejectInput,
   InitServiceInput,
 } from "./config-writer.js";
+// What `wasit init` reads from a route: one unpaid request, and the one way to pay it writes.
+export { ROUTE_READ_TIMEOUT_MS, chooseOffer, describeOffer, interpretRouteAnswer, readRoute } from "./route-reader.js";
+export type {
+  OfferChoice,
+  OfferWanted,
+  ReadRouteOptions,
+  RouteAnswer,
+  RouteOffer,
+  RouteProtocol,
+  RouteReading,
+} from "./route-reader.js";
 
 // The run report, the endpoint outcome and the versions a result names.
 export {
