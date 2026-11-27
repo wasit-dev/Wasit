@@ -1,0 +1,137 @@
+{
+  "schema": 1,
+  "wasit": {
+    "cli": "0.8.0-beta.1",
+    "core": "0.8.0-beta.1"
+  },
+  "sdk": {
+    "x402Version": 2,
+    "@x402/core": "2.28.0",
+    "@x402/stellar": "2.28.0",
+    "@stellar/mpp": "0.7.1",
+    "mppx": "0.8.14",
+    "@stellar/stellar-sdk": "16.4.1"
+  },
+  "environment": "local",
+  "network": "stellar:testnet",
+  "networkClass": "test",
+  "startedAt": "2026-11-27T09:52:38.077Z",
+  "endpoints": [
+    {
+      "name": "single-use",
+      "protocol": "x402",
+      "method": "GET",
+      "path": "/protected",
+      "outcome": "conformant",
+      "groups": {
+        "challenge": {
+          "passed": 5,
+          "failed": 0,
+          "errored": 0,
+          "skipped": 0
+        },
+        "payment": {
+          "passed": 2,
+          "failed": 0,
+          "errored": 0,
+          "skipped": 4
+        }
+      },
+      "results": [
+        {
+          "id": "X402-01",
+          "name": "402 Response Status",
+          "status": "PASS",
+          "detail": "Server responded with 402 as required.",
+          "destructive": false
+        },
+        {
+          "id": "X402-02",
+          "name": "Payment Header Present",
+          "status": "PASS",
+          "detail": "Payment header found.",
+          "destructive": false
+        },
+        {
+          "id": "X402-03",
+          "name": "Header Payload Decodable",
+          "status": "PASS",
+          "detail": "Header decoded to valid JSON.",
+          "destructive": false
+        },
+        {
+          "id": "X402-04",
+          "name": "Required Fields Present",
+          "status": "PASS",
+          "detail": "All required v2 fields present.",
+          "destructive": false
+        },
+        {
+          "id": "X402-05",
+          "name": "Network Identifier Valid",
+          "status": "PASS",
+          "detail": "Network identifier \"stellar:testnet\" is valid.",
+          "destructive": false
+        },
+        {
+          "id": "X402-06",
+          "name": "Signature Resubmit Accepted",
+          "status": "PASS",
+          "detail": "Valid payment accepted (HTTP 200) and settled on-chain for exactly the advertised 100000 base units of CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA to GDPAPDZWAKBXUPCNMI4YHAZ7DS7UOUTPGXAFDSWZG4URRMWHFSQTDQBM, verified from the transfer event (tx f94672c60f6b9a730a210011aef09bd4c7edc5de472384d18e5a70044a2d647b).",
+          "destructive": false,
+          "reference": "f94672c60f6b9a730a210011aef09bd4c7edc5de472384d18e5a70044a2d647b"
+        },
+        {
+          "id": "X402-07",
+          "name": "Invalid Signature Rejected",
+          "status": "SKIP",
+          "detail": "Skipped: resource consumed: the route answered 409 to a new request after X402-06's payment was accepted, a single-use resource that the payment used up, so this check has no new challenge to pay, and nothing was signed for it. X402-08, the replay, needs no new challenge and still runs.",
+          "destructive": false,
+          "skipKind": "resource-consumed"
+        },
+        {
+          "id": "X402-08",
+          "name": "Payment Replay Rejected",
+          "status": "PASS",
+          "detail": "The same payment, sent again, was refused (HTTP 409: resource_consumed).",
+          "destructive": false
+        },
+        {
+          "id": "X402-09",
+          "name": "Underpayment Rejected",
+          "status": "SKIP",
+          "detail": "Skipped: resource consumed: the route answered 409 to a new request after X402-06's payment was accepted, a single-use resource that the payment used up, so this check has no new challenge to pay, and nothing was signed for it. X402-08, the replay, needs no new challenge and still runs.",
+          "destructive": false,
+          "skipKind": "resource-consumed"
+        },
+        {
+          "id": "X402-10",
+          "name": "Expired Authorization Rejected",
+          "status": "SKIP",
+          "detail": "Skipped: resource consumed: the route answered 409 to a new request after X402-06's payment was accepted, a single-use resource that the payment used up, so this check has no new challenge to pay, and nothing was signed for it. X402-08, the replay, needs no new challenge and still runs.",
+          "destructive": false,
+          "skipKind": "resource-consumed"
+        },
+        {
+          "id": "X402-11",
+          "name": "Rejected Request Not Settled",
+          "status": "SKIP",
+          "detail": "Skipped: resource consumed: the route answered 409 to a new request after X402-06's payment was accepted, a single-use resource that the payment used up, so this check has no new challenge to pay, and nothing was signed for it. X402-08, the replay, needs no new challenge and still runs.",
+          "destructive": false,
+          "skipKind": "resource-consumed"
+        }
+      ]
+    }
+  ],
+  "totals": {
+    "endpoints": 1,
+    "graded": 1,
+    "conformant": 1,
+    "nonConformant": 0,
+    "noVerdict": 0,
+    "unsupported": 0
+  },
+  "notes": [
+    "Tier: payment on stellar:testnet. The run charged $0.01 of the $5.00 cap, at most $1.00 a payment; every signature is counted as if it settled."
+  ]
+}

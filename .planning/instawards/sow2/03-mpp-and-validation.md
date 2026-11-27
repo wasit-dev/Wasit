@@ -1,6 +1,6 @@
 # Job 03 — MPP, recent failures, own facilitator, validation of the opt-in
 
-Status: 🟡 **IN PROGRESS** — the validation of the opt-in was run on 2026-11-23 and MPP in `wasit run` on 2026-11-24, on the maintainer's machine (week 2, ahead of its week); MPP in the example project's Action comes with the release; the recent-failures line and "resource consumed" are not started · Deliverable: **D2** · Week: **3** · Depends on: #2
+Status: 🟡 **IN PROGRESS** — the validation of the opt-in was run on 2026-11-23 and MPP in `wasit run` on 2026-11-24, on the maintainer's machine (week 2, ahead of its week); MPP in the example project's Action comes with the release; a run against a single-use paywall shows "resource consumed" (2026-11-27, same way); the recent-failures line is built and waits for a run with a failure in its history · Deliverable: **D2** · Week: **3** · Depends on: #2
 
 ## Goal
 
@@ -22,13 +22,13 @@ down.
 
 - [~] MPP charge and channel runs in the example project, in the same comment format. Partly: run through `wasit run` on the maintainer's machine on 2026-11-24, and the comment written from those runs (below); the run in the example project, through the Action, comes with the release, when the code is public.
 - [ ] The line with recent failure counts in a run comment.
-- [ ] A run against a single-use test paywall shows "resource consumed".
+- [~] A run against a single-use test paywall shows "resource consumed". Partly: run on the maintainer's machine on 2026-11-27 and read back from the chain (below); the run in the example project, through the Action, comes with the release.
 - [~] Our own facilitator and a free mainnet RPC are running for the example service. Partly: they ran for a copy of the example's seller on the maintainer's machine for the validation (not hosted); the example project itself still uses the hosted test-network facilitator.
 - [~] The validation is run and its written findings are published (or the reason the opt-in is not offered). Run, closed on 2026-11-23, and its findings are written below.
 
 ## Result
 
-**Part 1 of this job (MPP) was run on 2026-11-24 on the maintainer's machine, on the Stellar test network; part 3 (the validation of the opt-in on our own service) on 2026-11-23 on Stellar mainnet. The recent-failures line and "resource consumed" are not started.**
+**Part 1 of this job (MPP) was run on 2026-11-24 on the maintainer's machine, on the Stellar test network; part 3 (the validation of the opt-in on our own service) on 2026-11-23 on Stellar mainnet. The recent-failures line is built (since week 1) and has no run with a failure in its history yet; "resource consumed" was run on 2026-11-27 (below).**
 
 ### MPP through `wasit run`, on the maintainer's machine (2026-11-24)
 
@@ -114,6 +114,24 @@ After the last run the maintainer unset the two key variables in the shell they 
 Not found in the runs, by their own results and ledgers: a signature without a ledger entry, a transfer outside the plan, or a spend above the plan. This is a reading of the result files and ledgers by the maintainer's session, not a second check by another party.
 
 **After the third set (`c8cf72a`).** The maintainer reported unsetting the two key variables again, in both shells (not checked by this session). The ledger folder held no lock file. Read on public Horizon (no key): the latest transaction on both accounts is the third set's paid run (`3cc8aac7…0382`), and the two before it are the earlier settlements. The payer's USDC is 3.2046205, its XLM is unchanged, and it stayed below $10. The totals still reconcile: 3.2146205 before the run, minus the 0.01 spent, equals what Horizon showed after it. The accounts were again kept, not emptied or rotated.
+
+### "Resource consumed", on the maintainer's machine (2026-11-27)
+
+A single-use resource answers a new request with 409 once its payment was served. Before this change the checks that need a new
+challenge (X402-07, 09, 10 and 11) read that as an unreadable challenge and ended as `ERROR (harness)`. They are now skipped with the
+reason "resource consumed" (`skipKind: resource-consumed`): nothing is signed for them, the route is not asked again after its 409,
+and X402-08, the replay, which needs no new challenge, still runs.
+
+The maintainer ran `wasit run` against a paywall of the repository's test fixtures that sells its resource once (the official x402
+middleware and the public test-network facilitator, on the Stellar test network). X402-01 to X402-06 passed, X402-06 settled
+on-chain ([payment on Stellar Expert](https://stellar.expert/explorer/testnet/tx/f94672c60f6b9a730a210011aef09bd4c7edc5de472384d18e5a70044a2d647b)); X402-07, 09, 10 and 11 were skipped as "resource consumed", none as an error; X402-08
+passed (the replay was refused with 409); the endpoint was graded conformant, exit 0, and the run charged $0.01 of the $5.00 cap.
+The same payment was read on Horizon: successful, the payer debited 0.0100000 USDC and the receiving address credited the same.
+`wasit ci-report` then wrote the comment with the skips and their reason. Copies: [terminal and read-back](week-3/copies/resource-consumed-run/excerpts-of-the-run.txt) · [comment](week-3/copies/resource-consumed-run/comment.md) ·
+[report](week-3/copies/resource-consumed-run/report.json). The code is commit `16c6500` on a local branch of the week 3 work, which
+becomes public with the release; the version line of the comment reads 0.8.0-beta.1 because the local build has not changed its version
+number. A route that answers 409 before any payment of the run gets no payment at all (X402-06 is skipped with that reason); that case is
+covered by offline tests only.
 
 ### Copies
 
