@@ -1,0 +1,102 @@
+`wasit init`, then `wasit run --read-only`, on the maintainer's machine, 2026-11-27
+
+Run by the maintainer in their own terminal, in the folder of the example project, against the example's own service
+(`npm start`, 127.0.0.1:4402, Stellar test network). Nothing was paid or signed, and no key was used. Code: commit
+5b1ee73 on a local branch of the week 3 work, which becomes public with the release (the published 0.8.0-beta.1 does not
+have `wasit init`). The output is copied from the terminal as it was, with the shell prompt removed and the commands
+shortened: the local build was run as `node <build>/index.js ...` with a full file path, shown here as `wasit ...`. The
+config was written to /tmp/coba.json, not into the example project.
+
+--- First attempt: a wrong answer at a question ---
+
+$ wasit init --config /tmp/coba.json
+URL of one paid route of your service (e.g. http://127.0.0.1:3000/api/weather): http://127.0.0.1:4402/paid
+Do you operate this service? Wasit tests only services their operator runs (yes/no): yes
+HTTP method of the route [GET]: http://127.0.0.1:4402/paid
+JSON file with the request body (empty for none):
+Command that starts the service for wasit run --start (empty for none):
+wasit init: --method "http://127.0.0.1:4402/paid" is not one of GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS. Nothing was written.
+
+(The URL was typed again at the method question by mistake. init refused it and wrote nothing.)
+
+--- Second attempt: Enter at the method question ---
+
+$ wasit init --config /tmp/coba.json
+URL of one paid route of your service (e.g. http://127.0.0.1:3000/api/weather): http://127.0.0.1:4402/paid
+Do you operate this service? Wasit tests only services their operator runs (yes/no): yes
+HTTP method of the route [GET]:
+Command that starts the service for wasit run --start (empty for none):
+wasit init: wrote /tmp/coba.json: the environment local and the endpoint paid.
+Read from your service:
+  one unpaid request: GET http://127.0.0.1:4402/paid; nothing was paid or signed
+  answer: 402 with a PAYMENT-REQUIRED header (x402)
+  offered: x402 on stellar:testnet: price 50000 base units ($0.005 in USDC), asset CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA, payTo GDPAPDZWAKBXUPCNMI4YHAZ7DS7UOUTPGXAFDSWZG4URRMWHFSQTDQBM
+  written: protocol x402, network stellar:testnet
+  pinned: payTo GDPAPDZWAKBXUPCNMI4YHAZ7DS7UOUTPGXAFDSWZG4URRMWHFSQTDQBM, asset CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA (wasit run pays only these)
+You gave:
+  url: http://127.0.0.1:4402/paid
+  operated by you: yes (--operated-by-me)
+Filled in by default:
+  method: GET
+  name: paid (from the path)
+  environment: local (the URL is on this machine)
+Not read from your service:
+  a request this route must refuse: X402-11 runs only with one (--reject-header or --reject-body-file)
+Next: wasit run --read-only --config /tmp/coba.json
+
+$ cat /tmp/coba.json
+{
+  "version": 1,
+  "defaultEnvironment": "local",
+  "environments": {
+    "local": {
+      "baseUrl": "http://127.0.0.1:4402",
+      "network": "stellar:testnet",
+      "operatedByMe": true,
+      "pinned": {
+        "payTo": "GDPAPDZWAKBXUPCNMI4YHAZ7DS7UOUTPGXAFDSWZG4URRMWHFSQTDQBM",
+        "asset": "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA"
+      }
+    }
+  },
+  "endpoints": [
+    {
+      "name": "paid",
+      "protocol": "x402",
+      "path": "/paid",
+      "method": "GET"
+    }
+  ]
+}
+
+--- The config read back by wasit run ---
+
+$ wasit run --read-only --config /tmp/coba.json
+Environment local: http://127.0.0.1:4402
+Network: stellar:testnet (test network)
+Endpoints: 1
+  paid  x402  GET /paid
+Tier: read-only. The payment checks were not run, and nothing was signed.
+
+paid  x402  GET /paid: conformant
+  PASS  X402-01  402 Response Status
+        Server responded with 402 as required.
+  PASS  X402-02  Payment Header Present
+        Payment header found.
+  PASS  X402-03  Header Payload Decodable
+        Header decoded to valid JSON.
+  PASS  X402-04  Required Fields Present
+        All required v2 fields present.
+  PASS  X402-05  Network Identifier Valid
+        Network identifier "stellar:testnet" is valid.
+  SKIP  X402-06, X402-07, X402-08, X402-09, X402-10, X402-11
+        Skipped: the read-only tier makes no payment and signs nothing; this check needs a payer key and the payment tier
+
+Summary: 1 graded.
+Result: 1 graded (exit 0).
+
+--- Checked against other sources by the maintainer ---
+
+payTo: equals the `payee` of the example project's project.json (GDPAPDZW...DQBM).
+asset: the example project's files do not name it; it equals the test-network USDC contract in Wasit's own table of
+known assets (packages/core/src/guard/budget.ts), which is not an independent source.

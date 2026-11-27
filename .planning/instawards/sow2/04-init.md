@@ -1,6 +1,6 @@
 # Job 04 — `wasit init` and the test-network key setup
 
-Status: ⬜ **NOT STARTED** · Deliverable: **D3** · Week: **3** · Depends on: #2
+Status: 🟡 **IN PROGRESS** — the questions, the 402 read and the config written, run on the maintainer's machine; the key setup is not built · Deliverable: **D3** · Week: **3** · Depends on: #2
 
 ## Goal
 
@@ -35,4 +35,17 @@ It never enables MPP-13.
 
 ## Result
 
-Not started.
+**2026-11-27 — `wasit init` run in a terminal, on the maintainer's machine (🟡).** In the folder of the example
+project, with its service running on this machine on the Stellar test network, `wasit init` asked for the URL, whether the
+builder operates the service and the method, sent one unpaid request, read the 402 (x402, `stellar:testnet`, price,
+receiving address, asset) and wrote a config. It printed four lists: what it read from the service, what the builder gave,
+what it filled in by default and what it did not read (the request that X402-11 needs). Nothing was paid or signed and no
+key was used. A wrong answer at a question (a URL typed at the method question) was refused and nothing was written. The
+receiving address in the config equals the example project's `payee`. `wasit run --read-only` then accepted the config
+unchanged: X402-01 to X402-05 passed, X402-06 to X402-11 were skipped as that tier makes no payment, exit 0. Copy of the
+terminal: [excerpts](week-3/copies/init-local-run/excerpts-of-the-runs.txt). The code is on a local branch and becomes
+public with the release.
+
+Not run yet: a fresh MPP project, the answer "no" to the question on who operates the service, a protocol chosen through
+the questions, Windows, a run of the payment tier from an `init` config, the 200, 500 and 503 answers in a terminal
+(covered by offline tests only), the test-network key setup (not built), the recording.
