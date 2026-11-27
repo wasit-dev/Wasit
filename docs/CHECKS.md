@@ -40,7 +40,7 @@ from a target that accepts a valid payment: one that refuses everything would pa
 all. So they run only after `X402-06`'s valid payment was answered with a 2xx, and are
 **skipped** otherwise, with that reason. They run in catalogue order after `X402-06`.
 
-**Note on single-use resources (0.8.0).** Some resources can be bought once: after
+**Note on single-use resources (0.8.0-beta.2).** Some resources can be bought once: after
 `X402-06`'s payment is served, the route answers a new request with 409 instead of a new
 402. The checks that need a new challenge to pay (`X402-07`, `09`, `10` and `11`) then
 have nothing to sign, so they are **skipped** with the reason "resource consumed"
@@ -451,6 +451,8 @@ target gets `ERROR (setup)` saying which, and nothing is sent: the cap keeps a p
 from charging a payer more than it meant to, and Wasit pays automatically, on
 `stellar:pubnet` with real money in 0.7.0 (0.8.0-beta.1 refuses that network)
 ([evidence](evidence/2026-10-06-0.7.0-verification-runs.md#part-2-the-clients-spend-controls)).
+
+On Stellar, the x402 client builds the payment by simulating the transfer on the RPC and signs the authorization entries the simulation returns. Wasit therefore checks each authorization before the payer's key signs it: it must be one `transfer` of the checked amount from the payer to the checked `payTo`, on the checked asset and the run's network, with no further authorized call, one signature per payment, valid no later than the payment's lifetime allows, counted from the first ledger the run reads. Anything else gets `ERROR (setup)` and nothing is signed; a testnet token whose `transfer` needs further authorized calls is refused too. A payment whose built transaction carries anything but that one signed authorization is discarded unsent. *(New in 0.8.0-beta.2.)*
 
 On Stellar, the payment checks need a testnet payer holding testnet USDC.
 `wasit wallet create --role x402 --fund` generates the key and funds it with

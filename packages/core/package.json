@@ -1,6 +1,6 @@
 {
   "name": "@wasit-dev/core",
-  "version": "0.8.0-beta.1",
+  "version": "0.8.0-beta.2",
   "description": "Check suite for x402/MPP protocol-conformance testing on Stellar. Powers the wasit CLI and wasit-mcp server.",
   "type": "module",
   "main": "dist/index.js",

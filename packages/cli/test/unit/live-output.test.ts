@@ -12,6 +12,7 @@
  */
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -28,6 +29,7 @@ import { colorEnabled, liveEnabled, spread, styler, truncate, visibleLength, wra
 import { startPaywall, type Paywall } from "./run-helpers.js";
 
 const CLI = fileURLToPath(new URL("../../dist/index.js", import.meta.url));
+const version = (JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf-8")) as { version: string }).version;
 const SECRET = "canary-secret-value-91c2";
 const SPINNER = /[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/;
 const SGR = /\u001b\[[0-9;]*m/g;
@@ -285,7 +287,8 @@ describe("wasit test, as the built binary", () => {
     const coloured = await wasit(read(), { FORCE_COLOR: "1" });
     assert.equal(coloured.code, plain.code);
     const text = plainText(coloured.out);
-    assert.match(text, /◆ wasit 0\.8\.0-beta\.1 · x402 conformance/);
+    // The version of the package under test, so a release bump does not break this test.
+    assert.ok(text.includes(`◆ wasit ${version} · x402 conformance`), text);
     assert.match(text, /^ challenge · no payment$/m);
     assert.match(text, /✓ X402-01 {2}402 Response Status .*PASS /);
     assert.match(text, / CONFORMANT  {2}5 passed · \d/);

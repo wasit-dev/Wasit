@@ -59,7 +59,7 @@ wasit test --target <url> [options]
 | `--target <url>` | required | Must include the scheme |
 | `--network <id>` | `stellar:testnet` | Network the payment checks pay on: `stellar:testnet`, `eip155:84532` (Base Sepolia), `eip155:11155111` (Ethereum Sepolia) or `solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` (Solana devnet). Any other network is refused before a key is read. `X402-01`–`05` apply on any chain |
 | `--payer-key <key>` | `STELLAR_PRIVATE_KEY`, `EVM_PRIVATE_KEY` on Base or Ethereum Sepolia, or `SVM_PRIVATE_KEY` on Solana devnet | A Stellar secret (`S...`), an EVM private key (`0x` + 64 hex), or a Solana keypair (base58 of its 64 bytes) |
-| `--rpc-url <url>` | testnet default | Soroban RPC used to verify `X402-06`'s settlement |
+| `--rpc-url <url>` | testnet default | Soroban RPC the payment is built through and `X402-06`'s settlement is read from; https only |
 | `--method <verb>` | `GET` | HTTP method the paid endpoint uses |
 | `--body <json>` | — | Request body; implies `Content-Type: application/json` |
 | `--header <name:value>` | — | Extra request header, repeatable |

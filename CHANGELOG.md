@@ -2,7 +2,7 @@
 
 All notable changes to Wasit are recorded here. Versions follow [Semantic Versioning](https://semver.org/): patch releases are fixes, minor releases add checks or features without breaking existing usage, major releases break something.
 
-## [Unreleased]
+## [0.8.0-beta.2] - 2026-11-28
 
 **Results can change on upgrade.**
 - The GitHub Action runs on `pull_request`, `push`, `schedule`,
@@ -51,6 +51,31 @@ All notable changes to Wasit are recorded here. Versions follow [Semantic Versio
   verdict is the same FAIL, and nothing is paid either way.
 
 **Added.**
+- `wasit init` writes a `wasit.config.json` for one paid route of a service you
+  operate, from one unpaid request to the route: its 402 tells x402 from MPP
+  and gives the protocol, the network, the receiving address and asset (pinned)
+  and an MPP channel. It pays and signs nothing, writes test networks only and
+  never a header or a secret, adds to an existing config without overwriting
+  it, and can run again on a route the config already has. A URL whose query
+  has a parameter named like a credential (`api_key`, `token`, `sig`), given
+  with `--url` or reached by the one redirect inside the origin, is refused.
+  With `--setup-keys`, or a yes at a terminal, it also sets up a Stellar
+  testnet payer key in `.env` (after checking git will not commit `.env`),
+  funds it with Friendbot and swaps 10 test XLM for test USDC.
+- `wasit run` and the Action pay MPP on `stellar:testnet`: `MPP-01` (charge)
+  with `MPP_PAYER_SECRET`, planned from its unpaid challenge, held to the same
+  $1.00 a payment and in the same $5.00 budget as x402; `MPP-10`, `11`, `12`
+  and `14` (channel) with `COMMITMENT_SECRET_HEX`, which sign commitments
+  off-chain and are not charged to the cap, only for the channel in the
+  config. `MPP-13` is never run by `wasit run`. `wasit run --dry-run` plans
+  an MPP charge endpoint from its challenge. A mainnet run pays x402 only.
+- `@wasit-dev/core` exports what `wasit init` is built from: `readRoute`,
+  `interpretRouteAnswer`, `chooseOffer`, `describeOffer`, `writeConfigText`,
+  `addTestnetUsdc`, and the plan of MPP-01 (`planPaymentRun`,
+  `planMppChargeEndpoint`, `combinePaymentPlan`, `describePaymentPlan`,
+  `plannedChargeOf`, `assertMppPaymentRpc`). `MPP-01`'s result carries the
+  settlement `reference`, and the pull request comment links it on Stellar
+  Expert on testnet. The channel checks take `onlyChannel`.
 - `@wasit-dev/core` exports `mainnetJobRefusals` and `assertMainnetJob`: the
   rules a job in GitHub Actions has to meet for the mainnet opt-in. The run is
   started by hand (`workflow_dispatch`), on
@@ -176,6 +201,8 @@ All notable changes to Wasit are recorded here. Versions follow [Semantic Versio
   A front end opens a mainnet run with `openMainnetOptIn`.
 
 **Fixed.**
+- A dry run of a run whose only MPP endpoints are channel endpoints no longer
+  says it plans x402 payment checks.
 - On Stellar testnet the x402 client builds and simulates the payment through
   the run's RPC, the one whose network Wasit checks and reads the settlement
   from. It used `https://soroban-testnet.stellar.org` whatever RPC the run was
