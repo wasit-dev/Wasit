@@ -25,7 +25,7 @@ command line, without the opt-in, goes to beta testers at the end of the week.
 - [x] The new check "rejected request does not settle" sends a valid payment with a request the service must refuse, then reads the chain to confirm that no transfer happened.
 - [ ] The opt-in switch: a flag on the run in the command line, an input on a run started by hand in the Action, and a start-up setting (never a tool argument) in the MCP server.
   In the pre-release the three switches exist and always refuse; the switch that allows waits for the validation (job 03).
-- [ ] Independent review of the payment code, in writing.
+- [x] Independent review of the payment code, in writing.
 - [x] The pre-release tag, without the opt-in: it refuses every payment on mainnet.
 
 ## What shipped (first layer)
