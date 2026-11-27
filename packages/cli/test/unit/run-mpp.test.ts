@@ -309,6 +309,20 @@ describe("wasit run, MPP", () => {
       assert.equal(site.total(), 0);
     });
 
+    it("pays nothing and signs nothing for a service its operator does not run (operatedByMe not true), with both keys set", async () => {
+      const run1 = await run({ config: await config([CHAT, STREAM], { operatedByMe: false }) }, { ...PAYER, ...COMMITMENT });
+      for (const name of ["chat", "stream"]) {
+        for (const entry of results(run1.report, name)) {
+          assert.equal(entry.status, "SKIP", `${name} ${entry.id}: ${entry.detail}`);
+          assert.equal(entry.skipKind, "read-only", `${name} ${entry.id}`);
+          assert.match(entry.detail, /operatedByMe is not true for environment local: Wasit pays only a service its operator runs/);
+        }
+      }
+      assert.equal(site.total(), 0, "the target was asked something");
+      assert.equal(rpc.calls(), 0, "the SDK reached the RPC: a payment or a commitment was being built");
+      assert.equal(run1.code, 2);
+    });
+
     it("sends nothing to an MPP endpoint with headers, a body or another method: unsupported in this version", async () => {
       const run1 = await run(
         {
