@@ -54,22 +54,25 @@ const file = (): string => path.join(dir, "wasit.config.json");
 describe("wasit init: at a terminal", () => {
   it("asks for what the flags leave out, and writes the answers", async () => {
     await writeFile(path.join(dir, "body.json"), '{"q":1}');
-    const { code, stdout, asked } = await init({}, ["http://127.0.0.1:3000/api/chat", "yes", "post", "body.json", "npm start"]);
+    const { code, stdout, asked } = await init({}, ["http://127.0.0.1:3000/api/chat", "yes", "post", "body.json", "npm start", "no"]);
     assert.equal(code, 0, stdout);
-    assert.equal(asked.length, 5);
+    assert.equal(asked.length, 6);
+    // The key question comes last, after the read, before anything is written (C1 step 8).
+    assert.match(asked[5] ?? "", /Set up a test payer in \.env \(STELLAR_PRIVATE_KEY\)\?/);
+    assert.match(stdout, /Test key: not set up \(you said no\)/);
     const config = JSON.parse(await readFile(file(), "utf-8")) as { service: { start: string }; endpoints: Array<Record<string, unknown>> };
     assert.equal(config.service.start, "npm start");
     assert.deepEqual(config.endpoints[0], { name: "chat", protocol: "x402", path: "/api/chat", method: "POST", body: { q: 1 } });
   });
 
   it("asks nothing the flags already answer", async () => {
-    const { code, asked } = await init({ url: "http://127.0.0.1:3000/paid", operatedByMe: true, method: "GET", start: "npm start" }, []);
+    const { code, asked } = await init({ url: "http://127.0.0.1:3000/paid", operatedByMe: true, method: "GET", start: "npm start", setupKeys: false }, []);
     assert.equal(code, 0);
     assert.deepEqual(asked, []);
   });
 
   it("asks for the environment's name when the route is not on this machine", async () => {
-    const { code, asked } = await init({ url: "https://api.example.com/paid", operatedByMe: true, method: "GET", start: "npm start", readyUrl: "http://127.0.0.1:1/" }, ["staging"]);
+    const { code, asked } = await init({ url: "https://api.example.com/paid", operatedByMe: true, method: "GET", start: "npm start", readyUrl: "http://127.0.0.1:1/", setupKeys: false }, ["staging"]);
     assert.equal(code, 0);
     assert.match(asked[0] ?? "", /Name for this environment/);
   });

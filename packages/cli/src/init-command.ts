@@ -19,6 +19,11 @@
  * 200, 500 or 503, or nothing, is said in plain words and nothing is written;
  * `--no-read` writes the route from the flags alone, as x402 (slice 2).
  *
+ * The testnet key setup (C4, slice 5, `init-keys.ts`) comes last, for a route
+ * on Stellar testnet: with `--setup-keys`, or a yes at a terminal. It writes the
+ * key the route's payment checks read into `.env` (never into the config, and
+ * never printed) after checking that git will not commit `.env`.
+ *
  * Nothing is sent and nothing is written without `--operated-by-me`: Wasit
  * tests only services their operator runs. Every flag is checked before the
  * route is asked anything. An existing config is added to, never overwritten
@@ -59,6 +64,16 @@ import {
   type RouteOffer,
   type RouteProtocol,
 } from "@wasit-dev/core";
+
+import {
+  GITIGNORE_QUESTION,
+  KEY_SETUP_NETWORK,
+  keySetupQuestion,
+  notSetUpLines,
+  otherNetworkLines,
+  setUpTestKeys,
+  type KeySetupDeps,
+} from "./init-keys.js";
 
 export const DEFAULT_CONFIG_FILE = "wasit.config.json";
 
@@ -105,6 +120,11 @@ export interface InitCommandOptions {
   readonly force: boolean;
   /** Read the route's 402 (the default); false is `--no-read`: no request, x402 from the flags. */
   readonly read: boolean;
+  /**
+   * The testnet key setup (C4): true is `--setup-keys`, false `--no-setup-keys`.
+   * Undefined: asked at a terminal, else not done.
+   */
+  readonly setupKeys?: boolean;
 }
 
 export interface InitContext {
@@ -123,6 +143,8 @@ export interface InitContext {
    * are missing (C5). Rejects when the input ends.
    */
   readonly ask?: (question: string) => Promise<string>;
+  /** The outside world of the key setup (git, Friendbot, Horizon, the key generator). Needed when the key setup runs. */
+  readonly keys?: KeySetupDeps;
 }
 
 /** A refusal: printed, exit 2, nothing written. */
@@ -690,6 +712,44 @@ async function completeAnswers(options: InitCommandOptions, context: InitContext
   };
 }
 
+/** A yes or a no at the terminal, before the config is written: input that ends is a refusal. */
+async function askYes(ask: (question: string) => Promise<string>, question: string): Promise<boolean> {
+  let reply: string;
+  try {
+    reply = await ask(question);
+  } catch {
+    refuse("init was asking, and the input ended. Nothing was written.");
+  }
+  const word = reply.trim().toLowerCase();
+  return word === "yes" || word === "y";
+}
+
+/**
+ * Whether the key setup runs for a route on the key setup's network: the flag,
+ * else the answer at a terminal (C1 step 8), else no (C5).
+ */
+async function keySetupWanted(
+  options: InitCommandOptions,
+  context: InitContext,
+  protocol: RouteProtocol,
+  account: Account,
+): Promise<{ readonly run: boolean; readonly why: string }> {
+  if (options.setupKeys === true) {
+    account.given.push("key setup: yes (--setup-keys)");
+    return { run: true, why: "--setup-keys" };
+  }
+  if (options.setupKeys === false) {
+    account.given.push("key setup: no (--no-setup-keys)");
+    return { run: false, why: "--no-setup-keys" };
+  }
+  if (context.ask === undefined) {
+    return { run: false, why: "init sets one up only with --setup-keys, or a yes at a terminal" };
+  }
+  const yes = await askYes(context.ask, keySetupQuestion(protocol));
+  account.given.push(`key setup: ${yes ? "yes" : "no"} (your answer)`);
+  return { run: yes, why: yes ? "your answer" : "you said no" };
+}
+
 /** A path for the next command: quoted when it has a space, which both PowerShell and cmd.exe read. */
 function commandArgument(value: string): string {
   return /\s/.test(value) ? `"${value}"` : value;
@@ -698,10 +758,14 @@ function commandArgument(value: string): string {
 /**
  * Runs `wasit init`. Returns the exit code: 0 the file was written; 2 nothing
  * was written (a flag is missing or wrong, the service is not yours, the route
- * is not a paywall init can read, or the writer refused the data).
+ * is not a paywall init can read, or the writer refused the data). The key
+ * setup runs after the file is written and never changes the exit code: what
+ * it could not do is in its status table, with the command that finishes it
+ * (Najmi, 2026-11-27).
  */
 export async function executeInit(given: InitCommandOptions, context: InitContext): Promise<number> {
-  const secrets = deniedEnvValues(context.env);
+  // A key the key setup makes is added here: no printed line may carry it.
+  const secrets: string[] = [...deniedEnvValues(context.env)];
   const clean = (line: string): string => sanitizeText(line, { redact: secrets });
   const cwd = context.cwd ?? process.cwd();
 
@@ -835,6 +899,15 @@ export async function executeInit(given: InitCommandOptions, context: InitContex
       );
     }
 
+    // C1 step 8: asked after the read, when the network is known, and before anything is written.
+    const keyStep =
+      route.network === KEY_SETUP_NETWORK ? await keySetupWanted(options, context, route.protocol, account) : undefined;
+    if (keyStep === undefined && options.setupKeys === true) {
+      account.given.push(`key setup: --setup-keys (init sets up keys on ${KEY_SETUP_NETWORK} only)`);
+    }
+    const keys = context.keys;
+    if (keyStep?.run === true && keys === undefined) throw new Error("the key setup was asked for, and init was given no way to run it");
+
     try {
       writeFileSync(configPath, result.text, { flag: before === undefined ? "wx" : "w" });
     } catch (error) {
@@ -859,6 +932,42 @@ export async function executeInit(given: InitCommandOptions, context: InitContex
     if (account.defaulted.length > 0) lines.push("Filled in by default:", ...account.defaulted.map((line) => `  ${line}`));
     if (account.notRead.length > 0) lines.push("Not read from your service:", ...account.notRead.map((line) => `  ${line}`));
 
+    for (const line of lines) context.stdout(clean(line));
+
+    // The config is written: from here on nothing refuses, and what the key setup could not do is a line (exit 0).
+    if (keyStep === undefined) {
+      for (const line of otherNetworkLines(route.network, route.protocol)) context.stdout(clean(line));
+    } else if (!keyStep.run || keys === undefined) {
+      for (const line of notSetUpLines(route.protocol, keyStep.why)) context.stdout(clean(line));
+    } else {
+      const ask = context.ask;
+      await setUpTestKeys(
+        {
+          network: route.network,
+          protocol: route.protocol,
+          ...(route.channel === undefined ? {} : { channel: route.channel }),
+          ...(route.pin === undefined ? {} : { asset: route.pin.asset }),
+          cwd,
+          env: context.env,
+          // --setup-keys answers this one too; at a terminal it is asked, and input that ends is a no.
+          allowGitignore:
+            options.setupKeys === true || ask === undefined
+              ? async () => true
+              : async () => {
+                  try {
+                    const word = (await ask(GITIGNORE_QUESTION)).trim().toLowerCase();
+                    return word === "yes" || word === "y";
+                  } catch {
+                    return false;
+                  }
+                },
+          say: (line) => context.stdout(clean(line)),
+          redact: (value) => secrets.push(value),
+        },
+        keys,
+      );
+    }
+
     const written = parseConfig(result.text);
     const runsByDefault =
       written.defaultEnvironment === environmentName ||
@@ -868,11 +977,10 @@ export async function executeInit(given: InitCommandOptions, context: InitContex
       ...(options.config === DEFAULT_CONFIG_FILE ? [] : [`--config ${commandArgument(options.config)}`]),
       ...(runsByDefault ? [] : [`--env ${environmentName}`]),
     ].join(" ");
-    lines.push(`Next: ${next}`);
+    context.stdout(clean(`Next: ${next}`));
     if (route.protocol !== "x402") {
-      lines.push("  (MPP has no read-only checks: the dry run prints what the payment tier would do, and signs nothing.)");
+      context.stdout(clean("  (MPP has no read-only checks: the dry run prints what the payment tier would do, and signs nothing.)"));
     }
-    for (const line of lines) context.stdout(clean(line));
     return 0;
   } catch (error) {
     if (error instanceof InitRefusal) {

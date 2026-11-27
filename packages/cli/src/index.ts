@@ -21,6 +21,7 @@ import { liveX402Test } from "./test-live.js";
 import { colorDepth, colorEnabled, lineWidth, styler } from "./style.js";
 import { executeRun } from "./run.js";
 import { DEFAULT_CONFIG_FILE, executeInit } from "./init-command.js";
+import { LIVE_KEY_SETUP } from "./init-keys.js";
 import {
   CHECK_CATALOGUE,
   PROTOCOL_IDS,
@@ -455,11 +456,17 @@ program
   .option("--reject-note <text>", "One line on why the route must refuse that request")
   .option("--config <path>", "The config file", DEFAULT_CONFIG_FILE)
   .option("--force", "Replace the config file instead of adding the endpoint to it", false)
+  .option(
+    "--setup-keys",
+    "Stellar testnet: set up the key the route's payment checks read, in .env (also adds .env to .gitignore when git does not ignore it)",
+  )
+  .option("--no-setup-keys", "Do not set up a key, and do not ask")
   .addHelpText(
     "after",
     `
 Examples:
   $ wasit init --url http://127.0.0.1:3000/api/weather --operated-by-me
+  $ wasit init --url http://127.0.0.1:3000/api/weather --operated-by-me --setup-keys
   $ wasit init --url http://127.0.0.1:3000/api/chat --method POST --body-file body.json --operated-by-me --start "npm start"
   $ wasit init --url http://127.0.0.1:3000/mpp/chat --operated-by-me --protocol mpp-charge
 
@@ -474,6 +481,17 @@ replaces it. Mainnet is not written in this version, and neither is a header of
 the route: send a credential in a WASIT_HEADER_<NAME> variable. After writing,
 init prints what it read from your service, what you gave, what it filled in by
 default and what it did not read, then the next command.
+
+Key setup (Stellar testnet only; --setup-keys, or a yes at a terminal), after
+the config is written: first it checks that git will not commit .env (not
+tracked, and ignored: else .env is added to .gitignore, or no key is written).
+A key already set is kept and its account only read. Otherwise init makes a
+testnet key (x402: STELLAR_PRIVATE_KEY; MPP charge: MPP_PAYER_SECRET), adds it
+to .env without showing the secret, funds it with Friendbot and swaps 10 test
+XLM for test USDC on the public test exchange, then prints a status table. For
+an MPP channel it makes no key: COMMITMENT_SECRET_HEX must be the key the
+channel was opened with. On other test networks it names the variable and the
+faucet. The key setup never changes the exit code.
 Exit codes: 0 the config was written; 2 nothing was written.`,
   )
   .exitOverride(exitTwoOnUsageError)
@@ -504,12 +522,14 @@ Exit codes: 0 the config was written; 2 nothing was written.`,
           config: opts.config as string,
           force: opts.force === true,
           read: opts.read !== false,
+          ...(typeof opts.setupKeys === "boolean" ? { setupKeys: opts.setupKeys } : {}),
         },
         {
           env: process.env,
           stdout: (line) => console.log(line),
           stderr: (line) => console.error(line),
           ...(rl === undefined ? {} : { ask: (question: string) => rl.question(question) }),
+          keys: LIVE_KEY_SETUP,
         },
       );
     } catch (error) {

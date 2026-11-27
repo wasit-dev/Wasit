@@ -164,9 +164,9 @@ const STELLAR_PUBNET = "stellar:pubnet";
 /** MPP pays on this network only (L0; D-036). The network is the config's: `MPP_STELLAR_NETWORK` is not read. */
 const MPP_NETWORK = "stellar:testnet";
 
-/** The key variables of the MPP checks: MPP-01's payer, and the channel's commitment key. */
-const MPP_PAYER_KEY_ENV = "MPP_PAYER_SECRET";
-const MPP_COMMITMENT_KEY_ENV = "COMMITMENT_SECRET_HEX";
+/** The key variables of the MPP checks: MPP-01's payer, and the channel's commitment key (`wasit init` sets up the same ones). */
+export const MPP_PAYER_KEY_ENV = "MPP_PAYER_SECRET";
+export const MPP_COMMITMENT_KEY_ENV = "COMMITMENT_SECRET_HEX";
 
 const MPP_NOT_ON_MAINNET =
   "MPP pays on test networks only: a mainnet run pays its x402 endpoints, so this endpoint's MPP checks were not run";
