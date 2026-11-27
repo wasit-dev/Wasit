@@ -117,6 +117,12 @@ export interface InitContext {
   readonly cwd?: string;
   /** Tests only: how long the read waits for the route. Index never sets it. */
   readonly readTimeoutMs?: number;
+  /**
+   * Asks one question and returns the answer. Given only when stdin and stdout
+   * are terminals (C1): without it, init asks nothing and names the flags that
+   * are missing (C5). Rejects when the input ends.
+   */
+  readonly ask?: (question: string) => Promise<string>;
 }
 
 /** A refusal: printed, exit 2, nothing written. */
@@ -615,6 +621,75 @@ function writesSecret(text: string, before: string | undefined, env: Readonly<Re
   });
 }
 
+/** The flags a non-interactive run is missing, or the questions an interactive one asks: C1 and C5. */
+async function completeAnswers(options: InitCommandOptions, context: InitContext): Promise<InitCommandOptions> {
+  const ask = context.ask;
+  if (ask === undefined) {
+    if (options.url === undefined && !options.operatedByMe) {
+      refuse(
+        "--url is required (the URL of one paid route, e.g. --url http://127.0.0.1:3000/api/weather), and so is " +
+          "--operated-by-me: Wasit tests only services their operator runs. init asks nothing when it is not at a " +
+          "terminal. Nothing was written.",
+      );
+    }
+    return options;
+  }
+  const answer = async (question: string): Promise<string> => {
+    try {
+      return (await ask(question)).trim();
+    } catch {
+      refuse("init was asking, and the input ended. Nothing was sent and nothing was written.");
+    }
+  };
+  let url = options.url;
+  if (url === undefined) url = await answer("URL of one paid route of your service (e.g. http://127.0.0.1:3000/api/weather): ");
+  let operatedByMe = options.operatedByMe;
+  if (!operatedByMe) {
+    const reply = (await answer("Do you operate this service? Wasit tests only services their operator runs (yes/no): ")).toLowerCase();
+    operatedByMe = reply === "yes" || reply === "y";
+  }
+  // A URL that is not usable, or a service that is not theirs: no more questions; the main path refuses in its own words.
+  if (!operatedByMe) return { ...options, ...(url === undefined || url === "" ? {} : { url }), operatedByMe };
+  routeUrl(url === "" ? undefined : url);
+  let method = options.method;
+  if (method === undefined) {
+    const reply = await answer("HTTP method of the route [GET]: ");
+    if (reply !== "") method = reply;
+  }
+  let bodyFile = options.bodyFile;
+  if (bodyFile === undefined && method !== undefined && !["GET", "HEAD"].includes(method.toUpperCase())) {
+    const reply = await answer("JSON file with the request body (empty for none): ");
+    if (reply !== "") bodyFile = reply;
+  }
+  let env = options.env;
+  if (env === undefined && url !== "") {
+    let loopback = true;
+    try {
+      loopback = isLoopbackUrl(new URL(url).href);
+    } catch {
+      // routeUrl refuses a URL that does not parse, in its own words.
+    }
+    if (!loopback) {
+      const reply = await answer("Name for this environment (e.g. staging): ");
+      if (reply !== "") env = reply;
+    }
+  }
+  let start = options.start;
+  if (start === undefined) {
+    const reply = await answer("Command that starts the service for wasit run --start (empty for none): ");
+    if (reply !== "") start = reply;
+  }
+  return {
+    ...options,
+    ...(url === undefined || url === "" ? {} : { url }),
+    operatedByMe,
+    ...(method === undefined ? {} : { method }),
+    ...(bodyFile === undefined ? {} : { bodyFile }),
+    ...(env === undefined ? {} : { env }),
+    ...(start === undefined ? {} : { start }),
+  };
+}
+
 /** A path for the next command: quoted when it has a space, which both PowerShell and cmd.exe read. */
 function commandArgument(value: string): string {
   return /\s/.test(value) ? `"${value}"` : value;
@@ -625,12 +700,13 @@ function commandArgument(value: string): string {
  * was written (a flag is missing or wrong, the service is not yours, the route
  * is not a paywall init can read, or the writer refused the data).
  */
-export async function executeInit(options: InitCommandOptions, context: InitContext): Promise<number> {
+export async function executeInit(given: InitCommandOptions, context: InitContext): Promise<number> {
   const secrets = deniedEnvValues(context.env);
   const clean = (line: string): string => sanitizeText(line, { redact: secrets });
   const cwd = context.cwd ?? process.cwd();
 
   try {
+    const options = await completeAnswers(given, context);
     const url = routeUrl(options.url);
     if (!options.operatedByMe) {
       refuse(

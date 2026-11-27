@@ -426,7 +426,7 @@ program
   .description(
     "Write a wasit.config.json for one paid route of a service you operate, from one unpaid request to the route",
   )
-  .option("--url <url>", "The URL of one paid route, e.g. http://127.0.0.1:3000/api/weather")
+  .option("--url <url>", "The URL of one paid route, e.g. http://127.0.0.1:3000/api/weather (at a terminal, init asks for what you leave out)")
   .option(
     "--operated-by-me",
     "Confirm that you operate the service. Wasit tests only services their operator runs: without it nothing is written",
@@ -479,6 +479,11 @@ Exit codes: 0 the config was written; 2 nothing was written.`,
   .exitOverride(exitTwoOnUsageError)
   .action(async (opts) => {
     let code: number;
+    // Questions only at a terminal (C1); in a script or a pipe init asks nothing and names the missing flags (C5).
+    const rl =
+      process.stdin.isTTY === true && process.stdout.isTTY === true
+        ? (await import("node:readline/promises")).createInterface({ input: process.stdin, output: process.stdout })
+        : undefined;
     try {
       code = await executeInit(
         {
@@ -500,12 +505,19 @@ Exit codes: 0 the config was written; 2 nothing was written.`,
           force: opts.force === true,
           read: opts.read !== false,
         },
-        { env: process.env, stdout: (line) => console.log(line), stderr: (line) => console.error(line) },
+        {
+          env: process.env,
+          stdout: (line) => console.log(line),
+          stderr: (line) => console.error(line),
+          ...(rl === undefined ? {} : { ask: (question: string) => rl.question(question) }),
+        },
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(sanitizeText(`wasit init: unexpected error: ${message}`, { redact: deniedEnvValues(process.env) }));
       code = 2;
+    } finally {
+      rl?.close();
     }
     await flushOutput();
     process.exit(code);
