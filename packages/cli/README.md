@@ -6,9 +6,9 @@ Protocol-compliance testing for **x402** and **MPP** on Stellar, from your termi
 
 For both MPP charge payments and x402 payments it verifies the settlement independently — via Stellar RPC and the token contract's own on-chain transfer event, rather than the response the service returns.
 
-**Testnet by default.** Several checks settle real transactions. The payment checks pay on test networks only: any other network, `stellar:pubnet` included, is refused before a key is read, but for `wasit run --mainnet` (beta, below). Do not use production keys.
+**Testnet by default.** Several checks settle real transactions. The payment checks pay on test networks only: any other network, `stellar:pubnet` included, is refused before a key is read, but for `wasit run --mainnet` (beta, below). Do not use production keys: the mainnet opt-in takes a dedicated account only.
 
-**This README describes 0.8.0-beta.1**, a pre-release on npm under the `beta` tag (`npm install -g @wasit-dev/cli@beta`). `latest` is still 0.7.0. New in the beta: `wasit run` for a whole service from a `wasit.config.json`, `wasit ci-report`, the GitHub Action, a seventeenth check (`X402-11`), and a cap on every payment Wasit signs.
+**This README describes 0.8.0-beta.2**, a pre-release on npm under the `beta` tag (`npm install -g @wasit-dev/cli@beta`). `latest` is still 0.7.0. New in 0.8.0-beta.2: `wasit init`, which writes the config from one unpaid request to your route and can set up a testnet payer; MPP charge and channel checks in `wasit run`; the capped mainnet opt-in, `wasit run --mainnet` (beta, x402 only); and "resource consumed", the result for a single-use route. New in 0.8.0-beta.1: `wasit run` for a whole service from a `wasit.config.json`, `wasit ci-report`, the GitHub Action, a seventeenth check (`X402-11`), and a cap on every payment Wasit signs.
 
 ## Install
 
@@ -38,6 +38,13 @@ wasit test --target https://your-service.example.com/paid --read-only
 ```
 
 That runs the read-only x402 checks (`X402-01`–`05`): whether the service issues a well-formed 402 challenge. Drop `--read-only` and set `STELLAR_PRIVATE_KEY` to also exercise the payment flow — `X402-06` settles a real testnet payment, and `X402-07`–`10` send payments the service must refuse.
+
+For a whole service you operate, let Wasit write the config from one unpaid request to a route, then run the free checks:
+
+```bash
+wasit init --url http://127.0.0.1:3000/api/weather --operated-by-me   # your service is running; init reads its 402
+wasit run --read-only                                                   # what init prints as the next command for x402
+```
 
 ## Commands
 
@@ -73,7 +80,7 @@ wasit mpp-charge --target <url> [options]
 | `--network <id>` | `MPP_STELLAR_NETWORK` | CAIP-2. Only a challenge on this network is paid; `stellar:testnet` only, any other network is refused |
 | `--rpc-url <url>` | testnet default | Used for the payment and the settlement read; https only |
 
-**Every run settles a real payment.** Charge mode has no dry run — a settlement that never happened cannot be verified on-chain.
+**Every run settles a real payment.** A settlement that never happened cannot be verified on-chain, so this command has no dry run. To see what a payment would be before anything is signed, use `wasit run --dry-run` (below): it prints the plan of an MPP charge endpoint from its unpaid challenge and signs nothing.
 
 ### `wasit mpp-channel` — MPP, channel mode
 
@@ -99,6 +106,21 @@ wasit mpp-channel --target <url> [options]
 
 `--channel` **asserts**, it does not select: the channel under test is resolved from the target's own 402 challenge, so every check in a run reports on the same contract. When `--channel` differs from what the target advertises, `MPP-10` fails and inspects nothing.
 
+### `wasit init`: write the config for one route (new in 0.8.0-beta.2)
+
+```bash
+wasit init --url http://127.0.0.1:3000/api/weather --operated-by-me
+wasit init --url http://127.0.0.1:3000/api/chat --method POST --body-file body.json --operated-by-me --start "npm start"
+wasit init --url http://127.0.0.1:3000/mpp/chat --operated-by-me --protocol mpp-charge
+wasit init                             # at a terminal: asks for what you leave out
+```
+
+Writes a `wasit.config.json` for one paid route of a service you operate. It sends the route one unpaid request (the method and body you give, and the `WASIT_HEADER_*` headers `wasit run` sends), follows at most one redirect inside the route's origin, and pays and signs nothing. The 402 tells x402 from MPP and gives the protocol, the network, the receiving address and asset (pinned), and for an MPP channel its contract. A route that answers 200, 500 or 503, or does not answer, writes nothing; `--no-read` writes the route from the flags alone, as x402.
+
+Nothing is written without `--operated-by-me` (at a terminal, `init` asks): Wasit tests only services their operator runs. At a terminal `init` asks only for what the flags leave out; without one it asks nothing and names the missing flags (exit 2). An existing config is added to, never overwritten (`--force` replaces it), and a route it already has exactly as given is left as it is, so `init` can run again. It writes test networks only, never a header of the route (send a credential in a `WASIT_HEADER_<NAME>` variable) and never a secret. After writing it prints what it read from your service, what you gave, what it filled in by default and what it did not read, then the next command: `wasit run --read-only` for x402, `wasit run --dry-run` for MPP, which has no read-only checks. Exit codes: `0` the config has the route (written now, or already there as given); `2` `init` refused and nothing was written.
+
+**Key setup (Stellar testnet only)**, with `--setup-keys` or a yes at a terminal, after the config is written. First `init` checks that git will not commit `.env`: it must not be tracked and must be ignored, else `.env` is added to `.gitignore` (asked at a terminal) or no key is written. A key that is already set is kept and its account only read. Otherwise `init` makes a testnet key (`STELLAR_PRIVATE_KEY` for x402, `MPP_PAYER_SECRET` for MPP charge), appends it to `.env` without showing the secret, funds it with Friendbot, adds the USDC trustline and swaps 10 test XLM for test USDC on the public test exchange, then prints a status table; what it could not finish is in the table with the command that finishes it. An MPP channel gets no key: `COMMITMENT_SECRET_HEX` must be the key the channel was opened with. A variable set to nothing in your shell hides `.env` from `wasit run`, so `init` says so and writes no key. The key setup never changes the exit code.
+
 ### `wasit run`: a whole service from `wasit.config.json` (new in 0.8.0-beta.1)
 
 ```bash
@@ -113,13 +135,17 @@ Without `--read-only` or `--dry-run` the run is the payment tier. It pays on tes
 
 For an endpoint with a `reject` case in the config, on Stellar, the payment tier also runs `X402-11`: a valid payment is sent with the request the service must refuse, and the chain is read until that payment's authorization has expired, up to six minutes.
 
+**MPP in `wasit run` (new in 0.8.0-beta.2).** MPP endpoints are paid in the payment tier on `stellar:testnet` only, by the same rules and caps and in the same budget as x402: `MPP-01` (charge) with `MPP_PAYER_SECRET`, planned from its unpaid challenge, and `MPP-10`, `11`, `12` and `14` (channel) with `COMMITMENT_SECRET_HEX`, with the channel and its expected terms from the config. `MPP-13`, which closes a channel for good, is never run by `wasit run`. The network and the channel come from the config: `MPP_STELLAR_NETWORK` and `CHANNEL_CONTRACT` are not read. An MPP endpoint is sent a plain GET: one with a method, a body or headers is not sent anything. A mainnet run pays its x402 endpoints only.
+
+**Single-use routes (new in 0.8.0-beta.2).** A route that can be bought once answers 409 where a new 402 was expected, after `X402-06`'s payment was served. `X402-07`, `09`, `10` and `11` need a new challenge to pay, so they are skipped as "resource consumed" (nothing is signed for them, and the route is not asked again); `X402-08`, the replay, needs none and still runs. A 409 before any payment of the run skips `X402-06` with that reason.
+
 ### `wasit ci-report`: the pull request comment and the job summary (new in 0.8.0-beta.1)
 
 ```bash
 wasit ci-report --report wasit-report.json --comment comment.md
 ```
 
-Turns the report of `wasit run --json --out` into the pull request comment and the job summary, compared with the default branch's report (`--baseline`). `--check-run <file>` also writes the title, summary and conclusion of a GitHub check run. The GitHub Action in the repository's `action/` directory runs `wasit run` and `wasit ci-report` in a workflow and comments on the pull request; pin it by full commit SHA.
+Turns the report of `wasit run --json --out` into the pull request comment and the job summary, compared with the default branch's report (`--baseline`). `--check-run <file>` also writes the title, summary and conclusion of a GitHub check run. The Action also uses `--summary <file>` (the job summary; default `$GITHUB_STEP_SUMMARY`), `--baseline-out <file>` (the next baseline, for a run on the default branch), `--history <file>` (the newest completed run's baseline, for the recent-failures line) and `--baseline-run <id>`; `wasit ci-report --help` lists them. The GitHub Action in the repository's `action/` directory runs `wasit run` and `wasit ci-report` in a workflow and comments on the pull request; pin it by full commit SHA.
 
 ### `wasit checks` — the catalogue
 
@@ -141,7 +167,7 @@ Testnet-only helpers for the keys the subcommands above read from `.env`. `--net
 
 `fund --asset usdc` opens the Circle testnet USDC trustline automatically, but **receiving a balance always needs one human step**: there is no scriptable USDC faucet for Stellar. Visit [faucet.circle.com](https://faucet.circle.com) once, or set `WASIT_USDC_DISTRIBUTOR_SECRET` to an account you funded that way and every later run sends from it automatically.
 
-`create` prints a secret key to stdout — don't run it on a screen you're recording.
+`create` prints a secret key to stdout — don't run it on a screen you're recording. `wasit init --setup-keys` needs none of this for a Stellar testnet route: it makes the key, writes it to `.env` without showing it and gets test USDC by a swap on the public test exchange (see `wasit init`).
 
 ### `wasit serve` — a paywall that misbehaves, for testing an agent that pays
 
@@ -196,17 +222,18 @@ A run with both a failure and an error exits `1` — a real finding outranks a m
 
 | Env var | Used by |
 |---|---|
-| `STELLAR_PRIVATE_KEY` | `test` (x402 payment checks on Stellar) |
+| `STELLAR_PRIVATE_KEY` | `test`, `run` (x402 payment checks on Stellar), `init --setup-keys` |
 | `EVM_PRIVATE_KEY` | `test --network eip155:84532` or `eip155:11155111` (x402 payment checks on Base or Ethereum Sepolia) |
 | `SVM_PRIVATE_KEY` | `test --network solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1` (x402 payment checks on Solana devnet) |
-| `MPP_PAYER_SECRET` | `mpp-charge` |
+| `MPP_PAYER_SECRET` | `mpp-charge`, `run` (MPP charge), `init --setup-keys` |
 | `MPP_STELLAR_NETWORK` | `mpp-charge`, `mpp-channel` |
-| `COMMITMENT_SECRET_HEX` | `mpp-channel` |
+| `COMMITMENT_SECRET_HEX` | `mpp-channel`, `run` (MPP channel) |
 | `CHANNEL_CONTRACT` | `mpp-channel` (optional assertion) |
 | `CHANNEL_CONTRACT_DISPOSABLE` | `mpp-channel --allow-destructive` |
 | `WASIT_USDC_DISTRIBUTOR_SECRET` | `wallet fund --asset usdc` (optional) |
+| `WASIT_MAINNET_PAYER_SECRET` | `run --mainnet` only (beta): a dedicated account's secret, exported in the shell, never in `.env` |
 
-All keys are **testnet only**. `wasit` also reads a `.env` file in the current working directory — pass `--payer-key` / `--commitment-key` directly to override it for a single run.
+All keys are **testnet only**, except `WASIT_MAINNET_PAYER_SECRET`, which `wasit run --mainnet` reads from the shell alone (a dedicated account; see `wasit run`). `wasit` also reads a `.env` file in the current working directory — pass `--payer-key` / `--commitment-key` directly to override it for a single run. `wasit run` does not read `.env` in CI, nor with `--mainnet`.
 
 ## What's checked
 

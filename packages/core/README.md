@@ -4,7 +4,7 @@ The check suite behind [`@wasit-dev/cli`](https://www.npmjs.com/package/@wasit-d
 
 This package holds the actual check logic. The CLI and the MCP server are thin adapters over these same functions, so a CLI run and an agent's run can never disagree about the same target — there is only one implementation of each check.
 
-**Testnet only.** Several checks settle real transactions on-chain. In 0.8.0-beta.1 (npm tag `beta`; `latest` is 0.7.0) every payment check pays on test networks only: any other network, `stellar:pubnet` included, is refused before a key is read. The mainnet opt-in (beta, not in 0.8.0-beta.1) is the one exception: x402 on `stellar:pubnet` through `openMainnetOptIn`, which every front end calls.
+**Testnet only.** Several checks settle real transactions on-chain. In 0.8.0-beta.2 (npm tag `beta`; `latest` is 0.7.0) every payment check pays on test networks only: any other network, `stellar:pubnet` included, is refused before a key is read. The mainnet opt-in (beta) is the one exception: x402 on `stellar:pubnet` through `openMainnetOptIn`, which every front end calls.
 
 Most people should reach for [`@wasit-dev/cli`](https://www.npmjs.com/package/@wasit-dev/cli) (terminal) or [`@wasit-dev/server`](https://www.npmjs.com/package/@wasit-dev/server) (MCP / agents) instead of this package directly. Install `@wasit-dev/core` yourself only if you're building your own tooling on top of the check suite.
 
@@ -81,7 +81,7 @@ Every check function returns `Promise<CheckResult[]>` and never rejects for a ta
 | `checkStatus(result)` | → `"PASS" \| "FAIL" \| "ERROR" \| "SKIP"` |
 | `summarize(results)` | → `{ passed, failed, errored, skipped, exitCode }` — `exitCode` is `0 \| 1 \| 2`, shared by both front ends so they can never disagree about the same run |
 | `errored(id, name, error)` | Builds an `ERROR` result — mostly useful writing your own check |
-| `skipped(id, name, reason)` | Builds a non-destructive `SKIP` result |
+| `skipped(id, name, reason, kind?)` | Builds a non-destructive `SKIP` result. `kind` says what sort of reason it is: `read-only`, `needs-payer`, `unsupported`, `resource-consumed`, `not-applicable` or `dependency` |
 | `skippedDestructive(id, name, reason)` | Builds a `SKIP` result for a destructive check not opted into |
 
 The full check catalogue — every check's exact pass criteria and spec reference — is in [`docs/CHECKS.md`](https://github.com/wasit-dev/wasit/blob/main/docs/CHECKS.md).
@@ -110,6 +110,16 @@ The catalogue is a short-form companion to [`docs/CHECKS.md`](https://github.com
 | `classifyCheckError(error)` | → `ClassifiedError` — maps an unknown throw to the `errorKind` (`"unreachable"`, `"configuration"`, `"harness"`) that appears in structured output |
 | `assertHttpUrl(target)`, `fetchTarget(...)` | The URL guard and bounded fetch the checks themselves use |
 
+### Writing a config (`wasit init`, new in 0.8.0-beta.2)
+
+The building blocks of `wasit init`: data that is certain in, a `wasit.config.json` that `wasit run` accepts out.
+
+| Export | Signature |
+|---|---|
+| `readRoute(url, shape, options?)` | → `Promise<RouteReading>` — sends the route one unpaid request and reads its answer: x402 or MPP, the network, the price, the asset, the receiving address, an MPP channel; or that it answered 200, 500 or 503, or did not answer. Pays and signs nothing |
+| `interpretRouteAnswer(answer)` / `chooseOffer(offers, wanted?)` | The same reading over a recorded answer, without a network; and the one way to pay that `init` writes for the route, or why it writes none |
+| `writeConfigText(input, options?)` | → `{ text, added, unchanged, environmentAdded, serviceAdded, changed }`. Writes only for an environment with `operatedByMe: true` on a test network, checks the result with the loader `wasit run` uses, adds to an existing file and never overwrites it (`replace` starts from nothing). An endpoint the file already has exactly as given is `unchanged`, and `changed` is false when nothing needs writing. Throws `ConfigWriteError`, and writes nothing |
+
 ### Testnet wallet helpers
 
 A convenience layer for setting up the keys the check functions read. It is not part of the check surface, and it is exported by name rather than with `export *` so `wallet.ts` stays free to change without that being a breaking change to this package.
@@ -123,6 +133,7 @@ A convenience layer for setting up the keys the check functions read. It is not 
 | `fundWithFriendbot(publicKey, attempts?)` | → `Promise<FriendbotOutcome>` — `"funded"` or `"already-funded"`. Two different claims: an account that already exists is a success, but no transfer happened |
 | `createUsdcTrustline(secretKey, source?)` | → `Promise<void>` — opens the Circle testnet USDC trustline. A trustline is not a balance |
 | `sendUsdcFromDistributor(distributorSecretKey, destinationPublicKey, amount)` | → `Promise<void>` — `amount` is a positive decimal string, at most 7 places |
+| `addTestnetUsdc(secretKey, source?)` | → `Promise<UsdcSetupOutcome>` — `{ swapped: true }` or `{ swapped: false, why }`. Opens the trustline and, when the public test exchange gives a usable price, swaps `TESTNET_SWAP_XLM` (10) test XLM for test USDC in the same transaction (at least 80% of the quote); otherwise it opens the trustline alone and says why. Throws only when the trustline fails |
 | `testnetUsdcAsset()` / `TESTNET_USDC_ISSUER` | The Circle testnet USDC `Asset` and its issuer address |
 | `describeTransactionError(error)` | → `string` — Horizon result codes formatted for a human |
 
