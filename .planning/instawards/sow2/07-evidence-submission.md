@@ -69,7 +69,7 @@ Further proofs of D1 (not SOW rows):
 | Evidence (per SOW) | Status | Proof |
 | --- | --- | --- |
 | The example project, with the Wasit workflow set up | ✅ (workflow) · 🟡 (payment and MPP runs later) | [Repository](https://github.com/dzakwannajmi/x402-example-paywall) · job 01 |
-| A short recording of `wasit init` on a fresh x402 project and a fresh MPP project | 🟡 (a terminal copy, x402 only, no recording yet) | [Excerpts of `wasit init` and of the read-only run on its config](week-3/copies/init-local-run/excerpts-of-the-runs.txt) · [job 04](04-init.md). No MPP project and no recording yet (week 3) |
+| A short recording of `wasit init` on a fresh x402 project and a fresh MPP project | 🟡 (terminal copies for an x402 route and an MPP charge project, no recording yet) | [Excerpts of `wasit init` and of the read-only run on its config](week-3/copies/init-local-run/excerpts-of-the-runs.txt) · [MPP charge project, excerpts](week-3/copies/init-local-run/mpp-charge-run.txt) · [job 04](04-init.md). No recording yet (week 3) |
 | The guides on usewasit.dev, including the guide for testing a paying agent and the page on the capped opt-in | ⬜ | Week 4 (job 05) |
 | The demo mode output | ⬜ | Week 4 (job 05) |
 | The install-time guarantees in SECURITY.md and the SBOM attached to the release | ⬜ | Week 4 (job 05) |

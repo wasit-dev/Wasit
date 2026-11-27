@@ -1,0 +1,99 @@
+`wasit init`, then `wasit run --dry-run` and `wasit run`, on a fresh MPP charge project, on the maintainer's machine, 2026-11-27
+
+Run by the maintainer in their own terminal, in a new empty folder (`git init` only), against an MPP charge server of the
+repository's test fixtures (127.0.0.1:3002, the official @stellar/mpp charge handler, settling on the Stellar test
+network). `wasit init` was given no flag: every answer was typed at its question. Code: commit 8ef0e0e on a local branch
+of the week 3 work, which becomes public with the release (the published 0.8.0-beta.1 does not have `wasit init`). The
+output is copied from the terminal as it was, with the shell prompt removed and the commands shortened: the local build was
+run as `node <build>/index.js ...` with a full file path, shown here as `wasit ...`. Test-network funds only. No secret
+appears in the output: `init` never prints the key it writes to `.env`.
+
+--- `wasit init` ---
+
+$ wasit init
+URL of one paid route of your service (e.g. http://127.0.0.1:3000/api/weather): http://127.0.0.1:3002/data
+Do you operate this service? Wasit tests only services their operator runs (yes/no): yes
+HTTP method of the route [GET]:
+Command that starts the service for wasit run --start (empty for none):
+Set up a test payer in .env (MPP_PAYER_SECRET)? If it is not set, init makes a Stellar testnet key (the secret is never shown), funds it with Friendbot and swaps 10 test XLM for test USDC (yes/no): yes
+wasit init: wrote wasit.config.json: the environment local and the endpoint data.
+Read from your service:
+  one unpaid request: GET http://127.0.0.1:3002/data; nothing was paid or signed
+  answer: 402 with a WWW-Authenticate challenge (MPP)
+  offered: MPP charge on stellar:testnet: price 10000 base units ($0.001 in USDC), currency CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA, recipient GALVZ57VAY6BE33WYPJMUJ27PFAUDRQ6ATTVMIIF4STTGQTXDBEIBXUI
+  written: protocol mpp-charge, network stellar:testnet
+  pinned: payTo GALVZ57VAY6BE33WYPJMUJ27PFAUDRQ6ATTVMIIF4STTGQTXDBEIBXUI, asset CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA (wasit run pays only these)
+You gave:
+  url: http://127.0.0.1:3002/data
+  operated by you: yes (--operated-by-me)
+  key setup: yes (your answer)
+Filled in by default:
+  method: GET
+  name: data (from the path)
+  environment: local (the URL is on this machine)
+Test key for the payment checks of wasit run (stellar:testnet, in .env):
+.env is not ignored by git. Add .env to .gitignore? (yes/no): yes
+  init added .env to .gitignore, and git now ignores it (commit that change)
+  MPP_PAYER_SECRET: new, written to .env (the secret is not shown), address GAVCQBLKKG433X5CR5EYML5DRANSSZ7ZRZOFITQOXPMMBQQNDPQZTN6H
+  Funding it with test XLM from Friendbot (the public testnet faucet) ...
+  Adding the USDC trustline and swapping 10 test XLM for test USDC on the public test exchange (up to a minute) ...
+    XLM:       ready, 9989.9999800 XLM
+    trustline: ready
+    USDC:      ready, 6.4405109 USDC
+Next: wasit run --dry-run
+  (MPP has no read-only checks: the dry run prints what the payment tier would do, and signs nothing.)
+
+--- `wasit run --dry-run` ---
+
+$ wasit run --dry-run
+Environment local: http://127.0.0.1:3002
+Network: stellar:testnet (test network)
+Endpoints: 1
+  data  mpp-charge  GET /data
+Plan (dry run): MPP-01 on stellar:testnet. Nothing is signed or sent.
+Caps: $1.00 a payment, $5.00 this run.
+Pinned: payTo GALVZ57VAY6BE33WYPJMUJ27PFAUDRQ6ATTVMIIF4STTGQTXDBEIBXUI, asset CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA.
+  data: pays "GALVZ57VAY6BE33WYPJMUJ27PFAUDRQ6ATTVMIIF4STTGQTXDBEIBXUI" in "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA", up to $0.001
+    MPP-01 10000 (base units)
+Worst case: $0.001 of $5.00.
+
+--- `wasit run` ---
+
+$ wasit run
+Payment tier on stellar:testnet (test network): test funds. MPP-01 payer GAVCQBLKKG433X5CR5EYML5DRANSSZ7ZRZOFITQOXPMMBQQNDPQZTN6H; at most $1.00 per payment; this run could spend up to $0.001 of the $5.00 cap.
+Caps: $1.00 a payment, $5.00 this run.
+Pinned: payTo GALVZ57VAY6BE33WYPJMUJ27PFAUDRQ6ATTVMIIF4STTGQTXDBEIBXUI, asset CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA.
+  data: pays "GALVZ57VAY6BE33WYPJMUJ27PFAUDRQ6ATTVMIIF4STTGQTXDBEIBXUI" in "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA", up to $0.001
+    MPP-01 10000 (base units)
+Worst case: $0.001 of $5.00.
+Environment local: http://127.0.0.1:3002
+Network: stellar:testnet (test network)
+Endpoints: 1
+  data  mpp-charge  GET /data
+Tier: payment on stellar:testnet. The run charged $0.001 of the $5.00 cap, at most $1.00 a payment; every signature is counted as if it settled.
+
+data  mpp-charge  GET /data: conformant
+  PASS  MPP-01  Charge Settlement On-Chain
+        Settled on-chain for exactly the advertised 10000 base units of CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA to GALVZ57VAY6BE33WYPJMUJ27PFAUDRQ6ATTVMIIF4STTGQTXDBEIBXUI, verified from the transfer event (tx 3d70a3aa98b52ec635a56a9feb459218842827f31572dcee847d95b19b658fad).
+
+Summary: 1 graded.
+Result: 1 graded (exit 0).
+
+--- A second folder: the answer "no" to who operates the service ---
+
+$ wasit init
+URL of one paid route of your service (e.g. http://127.0.0.1:3000/api/weather): http://127.0.0.1:3002/data
+Do you operate this service? Wasit tests only services their operator runs (yes/no): no
+wasit init: Wasit tests only services their operator runs. If you operate the service at http://127.0.0.1:3002, run this again with --operated-by-me. Nothing was sent and nothing was written.
+(exit 2; the folder was empty afterwards)
+
+--- Read back from the chain by the assistant, 2026-11-27 (Horizon, Stellar test network, public read) ---
+
+Account GAVCQBLK...PQZTN6H (the payer init made): USDC 6.4405109 (issuer Circle test network GBBD47IF...), XLM 9989.9999800:
+equal to the table `init` printed.
+Transaction 3d70a3aa...b658fad: successful, ledger 5947297, 2026-11-27T06:15:29Z, source GAVCQBLK...; effects: account_debited
+GAVCQBLK... 0.0010000 USDC, account_credited GALVZ57V...BXUI 0.0010000 USDC.
+`.env` of the project: owner-only permissions (-rw-------), 74 bytes; `.gitignore` holds `.env`.
+The asset CBIELTK6... is the constant USDC_TESTNET_ADDRESS of the @x402/stellar package, which the fixture server imports:
+a source outside Wasit's own table. The receiving address GALVZ57V...BXUI is the fixture's recipient, as already read back
+on 2026-11-24 (job 03).
