@@ -21,6 +21,7 @@ import { afterEach, beforeEach, describe, it } from "node:test";
 import { Keypair, Networks, StrKey } from "@stellar/stellar-sdk";
 import { charge as chargeClient } from "@stellar/mpp/charge/client";
 import { Mppx, Store, charge } from "@stellar/mpp/charge/server";
+import { Challenge } from "mppx";
 
 import { classifyCheckError } from "../../src/errors.js";
 import { PaymentGuardRefusedError, RunBudget, formatUsd, usdFromDollars } from "../../src/guard/budget.js";
@@ -233,7 +234,37 @@ describe("the plan of MPP-01 (planMppChargeEndpoint)", () => {
       await target.close();
     }
   });
+
+  it("does not plan an amount that is not whole base units: below zero, hex, padded, a decimal or an exponent", async () => {
+    for (const amount of ["-30000000000", "0x989680", " 10000000 ", "0.5", "1e3"]) {
+      const target = await handMadeChargeTarget({ amount, currency: USDC_SAC, recipient: RECIPIENT });
+      try {
+        const plan = await planMppChargeEndpoint("stellar:testnet", { name: "chat", target: target.url });
+        assert.equal(plan.status, "not-paid", `${JSON.stringify(amount)}: ${plan.reason ?? ""}`);
+        assert.match(plan.reason ?? "", /not a whole number of base units/, JSON.stringify(amount));
+        assert.equal(plan.worstCaseUsd, 0n);
+        assert.equal(plannedChargeOf(plan), undefined);
+        assert.equal(target.credentials(), 0);
+      } finally {
+        await target.close();
+      }
+    }
+  });
 });
+
+/** A target answering every request with one hand-made charge challenge: terms the official server never writes. */
+async function handMadeChargeTarget(request: Record<string, unknown>) {
+  const header = Challenge.serialize(
+    Challenge.from({ id: "hand-made-charge", realm: "127.0.0.1", method: "stellar", intent: "charge", request }),
+  );
+  let credentials = 0;
+  const target = await listen((req, res) => {
+    if (req.headers.authorization) credentials += 1;
+    res.writeHead(402, { "WWW-Authenticate": header });
+    res.end();
+  });
+  return { ...target, credentials: () => credentials };
+}
 
 /** An x402 plan with one planned endpoint of `usd` dollars, under a cap of `capUsd`. */
 function x402Plan(usd: number, capUsd = 5, capLowered = false): RunPlan {
@@ -287,6 +318,26 @@ describe("one plan and one cap for x402 and MPP-01 (combinePaymentPlan)", () => 
   it("names maxRunUsd when it lowered the cap", () => {
     const plan = combinePaymentPlan(x402Plan(0.5, 1, true), [mppEntry("chat", 0.9)]);
     assert.match(plan.refusal ?? "", /above the \$1\.00 per run set by maxRunUsd/);
+  });
+
+  it("never lets an entry lower the sum: a worst case below zero refuses the run", () => {
+    const belowZero: EndpointPlan = { ...mppEntry("chat", 0), worstCaseUsd: -usdFromDollars(3000) };
+    for (const x402 of [x402Plan(6), x402Plan(1)]) {
+      const plan = combinePaymentPlan(x402, [belowZero]);
+      assert.match(plan.refusal ?? "", /a worst case below zero for chat, which is not a price\. Nothing was signed\./);
+    }
+  });
+
+  it("still refuses an x402 plan above the cap when an MPP-01 challenge asks a negative amount", async () => {
+    const target = await handMadeChargeTarget({ amount: "-30000000000", currency: USDC_SAC, recipient: RECIPIENT });
+    try {
+      const entry = await planMppChargeEndpoint("stellar:testnet", { name: "chat", target: target.url });
+      const plan = combinePaymentPlan(x402Plan(6), [entry]);
+      assert.equal(formatUsd(plan.worstCaseUsd), "$6.00");
+      assert.match(plan.refusal ?? "", /This run could spend up to \$6\.00 \(weather \$6\.00\), above the \$5\.00 per run\./);
+    } finally {
+      await target.close();
+    }
   });
 
   it("does not count an entry that is not planned", () => {

@@ -40,6 +40,9 @@ import { verifySettlement } from "../settlement.js";
 const CHECK_ID = "MPP-01";
 const CHECK_NAME = "Charge Settlement On-Chain";
 
+/** An amount as a charge challenge must give it: base units, digits only, at most 78 (a uint256). */
+const WHOLE_BASE_UNITS = /^\d{1,78}$/;
+
 /** What the plan of a run (L1) allowed MPP-01 to pay, read from the unpaid challenge before anything was signed. */
 export interface PlannedCharge {
   /** Base units of `currency`. */
@@ -158,15 +161,16 @@ export function parseChargeChallenge(
     );
   }
 
-  let amount: bigint;
-  try {
-    amount = BigInt(amountRaw);
-  } catch {
+  // Digits only, the rule the run's guard holds a signed amount to (`parseAmount`
+  // in guard/budget.ts). `BigInt` alone also takes "-5", "0x10" and " 10 ": a
+  // negative price would lower the worst case a run's plan adds up.
+  if (!WHOLE_BASE_UNITS.test(amountRaw)) {
     throw new MalformedResponseError(
-      `Challenge advertises a non-numeric amount ("${amountRaw}"). The spec ` +
+      `Challenge advertises an amount that is not a whole number of base units (${shown(amountRaw)}). The spec ` +
         `requires base units, e.g. "10000" for 0.001 of a 7-decimal token.`,
     );
   }
+  const amount = BigInt(amountRaw);
 
   return { amount, currency, recipient, network: chargeNetwork(request) };
 }
@@ -206,7 +210,7 @@ function assertRunNetwork(asked: MppNetwork, network: MppNetwork): void {
  */
 function assertPlanned(asked: { amount: unknown; currency: unknown; recipient: unknown }, planned: PlannedCharge): void {
   const differs: string[] = [];
-  if (typeof asked.amount !== "string" || !/^\d{1,78}$/.test(asked.amount) || BigInt(asked.amount) !== planned.amount) {
+  if (typeof asked.amount !== "string" || !WHOLE_BASE_UNITS.test(asked.amount) || BigInt(asked.amount) !== planned.amount) {
     differs.push(`amount ${shown(asked.amount)} (planned ${planned.amount})`);
   }
   if (asked.currency !== planned.currency) differs.push(`currency ${shown(asked.currency)} (planned ${planned.currency})`);

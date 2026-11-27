@@ -147,6 +147,17 @@ export function combinePaymentPlan(x402: RunPlan, mppCharge: readonly EndpointPl
   const worstCaseUsd = planned.reduce((sum, endpoint) => sum + endpoint.worstCaseUsd, 0n);
   const { refusal: _x402Refusal, ...rest } = x402;
   const plan: RunPlan = { ...rest, endpoints, worstCaseUsd };
+  // No entry may lower the sum: a worst case below zero is not a price, and the
+  // challenge reader refuses one. Were one here, the run's sum would hide the rest.
+  const negative = planned.filter((endpoint) => endpoint.worstCaseUsd < 0n);
+  if (negative.length > 0) {
+    return {
+      ...plan,
+      refusal:
+        `The plan has a worst case below zero for ${negative.map((endpoint) => sanitizeText(endpoint.name)).join(", ")}, ` +
+        `which is not a price. Nothing was signed.`,
+    };
+  }
   if (worstCaseUsd <= x402.capUsd) return plan;
   const parts = planned.map((endpoint) => `${sanitizeText(endpoint.name)} ${formatUsd(endpoint.worstCaseUsd)}`);
   return {

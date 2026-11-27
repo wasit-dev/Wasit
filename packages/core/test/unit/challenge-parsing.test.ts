@@ -159,6 +159,21 @@ describe("parseChargeChallenge", () => {
     assert.throws(() => parseChargeChallenge(challengeWith(undefined)), /no request object/);
   });
 
+  // `BigInt` alone takes "-5", "0x10" and " 10 ". Only digits are base units, the
+  // rule the run's guard holds a signed amount to.
+  it("rejects an amount that is not whole base units, as a malformed response", () => {
+    for (const amount of ["-5", "+5", "0x10", " 10 ", "1.5", "1e3", "ten"]) {
+      let thrown: unknown;
+      try {
+        parseChargeChallenge(challengeWith({ amount, currency: "C1", recipient: "G1" }));
+      } catch (error) {
+        thrown = error;
+      }
+      assert.equal(classifyCheckError(thrown).kind, "malformed-response", JSON.stringify(amount));
+      assert.match((thrown as Error).message, /not a whole number of base units/, JSON.stringify(amount));
+    }
+  });
+
   // The network the SDK's client would sign for: the challenge's own, or
   // testnet when it names none (resolveNetworkId in @stellar/mpp 0.7.1).
   it("reads the network the SDK would sign for", () => {
@@ -202,10 +217,10 @@ describe("parseChargeChallenge", () => {
     );
   });
 
-  it("explains that a non-numeric amount must be base units", () => {
+  it("explains that a decimal amount must be base units", () => {
     assert.throws(
       () => parseChargeChallenge(challengeWith({ amount: "0.001", currency: "C1", recipient: "G1" })),
-      /non-numeric amount \("0\.001"\)[\s\S]*base units/,
+      /not a whole number of base units \("0\.001"\)[\s\S]*requires base units/,
     );
   });
 

@@ -44,6 +44,11 @@ All notable changes to Wasit are recorded here. Versions follow [Semantic Versio
   `WASIT_RPC_URL`, `--rpc-url`, the MCP tools' `rpcUrl`) before anything is
   sent, and `wasit run` refuses it before it starts the service: the x402
   Stellar client builds the payment through that RPC and accepts only https.
+- `MPP-01` reads the `amount` of a charge challenge as base units only:
+  digits and nothing else. A negative, hexadecimal or space-padded amount is a
+  malformed challenge (FAIL) when the challenge is read, as a decimal one
+  already was; before, it reached the payment client, which refused it. The
+  verdict is the same FAIL, and nothing is paid either way.
 
 **Added.**
 - `@wasit-dev/core` exports `mainnetJobRefusals` and `assertMainnetJob`: the
