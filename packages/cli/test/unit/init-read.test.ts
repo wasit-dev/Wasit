@@ -507,6 +507,42 @@ describe("wasit init: nothing is sent before every flag is checked", () => {
   });
 });
 
+describe("wasit init: a query named like a credential is never written (the config is committed)", () => {
+  for (const name of ["api_key", "apiKey", "authKey", "key", "access_token", "X-Amz-Signature", "sig", "client_secret", "password"]) {
+    it(`--url with ?${name}=: refused before anything is sent, the value never printed`, async () => {
+      const wall = await serve({ "/paid": x402Route(x402Header([option()])) });
+      const { code, stdout, stderr } = await init({ url: `${wall.base}/paid?${name}=made-up-value-0001&page=2` });
+      assert.equal(code, 2);
+      assert.equal(wall.received.length, 0, "the route was asked");
+      assert.ok(!existsSync(configFile()), "a config was written");
+      assert.ok(stderr.includes(`--url carries the query parameter "${name}", which is named like a credential`), stderr);
+      assert.ok(!`${stdout}${stderr}`.includes("made-up-value-0001"), "the value was printed");
+    });
+  }
+
+  it("--url with a query that names no credential is written as before", async () => {
+    const wall = await serve({ "/paid": x402Route(x402Header([option()])) });
+    const { code } = await init({ url: `${wall.base}/paid?keyword=weather&page=2` });
+    assert.equal(code, 0);
+    assert.equal((await written())["endpoints"][0]["path"], "/paid?keyword=weather&page=2");
+  });
+
+  it("a redirect inside the origin to a query named like a credential: refused, nothing written, the value never printed", async () => {
+    const wall = await serve({
+      "/hop": (_request, response) => {
+        response.writeHead(302, { location: "/paid?access_token=made-up-token-0001" });
+        response.end();
+      },
+      "/paid": x402Route(x402Header([option()])),
+    });
+    const { code, stdout, stderr } = await init({ url: `${wall.base}/hop` });
+    assert.equal(code, 2);
+    assert.ok(!existsSync(configFile()), "a config was written");
+    assert.match(stderr, /redirected once inside its origin, to a URL whose query carries the parameter "access_token", which is named like a credential/);
+    assert.ok(!`${stdout}${stderr}`.includes("made-up-token-0001"), "the value was printed");
+  });
+});
+
 describe("wasit init: adding a route that was read to an existing config", () => {
   it("adds to an environment without a pin, and says it adds none", async () => {
     const wall = await serve({ "/a": x402Route(x402Header([option()])), "/b": x402Route(x402Header([option()])) });

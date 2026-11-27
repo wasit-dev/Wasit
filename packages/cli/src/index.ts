@@ -481,9 +481,11 @@ An existing config is added to (one more endpoint), never overwritten: --force
 replaces it. A route the config already has exactly as given, in the same
 environment, is left as it is, so init can run again (to set up its key, say).
 Mainnet is not written in this version, and neither is a header of
-the route: send a credential in a WASIT_HEADER_<NAME> variable. After writing,
-init prints what it read from your service, what you gave, what it filled in by
-default and what it did not read, then the next command.
+the route: send a credential in a WASIT_HEADER_<NAME> variable. A URL whose query
+has a parameter named like a credential (api_key, token, sig), given with --url or
+reached by the redirect, is refused. After writing, init prints what it read from
+your service, what you gave, what it filled in by default and what it did not read,
+then the next command.
 
 Key setup (Stellar testnet only; --setup-keys, or a yes at a terminal), after
 the config is written: first it checks that git will not commit .env (not

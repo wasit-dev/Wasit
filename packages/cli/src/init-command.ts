@@ -177,6 +177,49 @@ function errorCode(error: unknown): string {
   return typeof code === "string" ? code : "an error";
 }
 
+/** Words of a query parameter's name that say it carries a credential (`api_key`, `access_token`, `X-Amz-Signature`, `sig`). */
+const CREDENTIAL_WORDS: ReadonlySet<string> = new Set([
+  "key",
+  "apikey",
+  "token",
+  "secret",
+  "password",
+  "passwd",
+  "pwd",
+  "auth",
+  "authorization",
+  "credential",
+  "credentials",
+  "signature",
+  "sig",
+  "session",
+  "sessionid",
+  "sid",
+  "cookie",
+  "jwt",
+  "bearer",
+]);
+
+/** The loader's pattern for a key that names a secret (config.ts, FORBIDDEN_KEYS), on a name with its separators removed. */
+const SECRET_NAME = /secret|privatekey|payerkey|commitment|passw|mnemonic|seed|apikey|accesskey|token|credential|signingkey|signer/;
+
+/**
+ * The first query parameter of `url` named like a credential, or undefined.
+ * The config is committed and its paths are printed in reports, so such a
+ * query is not written. Only the name is read, never the value.
+ */
+function credentialParameter(url: URL): string | undefined {
+  for (const name of url.searchParams.keys()) {
+    const words = name
+      .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((word) => word !== "");
+    if (words.some((word) => CREDENTIAL_WORDS.has(word)) || SECRET_NAME.test(words.join(""))) return name;
+  }
+  return undefined;
+}
+
 /** The route's URL: http(s), no credentials, no fragment. The value typed is never echoed: it may hold a credential. */
 function routeUrl(value: string | undefined): URL {
   if (value === undefined || value.trim() === "") {
@@ -202,6 +245,14 @@ function routeUrl(value: string | undefined): URL {
   }
   if (url.hash !== "") {
     refuse("--url carries a fragment (#...), which is never sent to a service. Leave it out. Nothing was written.");
+  }
+  const parameter = credentialParameter(url);
+  if (parameter !== undefined) {
+    refuse(
+      `--url carries the query parameter ${shown(parameter)}, which is named like a credential. The config is committed ` +
+        "and its paths are printed in reports: send a credential in a WASIT_HEADER_* variable instead. Nothing was sent " +
+        "and nothing was written.",
+    );
   }
   return url;
 }
@@ -576,6 +627,14 @@ async function routeFromReading(
   );
   const answered = new URL(reading.url);
   if (answered.href !== url.href) {
+    const parameter = credentialParameter(answered);
+    if (parameter !== undefined) {
+      refuse(
+        `init sent ${sent}. The route redirected once inside its origin, to a URL whose query carries the parameter ` +
+          `${shown(parameter)}, which is named like a credential: init does not write it into the config, which is ` +
+          "committed. Nothing was written.",
+      );
+    }
     account.read.push(`the route redirected once inside its origin, to ${answered.pathname}${answered.search}: init wrote that path`);
   }
   if (wanted.protocol !== undefined) account.given.push(`protocol: ${wanted.protocol}`);
