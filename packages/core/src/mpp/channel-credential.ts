@@ -10,7 +10,8 @@
  */
 
 import { Challenge, Credential } from "mppx";
-import { MalformedResponseError, fetchTarget } from "../errors.js";
+import { CheckSetupError, MalformedResponseError, fetchTarget } from "../errors.js";
+import { shown } from "../guard/budget.js";
 import { signChannelCommitment } from "./channel-commitment.js";
 import { networkPassphrase, resolveRpcUrl } from "./network.js";
 import { assertPaymentNetworkAllowed } from "../guard/networks.js";
@@ -158,16 +159,39 @@ export interface BuildChannelCredentialParams {
   readonly network: string;
   readonly rpcUrl?: string;
   readonly action?: ChannelAction;
+  /**
+   * The only channel a commitment may be signed for (`wasit run`: the config's
+   * `channel`). A challenge that names another channel gets no signature.
+   */
+  readonly onlyChannel?: string;
+}
+
+/**
+ * A challenge names another channel than the one the run signs for. A setup
+ * error: the check that hit it has no verdict, and nothing was signed.
+ */
+export class OtherChannelRefusedError extends CheckSetupError {
+  public constructor(named: string, onlyChannel: string) {
+    super(
+      `The route's challenge names the channel ${shown(named)}, and this run signs commitments for its ` +
+        `configured channel ${onlyChannel} only. Nothing was signed.`,
+    );
+    this.name = "OtherChannelRefusedError";
+  }
 }
 
 /** Signs `amount` for this challenge's channel and serialises the credential. */
 export async function buildChannelCredential(
   parameters: BuildChannelCredentialParams,
 ): Promise<{ credential: string; signature: string }> {
-  const { challenge, amount, commitmentSecretHex, network, rpcUrl, action } = parameters;
+  const { challenge, amount, commitmentSecretHex, network, rpcUrl, action, onlyChannel } = parameters;
 
   // L0 at the signature itself, whoever calls it.
   assertPaymentNetworkAllowed("mpp-channel", network);
+  // The channel, at the signature too: the service may name another one in any fresh challenge.
+  if (onlyChannel !== undefined && challenge.channelContract !== onlyChannel) {
+    throw new OtherChannelRefusedError(challenge.channelContract, onlyChannel);
+  }
   const signature = await signChannelCommitment({
     channelContract: challenge.channelContract,
     amount,

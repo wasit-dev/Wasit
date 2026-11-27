@@ -82,6 +82,12 @@ export interface MppChannelCheckOptions {
   network: string;
   /** Overrides the default RPC endpoint for the network. */
   rpcUrl?: string;
+  /**
+   * The only channel a commitment is signed for (`wasit run`: the config's
+   * `channel`). A fresh challenge that names another gets no signature, and the
+   * check has no verdict.
+   */
+  onlyChannel?: string;
 }
 
 /**
@@ -152,7 +158,7 @@ interface AcceptedCommitment {
 async function advanceCumulative(
   options: MppChannelCheckOptions,
 ): Promise<AcceptedCommitment> {
-  const { target, commitmentSecretHex, network, rpcUrl } = options;
+  const { target, commitmentSecretHex, network, rpcUrl, onlyChannel } = options;
   const refusals: string[] = [];
 
   for (let attempt = 1; attempt <= SETUP_ATTEMPTS; attempt += 1) {
@@ -164,6 +170,7 @@ async function advanceCumulative(
       commitmentSecretHex,
       network,
       rpcUrl,
+      ...(onlyChannel === undefined ? {} : { onlyChannel }),
     });
 
     const submission = await submitCredential(target, credential);
@@ -204,7 +211,7 @@ export async function runMppChannelOrderingCheck(
 ): Promise<CheckResult[]> {
   const id = "MPP-11";
   const name = "Cumulative Commitment Ordering";
-  const { target, commitmentSecretHex, network, rpcUrl } = options;
+  const { target, commitmentSecretHex, network, rpcUrl, onlyChannel } = options;
   const refused = refusedNetwork(id, name, network);
   if (refused) return refused;
 
@@ -222,6 +229,7 @@ export async function runMppChannelOrderingCheck(
           commitmentSecretHex,
           network,
           rpcUrl,
+          ...(onlyChannel === undefined ? {} : { onlyChannel }),
         })
       ).credential,
     );
@@ -261,6 +269,7 @@ export async function runMppChannelOrderingCheck(
           commitmentSecretHex,
           network,
           rpcUrl,
+          ...(onlyChannel === undefined ? {} : { onlyChannel }),
         })
       ).credential,
     );
@@ -413,6 +422,7 @@ export async function runMppChannelCloseCheck(
     commitmentSecretHex,
     network,
     rpcUrl,
+    onlyChannel,
     expectedChannel,
     allowDestructive = false,
     closePollAttempts = 6,
@@ -488,6 +498,7 @@ export async function runMppChannelCloseCheck(
       network,
       rpcUrl,
       action: "close",
+      ...(onlyChannel === undefined ? {} : { onlyChannel }),
     });
 
     const closed = await submitCredential(target, credential);

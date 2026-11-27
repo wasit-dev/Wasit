@@ -42,6 +42,12 @@ export interface MppChannelSuiteOptions {
    * on two contracts at once.
    */
   readonly channelOverride?: string;
+  /**
+   * The only channel the checks sign commitments for (`wasit run` passes the
+   * config's `channel`): a challenge that names another gets no signature.
+   * Without it they sign for the channel each challenge names.
+   */
+  readonly onlyChannel?: string;
   readonly expected?: Partial<ChannelDeployExpectations>;
   readonly allowDestructive?: boolean;
   readonly destructiveChannel?: string;
@@ -166,6 +172,7 @@ export async function runMppChannelSuite(
     network,
     rpcUrl,
     channelOverride,
+    onlyChannel,
     expected,
     allowDestructive = false,
     destructiveChannel,
@@ -193,6 +200,7 @@ export async function runMppChannelSuite(
     commitmentSecretHex,
     network,
     ...(rpcUrl ? { rpcUrl } : {}),
+    ...(onlyChannel ? { onlyChannel } : {}),
   };
 
   // The target decides which channel it bills through, so its challenge — not

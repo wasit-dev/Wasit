@@ -22,14 +22,27 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, afterEach, before, beforeEach, describe, it } from "node:test";
 
-import { Keypair, Networks } from "@stellar/stellar-sdk";
+import { Keypair, Networks, StrKey } from "@stellar/stellar-sdk";
 import { Mppx, Store, charge } from "@stellar/mpp/charge/server";
+import { Challenge } from "mppx";
 import { setRpcIdentityTransportForTesting } from "@wasit-dev/core/dist/guard/rpc-identity.js";
 
 import { executeRun, type RunCommandOptions } from "../../src/run.js";
 
 const USDC_SAC = "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA";
 const RECIPIENT = Keypair.random().publicKey();
+/** The channel /other-channel bills through, and the one a config names instead. */
+const ADVERTISED_CHANNEL = StrKey.encodeContract(randomBytes(32));
+const CONFIGURED_CHANNEL = StrKey.encodeContract(randomBytes(32));
+const OTHER_CHANNEL_HEADER = Challenge.serialize(
+  Challenge.from({
+    id: "run-mpp-other-channel",
+    realm: "127.0.0.1",
+    method: "stellar",
+    intent: "channel",
+    request: { amount: "100", channel: ADVERTISED_CHANNEL, methodDetails: { network: "stellar:testnet" } },
+  }),
+);
 
 interface Target {
   readonly base: string;
@@ -73,6 +86,11 @@ async function target(): Promise<Target> {
     if (url.pathname === "/stream") {
       res.writeHead(402, { "content-type": "application/json" });
       res.end("{}");
+      return;
+    }
+    if (url.pathname === "/other-channel") {
+      res.writeHead(402, { "WWW-Authenticate": OTHER_CHANNEL_HEADER });
+      res.end();
       return;
     }
     res.end("free");
@@ -288,6 +306,19 @@ describe("wasit run, MPP", () => {
       }
       assert.equal(site.total(), 0);
       assert.equal(run1.code, 2);
+    });
+
+    it("signs commitments for the config's channel only: a route naming another gets none, and no verdict", async () => {
+      const endpoint = { name: "other", protocol: "mpp-channel", path: "/other-channel", channel: CONFIGURED_CHANNEL };
+      const run1 = await run({ config: await config([endpoint]) }, COMMITMENT);
+      assert.match(result(run1.report, "other", "MPP-10").detail, /Channel mismatch/);
+      for (const id of ["MPP-11", "MPP-12", "MPP-14"]) {
+        const entry = result(run1.report, "other", id);
+        assert.equal(entry.status, "ERROR", `${id}: ${entry.detail}`);
+        assert.match(entry.detail, new RegExp(`names the channel "${ADVERTISED_CHANNEL}", and this run signs commitments for its configured channel ${CONFIGURED_CHANNEL} only\\. Nothing was signed\\.`));
+      }
+      assert.equal(site.credentials.get("/other-channel") ?? 0, 0, "a commitment was sent");
+      assert.equal(rpc.calls(), 0, "a commitment was being prepared through the RPC");
     });
 
     it("uses the config's channel and expectations, never CHANNEL_CONTRACT", async () => {

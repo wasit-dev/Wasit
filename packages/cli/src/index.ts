@@ -385,11 +385,12 @@ not signed, and an authorization signed to outlive 300 s is not sent.
 MPP endpoints are paid in the payment tier on stellar:testnet only, by the same rules:
 MPP-01 (charge) with MPP_PAYER_SECRET, planned from its unpaid challenge and held to the
 same caps, in the same budget as x402; MPP-10, 11, 12 and 14 (channel) with
-COMMITMENT_SECRET_HEX, with the channel and its expected terms from the config. MPP-13
-(close) is never run by wasit run. The network and the channel come from the config:
-MPP_STELLAR_NETWORK and CHANNEL_CONTRACT are not read. An MPP endpoint is sent a plain
-GET: one with a method, a body or headers is not sent anything. A mainnet run pays its
-x402 endpoints only.
+COMMITMENT_SECRET_HEX, with the channel and its expected terms from the config: with a
+channel in the config, commitments are signed for it only, and a route whose challenge
+names another gets none. MPP-13 (close) is never run by wasit run. The network and the
+channel come from the config: MPP_STELLAR_NETWORK and CHANNEL_CONTRACT are not read. An
+MPP endpoint is sent a plain GET: one with a method, a body or headers is not sent
+anything. A mainnet run pays its x402 endpoints only.
 In CI (CI or GITHUB_ACTIONS set) a .env file in the working directory is not read.`,
   )
   .exitOverride(exitTwoOnUsageError)

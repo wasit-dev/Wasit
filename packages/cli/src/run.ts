@@ -304,8 +304,9 @@ async function runMppEndpoint(endpoint: ResolvedEndpoint, mpp: MppRun): Promise<
     commitmentSecretHex: own.key,
     network: mpp.network,
     ...rpc,
-    // The channel and its expected terms come from the config only, never from CHANNEL_CONTRACT.
-    ...(endpoint.channel === undefined ? {} : { channelOverride: endpoint.channel }),
+    // The channel and its expected terms come from the config only, never from CHANNEL_CONTRACT. With a
+    // channel in the config, MPP-11, 12 and 14 sign commitments for that channel only.
+    ...(endpoint.channel === undefined ? {} : { channelOverride: endpoint.channel, onlyChannel: endpoint.channel }),
     ...(endpoint.expect === undefined ? {} : { expected: endpoint.expect }),
     allowDestructive: false,
   });
