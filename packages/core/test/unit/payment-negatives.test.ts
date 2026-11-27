@@ -18,6 +18,8 @@ import { after, before, describe, it } from "node:test";
 import { generatePrivateKey } from "viem/accounts";
 
 import type { CheckResult } from "../../src/check.js";
+import { renderComment } from "../../src/ci-report.js";
+import { buildEndpointReport, buildRunReport } from "../../src/report.js";
 import {
   expiredVerdict,
   replayVerdict,
@@ -49,8 +51,17 @@ async function standIn(options: {
   asset?: string;
   /** settle-fail only: what its PAYMENT-RESPONSE claims. */
   settled?: boolean;
-}): Promise<{ url: string; received: Received[]; close: () => Promise<void> }> {
+  /**
+   * A single-use resource (spec B8): once a payment was accepted, every request,
+   * paid or not, is answered with this status. With `usedUpFromStart` it is
+   * used up before the run: the first request already gets it.
+   */
+  afterUse?: number;
+  usedUpFromStart?: boolean;
+}): Promise<{ url: string; received: Received[]; unpaidAfterUse: () => number; close: () => Promise<void> }> {
   const received: Received[] = [];
+  let used = options.usedUpFromStart === true;
+  let unpaidAfterUse = 0;
   const challenge = {
     x402Version: 2,
     resource: { url: "http://127.0.0.1/paid" },
@@ -72,6 +83,16 @@ async function standIn(options: {
   const header = Buffer.from(JSON.stringify(challenge)).toString("base64");
   const server = http.createServer((request, response) => {
     const paid = request.headers["payment-signature"];
+    if (options.afterUse !== undefined && used) {
+      if (typeof paid === "string") {
+        received.push({ raw: paid, payload: JSON.parse(Buffer.from(paid, "base64").toString("utf-8")), atSeconds: Math.floor(Date.now() / 1000) });
+      } else {
+        unpaidAfterUse += 1;
+      }
+      response.writeHead(options.afterUse);
+      response.end();
+      return;
+    }
     if (typeof paid !== "string") {
       response.writeHead(402, { "payment-required": header });
       response.end();
@@ -103,12 +124,14 @@ async function standIn(options: {
     }
     response.writeHead(options.mode === "accept" ? 200 : 402);
     response.end();
+    if (options.mode === "accept") used = true;
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const { port } = server.address() as { port: number };
   return {
     url: `http://127.0.0.1:${port}/paid`,
     received,
+    unpaidAfterUse: () => unpaidAfterUse,
     close: () => new Promise((resolve) => server.close(() => resolve())),
   };
 }
@@ -495,6 +518,110 @@ describe("when a negative check has nothing to test, under the plan of wasit run
       assert.match(r["X402-09"]?.skipReason ?? "", /1 base unit/);
       // honest, replay, corrupted, expired: no underpayment was sent.
       assert.equal(target.received.length, 4);
+    } finally {
+      await target.close();
+    }
+  });
+});
+
+describe('a single-use resource: "resource consumed" (spec B8)', () => {
+  const REJECT = { headers: { "x-quote-lang": "xx" } };
+
+  it("skips each check that needs a new challenge once one drew a 409, runs the replay, and signs nothing more", async () => {
+    const target = await standIn({ mode: "accept", afterUse: 409 });
+    try {
+      const results = await runX402PaymentChecks({
+        target: target.url,
+        network: NETWORK,
+        payerSecretKey: generatePrivateKey(),
+        rpcUrl: funded.url,
+        reject: REJECT,
+      });
+      const r = byId(results);
+      assert.deepEqual(results.map((result) => result.id), ["X402-06", "X402-07", "X402-08", "X402-09", "X402-10", "X402-11"]);
+      for (const id of ["X402-07", "X402-09", "X402-10", "X402-11"]) {
+        assert.equal(r[id]?.skipped, true, id);
+        assert.equal(r[id]?.skipKind, "resource-consumed", id);
+        assert.match(r[id]!.detail, /^Skipped: resource consumed: the route answered 409 to a new request after X402-06's payment was accepted, a single-use resource/, id);
+        assert.equal(r[id]?.error, undefined, `${id} is not a harness error`);
+      }
+      // The replay needs no new challenge: it still runs, and a 409 to it is a refusal.
+      assert.equal(r["X402-08"]?.skipped, undefined);
+      assert.equal(r["X402-08"]?.pass, true);
+      // Signed and sent: the honest payment and its replay, byte for byte; nothing for X402-07, 09, 10 or 11.
+      assert.equal(target.received.length, 2);
+      assert.equal(target.received[1]?.raw, target.received[0]?.raw);
+      // One new challenge was asked for (by X402-07); none after it.
+      assert.equal(target.unpaidAfterUse(), 1);
+    } finally {
+      await target.close();
+    }
+  });
+
+  it('the comment of such a run says "Resource consumed" in its details, and still grades the endpoint', async () => {
+    const target = await standIn({ mode: "accept", afterUse: 409 });
+    try {
+      const results = await runX402PaymentChecks({
+        target: target.url,
+        network: NETWORK,
+        payerSecretKey: generatePrivateKey(),
+        rpcUrl: funded.url,
+      });
+      const endpoint = buildEndpointReport({ name: "single-use", protocol: "x402", method: "GET", path: "/paid", results });
+      assert.ok(endpoint.outcome === "conformant" || endpoint.outcome === "non-conformant", `graded, not ${endpoint.outcome}`);
+      const comment = renderComment({
+        report: buildRunReport({
+          environment: "local",
+          network: NETWORK,
+          startedAt: "2026-11-27T10:00:00.000Z",
+          versions: {
+            wasit: { cli: "0.8.0", core: "0.8.0" },
+            sdk: { x402Version: 2, "@x402/core": "2.28.0", "@x402/stellar": "2.28.0", "@stellar/mpp": "0.7.1", mppx: "0.8.14", "@stellar/stellar-sdk": "16.1.0" },
+          },
+          endpoints: [endpoint],
+          notes: [],
+        }),
+      });
+      assert.match(comment, /X402-07 Invalid Signature Rejected: Skipped: resource consumed: the route answered 409/);
+      assert.doesNotMatch(comment, /could not run/, "no check is a harness error");
+    } finally {
+      await target.close();
+    }
+  });
+
+  it("a resource used up before the run: X402-06 says 409 and pays nothing, and so do the negative checks", async () => {
+    const target = await standIn({ mode: "accept", afterUse: 409, usedUpFromStart: true });
+    try {
+      const results = await runX402PaymentChecks({
+        target: target.url,
+        network: NETWORK,
+        payerSecretKey: generatePrivateKey(),
+        rpcUrl: funded.url,
+      });
+      const r = byId(results);
+      assert.equal(r["X402-06"]?.skipped, true);
+      assert.match(r["X402-06"]!.detail, /answered 409 instead of a 402 challenge: a single-use resource that is already used up/);
+      for (const id of ["X402-07", "X402-08", "X402-09", "X402-10", "X402-11"]) assert.equal(r[id]?.skipped, true, id);
+      assert.equal(target.received.length, 0, "nothing was signed or sent");
+    } finally {
+      await target.close();
+    }
+  });
+
+  it("another status after the payment (500) is not called resource consumed", async () => {
+    const target = await standIn({ mode: "accept", afterUse: 500 });
+    try {
+      const results = await runX402PaymentChecks({
+        target: target.url,
+        network: NETWORK,
+        payerSecretKey: generatePrivateKey(),
+        rpcUrl: funded.url,
+      });
+      const r = byId(results);
+      assert.notEqual(r["X402-07"]?.skipKind, "resource-consumed");
+      assert.ok(r["X402-07"]?.error !== undefined, "an unreadable challenge stays a harness error, as before");
+      assert.notEqual(r["X402-09"]?.skipKind, "resource-consumed");
+      assert.ok(target.unpaidAfterUse() > 1, "the later checks still asked for their own challenge");
     } finally {
       await target.close();
     }

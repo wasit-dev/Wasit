@@ -33,6 +33,13 @@ All notable changes to Wasit are recorded here. Versions follow [Semantic Versio
   and the FAIL says whether the chain shows the offered amount moved from the
   payer to `payTo`. The verdict is the same FAIL; a chain that gives no answer
   leaves it as it was.
+- A single-use resource, which answers a new request with 409 once
+  `X402-06`'s payment was served, no longer turns `X402-07`, `09`, `10` and
+  `11` into `ERROR (harness)` ("the challenge could not be read"). They are
+  SKIP with the reason "resource consumed" (`skipKind: "resource-consumed"`),
+  nothing is signed for them, and the route is not asked again after its 409.
+  `X402-08` still runs. A 409 before any payment of the run skips `X402-06`
+  with that reason instead of calling the challenge unreadable.
 - A payment run on Stellar refuses an `http://` RPC (`rpcUrl` in the config,
   `WASIT_RPC_URL`, `--rpc-url`, the MCP tools' `rpcUrl`) before anything is
   sent, and `wasit run` refuses it before it starts the service: the x402

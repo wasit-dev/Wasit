@@ -31,6 +31,7 @@ FIXTURES=(
   "x402-svm:3007:packages/core/test/fixtures/x402-svm-server.ts"
   "x402-sepolia:3008:packages/core/test/fixtures/x402-evm-sepolia-server.ts"
   "x402-reject:3009:packages/core/test/fixtures/x402-reject-server.ts"
+  "x402-single-use:3010:packages/core/test/fixtures/x402-single-use-server.ts"
 )
 
 field() { echo "$1" | cut -d: -f"$2"; }
@@ -120,6 +121,7 @@ cmd_start() {
   echo "  x402-svm http://localhost:3007/protected   (Solana devnet, needs SVM_PAYEE_ADDRESS)"
   echo "  x402-sepolia http://localhost:3008/protected   (Ethereum Sepolia, own facilitator, needs EVM_FACILITATOR_PRIVATE_KEY)"
   echo "  x402-reject http://localhost:3009/refuses, /settles-then-refuses, /serves   (X402-11; invalid = header x-wasit-invalid)"
+  echo "  x402-single-use http://localhost:3010/protected   (sold once, then 409: \"resource consumed\"; restart to reset)"
 }
 
 cmd_stop() {

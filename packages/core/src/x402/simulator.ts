@@ -484,6 +484,35 @@ class PaymentNotAttemptedError extends Error {
 }
 
 /**
+ * The route answered 409 where a 402 challenge was asked for: a single-use
+ * resource that a payment has used up (spec B8). Nothing is paid for it.
+ * Before any payment of the run it is one more reason no payment was attempted
+ * (X402-06 and the plan read it so); after X402-06's payment was accepted the
+ * negative checks that need a new challenge are skipped as "resource consumed".
+ */
+class ResourceConsumedError extends PaymentNotAttemptedError {
+  public constructor() {
+    super(
+      "the target answered 409 instead of a 402 challenge: a single-use resource that is already used up, so no " +
+        "payment was attempted (see X402-01).",
+    );
+    this.name = "ResourceConsumedError";
+  }
+}
+
+/** The status a single-use resource answers once it is used up (spec B8). */
+const RESOURCE_CONSUMED_STATUS = 409;
+
+/** The one negative check that needs no new challenge: it sends X402-06's payment again. */
+const REPLAY_CHECK = "X402-08";
+
+/** Why a negative check is skipped once a new challenge drew a 409 after X402-06's payment was accepted. */
+const RESOURCE_CONSUMED_REASON =
+  "resource consumed: the route answered 409 to a new request after X402-06's payment was accepted, a single-use resource that the " +
+  "payment used up, so this check has no new challenge to pay, and nothing was signed for it. X402-08, the replay, " +
+  "needs no new challenge and still runs.";
+
+/**
  * No payment adapter pays on this network, so the payment checks cannot be
  * graded here. A `ConfigurationError`, so a caller that does not know the class
  * still reads it as no verdict; preflight turns it into a skip of kind
@@ -614,6 +643,11 @@ export async function readPaymentChallenge(options: RequestShape & { readonly ta
 /** The terms of a challenge already fetched, by the rules of {@link readPaymentChallenge}. */
 async function paymentTerms(challenge: Response, network: string) {
   const options = { network };
+  // B8: a single-use resource answers 409 once it is used up. Said as that, before its headers are read as a challenge.
+  if (challenge.status === RESOURCE_CONSUMED_STATUS) {
+    await challenge.body?.cancel().catch(() => undefined);
+    throw new ResourceConsumedError();
+  }
   let paymentRequired;
   try {
     paymentRequired = new x402HTTPClient(new x402Client()).getPaymentRequiredResponse((name) =>
@@ -1986,6 +2020,10 @@ export async function runX402PaymentChecks(
     );
   }
 
+  // B8: once a new challenge drew a 409, the resource is used up: every later
+  // check that needs one is skipped as "resource consumed" without asking again,
+  // and the replay, which needs none, still runs.
+  let consumed = false;
   for (const [id, name, run] of NEGATIVE_CHECKS) {
     // B3: once a mainnet run is stopped, nothing more is signed in it.
     const stopped = stopReason(options.mainnet);
@@ -1993,9 +2031,18 @@ export async function runX402PaymentChecks(
       emit(skipped(id, name, stopped));
       continue;
     }
+    if (consumed && id !== REPLAY_CHECK) {
+      emit(skipped(id, name, RESOURCE_CONSUMED_REASON, "resource-consumed"));
+      continue;
+    }
     try {
       emit(await run(options, honest));
     } catch (error) {
+      if (error instanceof ResourceConsumedError) {
+        consumed = true;
+        emit(skipped(id, name, RESOURCE_CONSUMED_REASON, "resource-consumed"));
+        continue;
+      }
       emit(errored(id, name, error));
     }
   }

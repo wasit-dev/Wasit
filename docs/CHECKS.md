@@ -40,6 +40,17 @@ from a target that accepts a valid payment: one that refuses everything would pa
 all. So they run only after `X402-06`'s valid payment was answered with a 2xx, and are
 **skipped** otherwise, with that reason. They run in catalogue order after `X402-06`.
 
+**Note on single-use resources (0.8.0).** Some resources can be bought once: after
+`X402-06`'s payment is served, the route answers a new request with 409 instead of a new
+402. The checks that need a new challenge to pay (`X402-07`, `09`, `10` and `11`) then
+have nothing to sign, so they are **skipped** with the reason "resource consumed"
+(`skipKind: "resource-consumed"`), not reported as an error: nothing is signed or paid
+for them, and Wasit does not ask the route again once it has answered 409. `X402-08`
+needs no new challenge (it sends `X402-06`'s payment again), so it still runs, and a
+409 to the replay is a refusal like any other. A route that answers 409 before any
+payment of the run (used up earlier) gets no payment at all: `X402-06` is skipped with
+that reason, and `X402-01` already reports the status.
+
 **Note on settlement timing (0.7.0).** There is no check that a target settles before it
 serves, because the protocol does not require it. x402 v2's default `authorization` flow
 is verify, run the resource, settle, then respond (spec §6.1); only a flow declared as
