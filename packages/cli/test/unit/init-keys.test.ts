@@ -10,7 +10,7 @@
 
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -205,6 +205,7 @@ describe("key setup: a new x402 payer", () => {
     assertNoSecret("the output", text, secret);
     assert.match(text, new RegExp(`STELLAR_PRIVATE_KEY: new, written to \\.env \\(the secret is not shown\\), address ${address}`));
     assert.match(text, /\.env is ignored by git and not tracked/);
+    assert.doesNotMatch(text, /open to other users/);
     assert.match(text, /XLM: {7}ready, 9990\.0000000 XLM/);
     assert.match(text, /trustline: ready/);
     assert.match(text, /USDC: {6}ready, 8\.8123456 USDC/);
@@ -227,6 +228,39 @@ describe("key setup: a new x402 payer", () => {
     const w = world(repo());
     await setUp(w.deps);
     assert.equal(readFileSync(envPath(), "utf-8"), `${before}\r\nSTELLAR_PRIVATE_KEY=${w.made[0]}\r\n`);
+  });
+
+  it("an existing .env others can read: the key is added, the mode is kept, and the chmod that closes it is said", { skip: process.platform === "win32" }, async () => {
+    writeFileSync(envPath(), "PORT=4402\n");
+    chmodSync(envPath(), 0o644);
+    const w = world(repo());
+    const { text } = await setUp(w.deps);
+    assert.match(readFileSync(envPath(), "utf-8"), /^PORT=4402\nSTELLAR_PRIVATE_KEY=S[A-Z2-7]{55}\n$/);
+    assert.equal(lstatSync(envPath()).mode & 0o777, 0o644);
+    assert.match(
+      text,
+      /^ {2}\.env is open to other users of this computer \(mode 644\), and it now holds the key: chmod 600 \.env makes it yours only\. init leaves the file's permissions as they are\.$/m,
+    );
+    // Said right after the key line, before anything is funded.
+    const keyLine = text.split("\n").findIndex((line) => line.includes("new, written to .env"));
+    assert.match(text.split("\n")[keyLine + 1] ?? "", /open to other users/);
+    assertNoSecret("the output", text, w.made[0]!);
+  });
+
+  it("an existing .env that is the owner's only: nothing to say", { skip: process.platform === "win32" }, async () => {
+    writeFileSync(envPath(), "PORT=4402\n");
+    chmodSync(envPath(), 0o600);
+    const w = world(repo());
+    const { text } = await setUp(w.deps);
+    assert.ok(w.calls.includes("generate"));
+    assert.doesNotMatch(text, /open to other users/);
+  });
+
+  it("group access alone (mode 620) is said as well", { skip: process.platform === "win32" }, async () => {
+    writeFileSync(envPath(), "PORT=4402\n");
+    chmodSync(envPath(), 0o620);
+    const { text } = await setUp(world(repo()).deps);
+    assert.match(text, /open to other users of this computer \(mode 620\)/);
   });
 
   it("an MPP charge route: MPP_PAYER_SECRET, and its own wallet role in the hints", async () => {
@@ -270,12 +304,93 @@ describe("key setup: reuse, never overwrite (C4 step 2)", () => {
   });
 });
 
+describe("key setup: a variable set to nothing in the environment hides .env (dotenv never replaces it)", () => {
+  const UNSET = "bash or zsh: unset STELLAR_PRIVATE_KEY; PowerShell: Remove-Item Env:STELLAR_PRIVATE_KEY";
+
+  for (const empty of ["", "   "]) {
+    it(`set to ${JSON.stringify(empty)} and not in .env: no key is made, and it says to unset it first`, async () => {
+      const w = world(repo());
+      const { text } = await setUp(w.deps, { env: { STELLAR_PRIVATE_KEY: empty } });
+      assert.ok(!w.calls.includes("generate") && !w.calls.includes("fund"));
+      assert.ok(!existsSync(envPath()));
+      assert.match(
+        text,
+        /STELLAR_PRIVATE_KEY: set to nothing in the environment init runs in \(your shell, most likely\), and init wrote none: \.env never replaces a variable that is set, and wasit run reads an empty one as no key\./,
+      );
+      assert.ok(text.includes(`Once STELLAR_PRIVATE_KEY is unset there (${UNSET}), by hand: wasit wallet create --role x402 --fund`), text);
+    });
+  }
+
+  it("set to nothing, with a value in .env: .env is not changed, and it says the empty one wins", async () => {
+    const kept = Keypair.random().secret();
+    writeFileSync(envPath(), `STELLAR_PRIVATE_KEY=${kept}\n`);
+    const w = world(repo());
+    const { text } = await setUp(w.deps, { env: { STELLAR_PRIVATE_KEY: "" } });
+    assert.equal(readFileSync(envPath(), "utf-8"), `STELLAR_PRIVATE_KEY=${kept}\n`);
+    assert.ok(!w.calls.includes("generate") && !w.calls.includes("status"));
+    assert.ok(text.includes(`STELLAR_PRIVATE_KEY: in .env, and set to nothing in the environment init runs in (your shell, most likely), which wins: wasit run reads that as no key. Unset it there (${UNSET}); init does not change .env.`), text);
+    assertNoSecret("the output", text, kept);
+  });
+
+  it("set to nothing, and .env names it with no value too: said as the line without a value", async () => {
+    writeFileSync(envPath(), "STELLAR_PRIVATE_KEY=\n");
+    const w = world(repo());
+    const { text } = await setUp(w.deps, { env: { STELLAR_PRIVATE_KEY: "" } });
+    assert.match(text, /in \.env without a value: init does not change it/);
+    assert.doesNotMatch(text, /set to nothing/);
+    assert.ok(!w.calls.includes("generate"));
+  });
+
+  it("set to nothing, and .env tracked: the by-hand way names both things to fix first", async () => {
+    const w = world(repo({ tracked: true }));
+    const { text } = await setUp(w.deps, { env: { STELLAR_PRIVATE_KEY: "" } });
+    assert.ok(text.includes(`Once .env is untracked and ignored, and STELLAR_PRIVATE_KEY is unset there (${UNSET}), by hand: `), text);
+    assert.ok(!existsSync(envPath()) && !w.calls.includes("generate"));
+  });
+
+  it("an MPP charge payer set to nothing: its own variable is named", async () => {
+    const w = world(repo());
+    const { text } = await setUp(w.deps, { protocol: "mpp-charge", env: { MPP_PAYER_SECRET: "" } });
+    assert.match(text, /MPP_PAYER_SECRET: set to nothing in the environment init runs in/);
+    assert.match(text, /Once MPP_PAYER_SECRET is unset there \(bash or zsh: unset MPP_PAYER_SECRET; PowerShell: Remove-Item Env:MPP_PAYER_SECRET\), by hand: wasit wallet create --role mpp-charge/);
+    assert.ok(!existsSync(envPath()) && !w.calls.includes("generate"));
+  });
+
+  it("an MPP channel key set to nothing and not in .env: unset it, then which key belongs in .env", async () => {
+    const w = world(repo());
+    const { text } = await setUp(w.deps, { protocol: "mpp-channel", channel: CHANNEL, env: { COMMITMENT_SECRET_HEX: "" } });
+    assert.ok(
+      text.includes(
+        "COMMITMENT_SECRET_HEX: set to nothing in the environment init runs in (your shell, most likely), and init wrote none: " +
+          ".env never replaces a variable that is set, and wasit run reads an empty one as no key. Unset it there (bash or zsh: " +
+          "unset COMMITMENT_SECRET_HEX; PowerShell: Remove-Item Env:COMMITMENT_SECRET_HEX), then put in .env the secret (64 hex " +
+          `characters) of the commitment key channel ${CHANNEL} was opened with.`,
+      ),
+      text,
+    );
+    assert.ok(!existsSync(envPath()));
+  });
+
+  it("an MPP channel key set to nothing, with a value in .env: .env is not changed, and the value is in no output", async () => {
+    const hex = "cd".repeat(32);
+    writeFileSync(envPath(), `COMMITMENT_SECRET_HEX=${hex}\n`);
+    const { text } = await setUp(world(repo()).deps, { protocol: "mpp-channel", channel: CHANNEL, env: { COMMITMENT_SECRET_HEX: "" } });
+    assert.match(text, /COMMITMENT_SECRET_HEX: in \.env, and set to nothing in the environment init runs in \(your shell, most likely\), which wins/);
+    assert.equal(readFileSync(envPath(), "utf-8"), `COMMITMENT_SECRET_HEX=${hex}\n`);
+    assert.ok(!text.includes(hex));
+  });
+});
+
 describe("key setup: .env protection comes first (C4 step 1, C7 row 2)", () => {
   it("a tracked .env gets no key, and the line to untrack it", async () => {
     const w = world(repo({ tracked: true }));
     const { text } = await setUp(w.deps);
     assert.match(text, /\.env is tracked by git.*git rm --cached \.env/);
-    assert.match(text, /STELLAR_PRIVATE_KEY: not set, and init wrote none\. By hand: wasit wallet create --role x402 --fund/);
+    // The by-hand way names what must be fixed first, so it does not send the key into a tracked .env.
+    assert.match(
+      text,
+      /STELLAR_PRIVATE_KEY: not set, and init wrote none\. Once \.env is untracked and ignored, by hand: wasit wallet create --role x402 --fund/,
+    );
     assert.ok(!w.calls.includes("generate"));
     assert.ok(!existsSync(envPath()));
   });
@@ -284,6 +399,7 @@ describe("key setup: .env protection comes first (C4 step 1, C7 row 2)", () => {
     const w = world(repo({ ignored: false }));
     const { text } = await setUp(w.deps, { allowGitignore: async () => false });
     assert.match(text, /\.env is not ignored by git, and \.gitignore was left as it is/);
+    assert.match(text, /not set, and init wrote none\. Once git ignores \.env, by hand: wasit wallet create/);
     assert.ok(!existsSync(gitignorePath()) && !existsSync(envPath()));
     assert.ok(!w.calls.includes("generate"));
   });
@@ -318,6 +434,7 @@ describe("key setup: .env protection comes first (C4 step 1, C7 row 2)", () => {
     const w = world(gitMissing);
     const { text } = await setUp(w.deps);
     assert.match(text, /git could not say whether \.env is tracked or ignored/);
+    assert.match(text, /Once git can tell that \.env is ignored and not tracked, by hand: /);
     assert.ok(!existsSync(envPath()) && !w.calls.includes("generate"));
   });
 
@@ -344,7 +461,16 @@ describe("key setup: .env protection comes first (C4 step 1, C7 row 2)", () => {
     const w = world(repo());
     const { text } = await setUp(w.deps, { env: { DOTENV_CONFIG_PATH: "/somewhere/.env" } });
     assert.match(text, /DOTENV_CONFIG_PATH is set/);
+    assert.match(text, /By hand: .*put its STELLAR_PRIVATE_KEY line in the file DOTENV_CONFIG_PATH names \(keep that file out of git\)/);
     assert.ok(!existsSync(envPath()) && w.calls.length === 0);
+  });
+
+  it("DOTENV_CONFIG_PATH set and the variable empty: the other file is the reason, not the shell", async () => {
+    const w = world(repo());
+    const { text } = await setUp(w.deps, { env: { DOTENV_CONFIG_PATH: "/somewhere/.env", STELLAR_PRIVATE_KEY: "" } });
+    assert.match(text, /DOTENV_CONFIG_PATH is set/);
+    assert.doesNotMatch(text, /set to nothing/);
+    assert.ok(!existsSync(envPath()) && !w.calls.includes("generate"));
   });
 
   it(".env that is a link: no key, and the file it points to is not changed", { skip: process.platform === "win32" }, async () => {
@@ -600,6 +726,15 @@ describe("wasit init with the key setup", () => {
     assert.ok(!w.calls.includes("generate"));
     assertNoSecret("stdout", stdout, canary);
     assertNoSecret("stderr", stderr, canary);
+  });
+
+  it("--setup-keys with the payer variable set to nothing: the config is written, no key, exit 0", async () => {
+    const w = world(repo());
+    const { code, stdout } = await init({ setupKeys: true }, w.deps, { env: { STELLAR_PRIVATE_KEY: "" } });
+    assert.equal(code, 0);
+    assert.ok(existsSync(path.join(dir, "wasit.config.json")));
+    assert.ok(!existsSync(envPath()) && !w.calls.includes("generate"));
+    assert.match(stdout, /STELLAR_PRIVATE_KEY: set to nothing in the environment init runs in/);
   });
 
   it("--setup-keys on another test network: the faucet and the variable, nothing touched", async () => {

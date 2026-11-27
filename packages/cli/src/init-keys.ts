@@ -17,10 +17,15 @@
  *    same. In a repository git cannot answer for: no key. `DOTENV_CONFIG_PATH`
  *    set: no key, since wasit then reads another file.
  * 3. Reuse, never overwrite. A variable that is set is kept, and its account is
- *    only read. One that `.env` has without a value is left as it is.
+ *    only read. One that `.env` has without a value is left as it is. One set
+ *    to nothing in the environment init runs in hides `.env` from `wasit run`
+ *    (dotenv never replaces a variable that is set, and run reads an empty one
+ *    as no key): that is said, and no key is made.
  * 4. A new key is made in memory and appended to `.env`: created readable by
  *    its owner only, never through a link, never rewritten, the file's own
- *    line ending kept. It is read back, and only then funded: Friendbot, then
+ *    line ending kept. An existing `.env` keeps its permissions; one open to
+ *    other users is said, with the `chmod` that closes it. It is read back,
+ *    and only then funded: Friendbot, then
  *    the trustline and test USDC by a swap on the public test exchange. A step
  *    that fails is said with the command that finishes it later, and the rest
  *    goes on: the read-only checks need none of it.
@@ -158,11 +163,20 @@ function errorCode(error: unknown): string {
   return typeof code === "string" ? code : "an error";
 }
 
+/** Where a payer set up by hand goes, and what must be true before it goes there. */
+interface HandSetup {
+  /** What must be done first, as the start of a sentence ("Once git ignores .env"). */
+  readonly first?: string;
+  /** The file the key line goes in: `.env` when not given. */
+  readonly file?: string;
+}
+
 /** How to set up a payer by hand, with the commands that exist today. */
-function byHand(role: Extract<Role, { kind: "payer" }>): string {
+function byHand(role: Extract<Role, { kind: "payer" }>, hand: HandSetup = {}): string {
   return (
-    `By hand: wasit wallet create --role ${role.walletRole} --fund makes a testnet key and prints it (not on a shared ` +
-    `screen); put its ${role.variable} line in .env, then run wasit wallet fund --role ${role.walletRole} --asset usdc.`
+    `${hand.first === undefined ? "By hand" : `${hand.first}, by hand`}: wasit wallet create --role ${role.walletRole} ` +
+    `--fund makes a testnet key and prints it (not on a shared screen); put its ${role.variable} line in ` +
+    `${hand.file ?? ENV_FILE}, then run wasit wallet fund --role ${role.walletRole} --asset usdc.`
   );
 }
 
@@ -214,14 +228,18 @@ export function otherNetworkLines(network: string, protocol: RouteProtocol): str
   ];
 }
 
-/** Whether `.env` may get a key, and what was done to make sure. */
+/** Whether `.env` may get a key, and what was done to make sure; when it may not, how a key is set up by hand. */
 type Protection =
   | { readonly writable: true; readonly lines: readonly string[] }
-  | { readonly writable: false; readonly lines: readonly string[]; readonly why: string };
+  | { readonly writable: false; readonly lines: readonly string[]; readonly why: string; readonly hand: HandSetup };
 
-function blocked(why: string, lines: readonly string[] = []): Protection {
-  return { writable: false, lines, why };
+function blocked(why: string, hand: HandSetup, lines: readonly string[] = []): Protection {
+  return { writable: false, lines, why, hand };
 }
+
+/** What must be true before a key goes into `.env` by hand, for each reason init wrote none. */
+const ONCE_GIT_ANSWERS: HandSetup = { first: "Once git can tell that .env is ignored and not tracked" };
+const ONCE_IGNORED: HandSetup = { first: "Once git ignores .env" };
 
 /** A `.git` in this folder or a folder above it: a repository, whether or not git runs. */
 function inRepositoryFolder(cwd: string): boolean {
@@ -278,17 +296,23 @@ function gitignoreListsEnv(cwd: string): boolean {
 async function protectEnv(request: KeySetupRequest, deps: KeySetupDeps): Promise<Protection> {
   const { cwd } = request;
   if ((request.env["DOTENV_CONFIG_PATH"] ?? "").trim() !== "") {
-    return blocked("DOTENV_CONFIG_PATH is set, so wasit reads its keys from that file and not from .env here");
+    return blocked("DOTENV_CONFIG_PATH is set, so wasit reads its keys from that file and not from .env here", {
+      file: "the file DOTENV_CONFIG_PATH names (keep that file out of git)",
+    });
   }
   const gitFailed =
     "this folder is in a git repository, and git could not say whether .env is tracked or ignored (is git installed?)";
 
   const inside = await deps.git(["rev-parse", "--is-inside-work-tree"], cwd);
   if (inside.code !== 0 || inside.stdout.trim() !== "true") {
-    if (inRepositoryFolder(cwd)) return blocked(gitFailed);
+    if (inRepositoryFolder(cwd)) return blocked(gitFailed, ONCE_GIT_ANSWERS);
     if (gitignoreListsEnv(cwd)) return { writable: true, lines: ["this folder is not a git repository; .gitignore lists .env"] };
     const problem = appendLine(path.join(cwd, GITIGNORE_FILE), ENV_FILE, 0o666);
-    if (problem !== undefined) return blocked(`this folder is not a git repository, and init could not add .env to .gitignore: ${problem}`);
+    if (problem !== undefined) {
+      return blocked(`this folder is not a git repository, and init could not add .env to .gitignore: ${problem}`, {
+        first: "Once .gitignore lists .env",
+      });
+    }
     return { writable: true, lines: ["this folder is not a git repository: init added .env to .gitignore all the same, for when it is one"] };
   }
 
@@ -297,37 +321,97 @@ async function protectEnv(request: KeySetupRequest, deps: KeySetupDeps): Promise
     return blocked(
       ".env is tracked by git, so a key in it would be committed. Untrack it (git rm --cached .env, then commit) and add " +
         ".env to .gitignore. A key it ever held is in the history: treat it as public",
+      { first: "Once .env is untracked and ignored" },
     );
   }
-  if (tracked.code !== 1) return blocked(gitFailed);
+  if (tracked.code !== 1) return blocked(gitFailed, ONCE_GIT_ANSWERS);
 
   const ignored = await deps.git(["check-ignore", "-q", "--", ENV_FILE], cwd);
   if (ignored.code === 0) return { writable: true, lines: [".env is ignored by git and not tracked"] };
-  if (ignored.code !== 1) return blocked(gitFailed);
+  if (ignored.code !== 1) return blocked(gitFailed, ONCE_GIT_ANSWERS);
 
   if (!(await request.allowGitignore())) {
-    return blocked(".env is not ignored by git, and .gitignore was left as it is: add .env to .gitignore first");
+    return blocked(".env is not ignored by git, and .gitignore was left as it is: add .env to .gitignore first", ONCE_IGNORED);
   }
   const problem = appendLine(path.join(cwd, GITIGNORE_FILE), ENV_FILE, 0o666);
-  if (problem !== undefined) return blocked(`.env is not ignored by git, and init could not add it to .gitignore: ${problem}`);
+  if (problem !== undefined) return blocked(`.env is not ignored by git, and init could not add it to .gitignore: ${problem}`, ONCE_IGNORED);
   const again = await deps.git(["check-ignore", "-q", "--", ENV_FILE], cwd);
   if (again.code !== 0) {
-    return blocked("init added .env to .gitignore, and git still does not ignore it (a rule such as !.env after it?)", [
+    return blocked("init added .env to .gitignore, and git still does not ignore it (a rule such as !.env after it?)", ONCE_IGNORED, [
       "init added .env to .gitignore",
     ]);
   }
   return { writable: true, lines: ["init added .env to .gitignore, and git now ignores it (commit that change)"] };
 }
 
-/** The names `.env` defines, values unread by the caller; or why it cannot be read. */
-function envFileNames(cwd: string): { readonly names: ReadonlySet<string> } | { readonly problem: string } {
+/** The names `.env` defines, and those of them it gives no value (values unread by the caller). */
+interface EnvFileNames {
+  readonly names: ReadonlySet<string>;
+  readonly empty: ReadonlySet<string>;
+}
+
+/** The names `.env` defines; or why it cannot be read. */
+function envFileNames(cwd: string): EnvFileNames | { readonly problem: string } {
   const file = path.join(cwd, ENV_FILE);
   try {
     if (!lstatSync(file).isFile()) return { problem: ".env is not a plain file (a link or a folder)" };
-    return { names: new Set(Object.keys(parseDotenv(readFileSync(file, "utf-8")))) };
+    const parsed = parseDotenv(readFileSync(file, "utf-8"));
+    const names = new Set(Object.keys(parsed));
+    return { names, empty: new Set([...names].filter((name) => (parsed[name] ?? "").trim() === "")) };
   } catch (error) {
-    if (errorCode(error) === "ENOENT") return { names: new Set() };
+    if (errorCode(error) === "ENOENT") return { names: new Set(), empty: new Set() };
     return { problem: `cannot read .env (${errorCode(error)})` };
+  }
+}
+
+/**
+ * Whether a variable set to nothing in the environment init runs in hides
+ * `.env` from `wasit run`: dotenv never replaces a variable that is set, and
+ * run reads an empty one as no key. "no line": `.env` does not name it, so a
+ * key added there would be hidden; "line": `.env` gives it a value that is
+ * hidden. Undefined when nothing is hidden, when `.env` names it with no value
+ * too (said as that), or when DOTENV_CONFIG_PATH points wasit at another file.
+ */
+function hiddenByEnvironment(request: KeySetupRequest, variable: string, file: EnvFileNames): "no line" | "line" | undefined {
+  const value = request.env[variable];
+  if (value === undefined || value.trim() !== "") return undefined;
+  if ((request.env["DOTENV_CONFIG_PATH"] ?? "").trim() !== "") return undefined;
+  if (!file.names.has(variable)) return "no line";
+  return file.empty.has(variable) ? undefined : "line";
+}
+
+/** How to clear a variable set to nothing, in the shells most builders use. */
+function unsetHint(variable: string): string {
+  return `bash or zsh: unset ${variable}; PowerShell: Remove-Item Env:${variable}`;
+}
+
+/** Why an empty variable in the environment makes init write no key. */
+function emptyInEnvironment(variable: string): string {
+  return (
+    `${variable}: set to nothing in the environment init runs in (your shell, most likely), and init wrote none: .env ` +
+    "never replaces a variable that is set, and wasit run reads an empty one as no key."
+  );
+}
+
+/** A value `.env` has that an empty variable in the environment hides from `wasit run`. */
+function hiddenLine(variable: string): string {
+  return (
+    `  ${variable}: in .env, and set to nothing in the environment init runs in (your shell, most likely), which ` +
+    `wins: wasit run reads that as no key. Unset it there (${unsetHint(variable)}); init does not change .env.`
+  );
+}
+
+/**
+ * The permission bits of `file` when users other than its owner have any
+ * access to it, else undefined (and on Windows, whose files have no such bits).
+ */
+function openToOthers(file: string): string | undefined {
+  if (process.platform === "win32") return undefined;
+  try {
+    const mode = lstatSync(file).mode & 0o777;
+    return (mode & 0o077) === 0 ? undefined : mode.toString(8);
+  } catch {
+    return undefined;
   }
 }
 
@@ -434,6 +518,13 @@ async function newPayer(
     return;
   }
   emit(`  ${role.variable}: new, written to .env (the secret is not shown), address ${wallet.publicKey}`);
+  const mode = openToOthers(file);
+  if (mode !== undefined) {
+    emit(
+      `  .env is open to other users of this computer (mode ${mode}), and it now holds the key: chmod 600 .env makes ` +
+        "it yours only. init leaves the file's permissions as they are.",
+    );
+  }
 
   const problems: Problems = {};
   emit("  Funding it with test XLM from Friendbot (the public testnet faucet) ...");
@@ -478,7 +569,7 @@ async function newPayer(
 }
 
 /** The channel's commitment key: checked when it is set, never made (Najmi, 2026-11-27). */
-function commitmentLines(role: Extract<Role, { kind: "commitment" }>, request: KeySetupRequest, names: ReadonlySet<string> | undefined): string[] {
+function commitmentLines(role: Extract<Role, { kind: "commitment" }>, request: KeySetupRequest, file: EnvFileNames | undefined): string[] {
   const channel = request.channel === undefined ? "the route's channel" : `channel ${request.channel}`;
   const value = (request.env[role.variable] ?? "").trim();
   if (value !== "") {
@@ -490,13 +581,18 @@ function commitmentLines(role: Extract<Role, { kind: "commitment" }>, request: K
         "MPP-12 and MPP-14 fail if it is not.",
     ];
   }
-  if (names?.has(role.variable) === true) {
+  const which = `the secret (64 hex characters) of the commitment key ${channel} was opened with`;
+  const hidden = file === undefined ? undefined : hiddenByEnvironment(request, role.variable, file);
+  if (hidden === "line") return [hiddenLine(role.variable)];
+  if (hidden === "no line") {
+    return [`  ${emptyInEnvironment(role.variable)} Unset it there (${unsetHint(role.variable)}), then put in .env ${which}.`];
+  }
+  if (file?.names.has(role.variable) === true) {
     return [`  ${role.variable}: in .env without a value: init does not change it.`];
   }
   return [
-    `  ${role.variable}: not set. Put in .env the secret (64 hex characters) of the commitment key ${channel} was ` +
-      "opened with. init makes none: the channel's server checks each commitment against that key, and a new one " +
-      "would not match it.",
+    `  ${role.variable}: not set. Put in .env ${which}. init makes none: the channel's server checks each commitment ` +
+      "against that key, and a new one would not match it.",
   ];
 }
 
@@ -534,21 +630,28 @@ export async function setUpTestKeys(request: KeySetupRequest, deps: KeySetupDeps
     if (!protection.writable) emit(`  .env: init writes no key into it: ${protection.why}.`);
 
     const file = envFileNames(request.cwd);
-    const names = "names" in file ? file.names : undefined;
     if (role.kind === "commitment") {
-      for (const line of commitmentLines(role, request, names)) emit(line);
+      for (const line of commitmentLines(role, request, "names" in file ? file : undefined)) emit(line);
       return lines;
     }
 
     const value = (request.env[role.variable] ?? "").trim();
+    const hidden = "names" in file ? hiddenByEnvironment(request, role.variable, file) : undefined;
     if (value !== "") {
       await existingPayer(role, value, deps, emit);
     } else if ("problem" in file) {
       emit(`  ${role.variable}: not set, and init wrote none: ${file.problem}. ${byHand(role)}`);
+    } else if (hidden === "line") {
+      emit(hiddenLine(role.variable));
+    } else if (hidden === "no line") {
+      // Both must be true before a key goes into .env: the variable unset, and .env kept out of git.
+      const unset = `${role.variable} is unset there (${unsetHint(role.variable)})`;
+      const first = protection.writable || protection.hand.first === undefined ? `Once ${unset}` : `${protection.hand.first}, and ${unset}`;
+      emit(`  ${emptyInEnvironment(role.variable)} ${byHand(role, { first })}`);
     } else if (file.names.has(role.variable)) {
       emit(`  ${role.variable}: in .env without a value: init does not change it. Fill it in, or delete the line.`);
     } else if (!protection.writable) {
-      emit(`  ${role.variable}: not set, and init wrote none. ${byHand(role)}`);
+      emit(`  ${role.variable}: not set, and init wrote none. ${byHand(role, protection.hand)}`);
     } else {
       await newPayer(role, request, deps, emit);
     }
