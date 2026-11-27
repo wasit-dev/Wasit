@@ -1,16 +1,21 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { Asset, Keypair } from "@stellar/stellar-sdk";
+import { Account, Asset, Keypair, Networks, type Transaction } from "@stellar/stellar-sdk";
 
 import {
+  TESTNET_SWAP_XLM,
   TESTNET_USDC_ISSUER,
+  addTestnetUsdc,
   describeTransactionError,
   generateCommitmentKey,
   generateTestnetWallet,
   publicKeyFromSecret,
   sendUsdcFromDistributor,
+  swapQuoteFrom,
   testnetUsdcAsset,
+  usdcSetupTransaction,
+  type SwapPathRecord,
 } from "../../src/wallet.js";
 import { ConfigurationError } from "../../src/errors.js";
 
@@ -125,5 +130,105 @@ describe("sendUsdcFromDistributor argument validation", () => {
         `expected "${amount}" to be rejected`,
       );
     }
+  });
+});
+
+/** A strict-send path to testnet USDC as Horizon writes it. */
+function usdcPath(destinationAmount: string, path: SwapPathRecord["path"] = []): SwapPathRecord {
+  return {
+    destination_amount: destinationAmount,
+    destination_asset_type: "credit_alphanum4",
+    destination_asset_code: "USDC",
+    destination_asset_issuer: TESTNET_USDC_ISSUER,
+    path,
+  };
+}
+
+describe("swapQuoteFrom (the exchange's answer is not trusted)", () => {
+  it("takes the path that gives the most USDC, and accepts no less than 80% of it, rounded down", () => {
+    const quote = swapQuoteFrom([usdcPath("8.8000000"), usdcPath("9.1234567"), usdcPath("2.5")]);
+    assert.equal(quote?.destMin, "7.2987653");
+    assert.deepEqual(quote?.path, []);
+  });
+
+  it("keeps the path's own assets in order", () => {
+    const other = Keypair.random().publicKey();
+    const quote = swapQuoteFrom([
+      usdcPath("5", [
+        { asset_type: "credit_alphanum4", asset_code: "EURC", asset_issuer: other },
+        { asset_type: "native" },
+      ]),
+    ]);
+    assert.ok(quote?.path[0]?.equals(new Asset("EURC", other)));
+    assert.ok(quote?.path[1]?.isNative());
+    assert.equal(quote?.destMin, "4.0000000");
+  });
+
+  it("under one USDC is no usable price", () => {
+    assert.equal(swapQuoteFrom([usdcPath("0.9999999")]), undefined);
+    assert.equal(swapQuoteFrom([usdcPath("1")])?.destMin, "0.8000000");
+    assert.equal(swapQuoteFrom([]), undefined);
+  });
+
+  it("ignores a path to another asset, another issuer, a bad amount or an asset that does not parse", () => {
+    const fake = Keypair.random().publicKey();
+    const records: SwapPathRecord[] = [
+      { ...usdcPath("50"), destination_asset_issuer: fake },
+      { ...usdcPath("50"), destination_asset_code: "USDT" },
+      { ...usdcPath("50"), destination_asset_type: "native" },
+      usdcPath("1e9"),
+      usdcPath("-5"),
+      usdcPath("5.12345678"),
+      { ...usdcPath("50"), destination_amount: 50 },
+      usdcPath("50", [{ asset_type: "credit_alphanum4", asset_code: "BAD CODE", asset_issuer: "nope" }]),
+      { ...usdcPath("50"), path: "not a list" },
+    ];
+    assert.equal(swapQuoteFrom(records), undefined);
+    assert.equal(swapQuoteFrom([...records, usdcPath("3")])?.destMin, "2.4000000");
+  });
+});
+
+describe("usdcSetupTransaction (built and signed, never sent)", () => {
+  const keypair = Keypair.random();
+  const account = (): Account => new Account(keypair.publicKey(), "100");
+
+  function operations(transaction: Transaction): Array<Record<string, unknown>> {
+    return transaction.operations as unknown as Array<Record<string, unknown>>;
+  }
+
+  it("with a quote: the trustline and the swap to the account itself, in one transaction on testnet", () => {
+    const transaction = usdcSetupTransaction(account(), keypair, { destMin: "7.0400000", path: [] });
+    assert.equal(transaction.networkPassphrase, Networks.TESTNET);
+    assert.equal(transaction.source, keypair.publicKey());
+    const [trust, swap, ...rest] = operations(transaction);
+    assert.deepEqual(rest, []);
+    assert.equal(trust?.["type"], "changeTrust");
+    assert.ok((trust?.["line"] as Asset).equals(testnetUsdcAsset()));
+    assert.equal(swap?.["type"], "pathPaymentStrictSend");
+    assert.ok((swap?.["sendAsset"] as Asset).isNative());
+    assert.equal(swap?.["sendAmount"], "10.0000000");
+    assert.equal(TESTNET_SWAP_XLM, "10");
+    assert.equal(swap?.["destination"], keypair.publicKey());
+    assert.ok((swap?.["destAsset"] as Asset).equals(testnetUsdcAsset()));
+    assert.equal(swap?.["destMin"], "7.0400000");
+    assert.equal(transaction.signatures.length, 1);
+    assert.ok(keypair.verify(transaction.hash(), transaction.signatures[0]!.signature()));
+  });
+
+  it("without a quote: the trustline alone", () => {
+    const transaction = usdcSetupTransaction(account(), keypair, undefined);
+    assert.deepEqual(
+      operations(transaction).map((operation) => operation["type"]),
+      ["changeTrust"],
+    );
+  });
+});
+
+describe("addTestnetUsdc argument validation", () => {
+  it("rejects a malformed key before touching the network, without echoing it", async () => {
+    await assert.rejects(
+      () => addTestnetUsdc("SBROKENKEY", "STELLAR_PRIVATE_KEY"),
+      (error: unknown) => error instanceof ConfigurationError && /STELLAR_PRIVATE_KEY/.test(error.message) && !error.message.includes("SBROKENKEY"),
+    );
   });
 });

@@ -12,6 +12,9 @@
  * (faucet.circle.com) is a captcha-gated web form with no public API for
  * Stellar. `sendUsdcFromDistributor` covers the case where the operator has
  * already completed that manual step once, on an account of their own.
+ * `addTestnetUsdc` (used by `wasit init`) needs neither: it swaps a little of
+ * the account's own test XLM for test USDC on the public test exchange, the
+ * starter kit's way, and falls back to the trustline alone.
  *
  * **Error contract.** Every exported function that can fail throws one of
  * `errors.ts`'s types and never a raw Stellar SDK error: a bad key or a
@@ -35,6 +38,8 @@ import {
   Operation,
   TransactionBuilder,
   TransactionFailedError,
+  type Transaction,
+  type TransactionSource,
 } from "@stellar/stellar-sdk";
 import { COMMITMENT_SEED_BYTES } from "./mpp/channel-commitment.js";
 import { ConfigurationError, TargetUnreachableError } from "./errors.js";
@@ -286,6 +291,163 @@ export async function createUsdcTrustline(secretKey: string, source?: string): P
   } catch (error) {
     throw asWalletError(error, "create the USDC trustline");
   }
+}
+
+/**
+ * How much test XLM a new payer swaps for test USDC on the public test
+ * exchange, so it needs no faucet: the starter kit's amount
+ * (x402-starter-kit `lib/full.mjs`, `SWAP_XLM`), out of the 10,000 XLM
+ * Friendbot gives.
+ */
+export const TESTNET_SWAP_XLM = "10";
+
+/** The swap accepts no less than this share of the quoted USDC, in percent (the kit's `SWAP_MIN_SHARE`, 0.8). */
+const SWAP_MIN_PERCENT = 80n;
+
+/** A quote under one USDC, in stroops, is no usable price (the kit's `out >= 1`). */
+const SWAP_MIN_QUOTE_STROOPS = 10_000_000n;
+
+const STROOPS_PER_UNIT = 10_000_000n;
+
+/** A Stellar amount (at most 7 decimals) in stroops, or undefined when it is not one. */
+function toStroops(amount: unknown): bigint | undefined {
+  if (typeof amount !== "string") return undefined;
+  const match = /^(\d{1,15})(?:\.(\d{1,7}))?$/.exec(amount);
+  if (match === null) return undefined;
+  return BigInt(match[1]!) * STROOPS_PER_UNIT + BigInt((match[2] ?? "").padEnd(7, "0"));
+}
+
+function fromStroops(stroops: bigint): string {
+  return `${stroops / STROOPS_PER_UNIT}.${(stroops % STROOPS_PER_UNIT).toString().padStart(7, "0")}`;
+}
+
+/** One path Horizon's strict-send search answers with: only the fields the swap reads. */
+export interface SwapPathRecord {
+  readonly destination_amount?: unknown;
+  readonly destination_asset_type?: unknown;
+  readonly destination_asset_code?: unknown;
+  readonly destination_asset_issuer?: unknown;
+  readonly path?: unknown;
+}
+
+/** The terms of the swap: the least USDC it accepts, and the assets in between. */
+export interface UsdcSwapQuote {
+  /** A Stellar amount with 7 decimals. */
+  readonly destMin: string;
+  readonly path: readonly Asset[];
+}
+
+function pathAssets(path: unknown): Asset[] | undefined {
+  if (!Array.isArray(path)) return undefined;
+  try {
+    return path.map((entry: { asset_type?: unknown; asset_code?: unknown; asset_issuer?: unknown }) =>
+      entry.asset_type === "native" ? Asset.native() : new Asset(String(entry.asset_code), String(entry.asset_issuer)),
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The swap's terms from Horizon's answer, or undefined when it gives no usable
+ * price. Every record is the exchange's, not trusted: only a path to Circle's
+ * testnet USDC counts, with an amount Stellar can carry and assets that parse;
+ * of those, the one that gives the most. It must give at least one USDC, and
+ * the swap then accepts no less than 80% of it, so it never runs at a much
+ * worse price than the one quoted. Sends nothing.
+ */
+export function swapQuoteFrom(records: readonly SwapPathRecord[]): UsdcSwapQuote | undefined {
+  let best: { readonly stroops: bigint; readonly path: Asset[] } | undefined;
+  for (const record of records) {
+    if (
+      record.destination_asset_type === "native" ||
+      record.destination_asset_code !== "USDC" ||
+      record.destination_asset_issuer !== TESTNET_USDC_ISSUER
+    ) {
+      continue;
+    }
+    const stroops = toStroops(record.destination_amount);
+    const path = pathAssets(record.path);
+    if (stroops === undefined || path === undefined) continue;
+    if (best === undefined || stroops > best.stroops) best = { stroops, path };
+  }
+  if (best === undefined || best.stroops < SWAP_MIN_QUOTE_STROOPS) return undefined;
+  return { destMin: fromStroops((best.stroops * SWAP_MIN_PERCENT) / 100n), path: best.path };
+}
+
+/**
+ * The one transaction that gives the account of `keypair` the testnet USDC
+ * trustline and, with a quote, swaps {@link TESTNET_SWAP_XLM} of its test XLM
+ * for test USDC paid to itself: both happen or neither does. Built for Stellar
+ * testnet only and signed; sends nothing.
+ */
+export function usdcSetupTransaction(account: TransactionSource, keypair: Keypair, quote: UsdcSwapQuote | undefined): Transaction {
+  const usdc = testnetUsdcAsset();
+  const builder = new TransactionBuilder(account, { fee: BASE_FEE, networkPassphrase: Networks.TESTNET }).addOperation(
+    Operation.changeTrust({ asset: usdc }),
+  );
+  if (quote !== undefined) {
+    builder.addOperation(
+      Operation.pathPaymentStrictSend({
+        sendAsset: Asset.native(),
+        sendAmount: TESTNET_SWAP_XLM,
+        destination: keypair.publicKey(),
+        destAsset: usdc,
+        destMin: quote.destMin,
+        path: [...quote.path],
+      }),
+    );
+  }
+  const transaction = builder.setTimeout(60).build();
+  transaction.sign(keypair);
+  return transaction;
+}
+
+/** What {@link addTestnetUsdc} did: the trustline is there in both cases. */
+export type UsdcSetupOutcome =
+  | { readonly swapped: true }
+  | { readonly swapped: false; readonly why: string };
+
+/**
+ * Gives the account of `secretKey` the testnet USDC trustline and test USDC,
+ * with no faucet: it swaps {@link TESTNET_SWAP_XLM} test XLM on the public test
+ * exchange, in the same transaction as the trustline (the starter kit's way,
+ * spec C7 row 3). Without a usable price, or when that transaction fails (a
+ * price that moved, an empty book), it adds the trustline alone and says why.
+ * Throws only when the trustline itself could not be added. The account needs
+ * its test XLM first.
+ */
+export async function addTestnetUsdc(secretKey: string, source?: string): Promise<UsdcSetupOutcome> {
+  publicKeyFromSecret(secretKey, source);
+  const keypair = Keypair.fromSecret(secretKey);
+  const server = horizonServer();
+
+  let quote: UsdcSwapQuote | undefined;
+  let why = "the public test exchange gave no usable price";
+  try {
+    const found = await server.strictSendPaths(Asset.native(), TESTNET_SWAP_XLM, [testnetUsdcAsset()]).call();
+    quote = swapQuoteFrom(found.records);
+  } catch {
+    why = "the public test exchange could not be asked for a price";
+  }
+
+  if (quote !== undefined) {
+    try {
+      const account = await server.loadAccount(keypair.publicKey());
+      await server.submitTransaction(usdcSetupTransaction(account, keypair, quote));
+      return { swapped: true };
+    } catch (error) {
+      why = `the swap was not confirmed (${describeTransactionError(error)})`;
+    }
+  }
+
+  try {
+    const account = await server.loadAccount(keypair.publicKey());
+    await server.submitTransaction(usdcSetupTransaction(account, keypair, undefined));
+  } catch (error) {
+    throw asWalletError(error, "create the USDC trustline");
+  }
+  return { swapped: false, why };
 }
 
 /**

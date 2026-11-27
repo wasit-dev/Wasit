@@ -284,6 +284,7 @@ export {
 // surface, and naming each entry keeps the rest of wallet.ts free to change
 // without that being a breaking change to @wasit-dev/core.
 export {
+  addTestnetUsdc,
   createUsdcTrustline,
   describeTransactionError,
   fundWithFriendbot,
@@ -292,14 +293,20 @@ export {
   getTestnetWalletStatus,
   publicKeyFromSecret,
   sendUsdcFromDistributor,
+  swapQuoteFrom,
   testnetUsdcAsset,
+  TESTNET_SWAP_XLM,
   TESTNET_USDC_ISSUER,
+  usdcSetupTransaction,
 } from "./wallet.js";
 export type {
   AssetBalance,
   FriendbotOutcome,
   GeneratedCommitmentKey,
   GeneratedWallet,
+  SwapPathRecord,
+  UsdcSetupOutcome,
+  UsdcSwapQuote,
   WalletStatus,
 } from "./wallet.js";
 
