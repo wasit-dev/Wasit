@@ -1,6 +1,6 @@
 # Job 04 — `wasit init` and the test-network key setup
 
-Status: 🟡 **IN PROGRESS** — the questions, the 402 read and the config written, run on the maintainer's machine; the key setup is not built · Deliverable: **D3** · Week: **3** · Depends on: #2
+Status: 🟡 **IN PROGRESS** — the questions, the 402 read, the config written and the test-network key setup, run on the maintainer's machine for an x402 route and for a fresh MPP charge project; the recording and Windows are not done · Deliverable: **D3** · Week: **3** · Depends on: #2
 
 ## Goal
 
@@ -30,7 +30,7 @@ It never enables MPP-13.
 
 - [ ] `wasit init` on a fresh x402 project and on a fresh MPP project writes a config that the Action and a local run both accept.
 - [ ] Reading the 402 answer, including the paywall-off messages for 200, 500 and 503.
-- [ ] The test-network key setup, with an independent review of it.
+- [x] The test-network key setup, with an independent review of it.
 - [ ] A short recording of `init` on both projects, from the first question to the written config and a first read-only run.
 
 ## Result
@@ -46,6 +46,27 @@ unchanged: X402-01 to X402-05 passed, X402-06 to X402-11 were skipped as that ti
 terminal: [excerpts](week-3/copies/init-local-run/excerpts-of-the-runs.txt). The code is on a local branch and becomes
 public with the release.
 
-Not run yet: a fresh MPP project, the answer "no" to the question on who operates the service, a protocol chosen through
-the questions, Windows, a run of the payment tier from an `init` config, the 200, 500 and 503 answers in a terminal
-(covered by offline tests only), the test-network key setup (not built), the recording.
+**2026-11-27, later — a fresh MPP charge project, and the test-network key setup (🟡).** In a new empty folder (`git init`
+only), against an MPP charge server of the repository's test fixtures on this machine, `wasit init` was given no flag.
+It asked for the URL, whether the builder operates the service, the method, the start command and whether to set up a test
+payer, read the 402 as an MPP charge (the protocol came from the read, not from a flag) and wrote the config with the
+receiving address and the asset pinned. It asked to add `.env` to `.gitignore` (git did not ignore it), wrote a new payer
+key to `.env` without showing it, funded it on the Stellar test network and printed a table: XLM, the USDC trustline and
+test USDC, each ready. `wasit run --dry-run` printed the plan (MPP-01 only, nothing signed); `wasit run` then paid the
+service and MPP-01 passed, settled on-chain and verified from the transfer event.
+
+Read back from the chain (Horizon, Stellar test network): the payer's balances equal the table `init` printed (test USDC
+6.4405109, XLM 9989.9999800), and the payment is a successful transaction in which the payer was debited 0.0010000 USDC and
+the receiving address credited the same ([transaction on Stellar Expert](https://stellar.expert/explorer/testnet/tx/3d70a3aa98b52ec635a56a9feb459218842827f31572dcee847d95b19b658fad)).
+`.env` was created readable by its owner only, and `.gitignore` lists it. The asset in the config is the constant of the
+`@x402/stellar` package that the fixture server imports, a source outside Wasit's own table. The answer "no" to the
+question on who operates the service ended with exit 2, no request and an empty folder. Copy of the terminal, with that
+read-back: [MPP charge project, excerpts](week-3/copies/init-local-run/mpp-charge-run.txt).
+
+An earlier run of the key setup alone, on an x402 route in a new git folder, wrote the key to `.env` (owner-only, ignored by
+git) and the table matched the chain the same way (test USDC 6.4454110). The key setup was reviewed independently in a
+separate session; the review is kept internal, and the code changes it led to are in the same local branch.
+
+Not run yet: an MPP channel project, a protocol chosen through the questions on an x402 project, Windows, the payment tier
+of the Action from an `init` config, the 200, 500 and 503 answers in a terminal (covered by offline tests only), the
+recording.
