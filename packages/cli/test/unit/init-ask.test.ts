@@ -77,6 +77,33 @@ describe("wasit init: at a terminal", () => {
     assert.match(asked[0] ?? "", /Name for this environment/);
   });
 
+  it("a method typed wrong is asked again, and the right one is used", async () => {
+    const { code, stdout, asked } = await init({ start: "npm start", setupKeys: false }, ["http://127.0.0.1:3000/api/weather", "yes", "GTE", "get"]);
+    assert.equal(code, 0, stdout);
+    assert.equal(asked.filter((question) => question.includes("HTTP method of the route")).length, 2);
+    assert.ok(asked.some((question) => question.startsWith('"GTE" is not one of GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS. HTTP method')));
+    assert.match(await readFile(file(), "utf-8"), /"method": "GET"|"path": "\/api\/weather"/);
+  });
+
+  it("a method wrong three times: exit 2, nothing written, and never a fourth question", async () => {
+    const { code, stderr, asked } = await init({ start: "npm start" }, ["http://127.0.0.1:3000/api/weather", "yes", "GTE", "PSOT", "PUSH"]);
+    assert.equal(code, 2);
+    assert.equal(asked.filter((question) => question.includes("HTTP method of the route")).length, 3);
+    assert.match(stderr, /is not one of GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS\. Nothing was written\./);
+    assert.ok(!existsSync(file()));
+  });
+
+  it("an empty answer to the method question is GET, and is not asked again", async () => {
+    const { code, asked } = await init({ start: "npm start", setupKeys: false }, ["http://127.0.0.1:3000/api/weather", "yes", ""]);
+    assert.equal(code, 0);
+    assert.equal(asked.filter((question) => question.includes("HTTP method of the route")).length, 1);
+  });
+
+  it("a method given as a flag is never asked", async () => {
+    const { asked } = await init({ method: "post", start: "npm start", setupKeys: false }, ["http://127.0.0.1:3000/api/weather", "yes", "", ""]);
+    assert.ok(!asked.some((question) => question.includes("HTTP method of the route")));
+  });
+
   it("an answer other than yes: the rule, nothing written", async () => {
     const { code, stderr } = await init({ url: "http://127.0.0.1:3000/paid" }, ["no"]);
     assert.equal(code, 2);

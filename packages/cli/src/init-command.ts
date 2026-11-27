@@ -93,6 +93,9 @@ const HTTP_METHODS: readonly string[] = ["GET", "HEAD", "POST", "PUT", "PATCH", 
 
 const PROTOCOLS: readonly RouteProtocol[] = ["x402", "mpp-charge", "mpp-channel"];
 
+/** How often init asks for the method at a terminal before it takes the last answer and refuses it (exit 2). */
+const METHOD_ATTEMPTS = 3;
+
 /** The most offers printed: the rest is counted. */
 const MAX_OFFER_LINES = 10;
 
@@ -675,8 +678,17 @@ async function completeAnswers(options: InitCommandOptions, context: InitContext
   routeUrl(url === "" ? undefined : url);
   let method = options.method;
   if (method === undefined) {
-    const reply = await answer("HTTP method of the route [GET]: ");
-    if (reply !== "") method = reply;
+    // A method that is not one of ours is asked again, a few times: a typo costs a retry, not the whole run.
+    let question = "HTTP method of the route [GET]: ";
+    for (let attempt = 1; attempt <= METHOD_ATTEMPTS; attempt += 1) {
+      const reply = await answer(question);
+      if (reply === "") break;
+      method = reply;
+      if (HTTP_METHODS.includes(reply.toUpperCase())) break;
+      // The last try is wrong too: refuse here, in the main path's words, before any other question.
+      if (attempt === METHOD_ATTEMPTS) refuse(`--method ${shown(reply)} is not one of ${HTTP_METHODS.join(", ")}. Nothing was written.`);
+      question = `${shown(reply)} is not one of ${HTTP_METHODS.join(", ")}. HTTP method of the route [GET]: `;
+    }
   }
   let bodyFile = options.bodyFile;
   if (bodyFile === undefined && method !== undefined && !["GET", "HEAD"].includes(method.toUpperCase())) {
