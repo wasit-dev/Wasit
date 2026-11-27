@@ -4,7 +4,7 @@ MCP server exposing [Wasit](https://github.com/wasit-dev/wasit)'s **x402** / **M
 
 The suite logic isn't reimplemented here — this is a thin adapter over [`@wasit-dev/core`](https://www.npmjs.com/package/@wasit-dev/core), the same package [`@wasit-dev/cli`](https://www.npmjs.com/package/@wasit-dev/cli) runs. An agent's run and a CLI run against the same target can never disagree.
 
-**Testnet by default.** Several tools settle real transactions. The tools an agent can call with a network pay on test networks only: any other network, `stellar:pubnet` included, is refused before a key is read. The one exception is the [mainnet opt-in](#mainnet-beta) (beta), which a person sets when the server starts, never an agent. In 0.8.0-beta.1 (npm tag `beta`; `latest` is 0.7.0) there is no opt-in: its variables stop the server at start.
+**Testnet by default.** Several tools settle real transactions. The tools an agent can call with a network pay on test networks only: any other network, `stellar:pubnet` included, is refused before a key is read. The one exception is the [mainnet opt-in](#mainnet-beta) (beta, new in 0.8.0-beta.2; npm tag `beta`, `latest` is 0.7.0), which a person sets when the server starts, never an agent. In 0.8.0-beta.1 there is no opt-in: its variables stop the server at start.
 
 ## Install
 
