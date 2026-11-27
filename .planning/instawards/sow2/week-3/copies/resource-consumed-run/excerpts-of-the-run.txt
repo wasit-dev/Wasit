@@ -1,0 +1,62 @@
+`wasit run` against a single-use paywall: "resource consumed", on the maintainer's machine, 2026-11-27
+
+Run by the maintainer in their own terminal, against a paywall of the repository's test fixtures (127.0.0.1:3010): the
+official x402 middleware and the public test-network facilitator, for one resource that can be bought once. After the first paid
+request is served, every request, paid or not, is answered with 409. Stellar test network, test funds, one payment of $0.01.
+Code: commit 16c6500 on a local branch of the week 3 work, which becomes public with the release (the published 0.8.0-beta.1 does
+not have this change; the version line of the comment reads 0.8.0-beta.1 because the local build has not changed its version
+number). The output is copied from the terminal as it was, with the shell prompt removed and the command shortened: the local
+build was run as `node <build>/index.js ...` with a full file path, shown here as `wasit ...`.
+
+--- `wasit run` ---
+
+$ wasit run --config wasit.single-use.json --out report.json
+Payment tier on stellar:testnet (test network): test funds. Payer GCWG7X3Z2RHWEXIYQ4IG24STQAD3OORWCAV63X7K3KW3VFUBOU7TKPB2; at most $1.00 per payment; this run could spend up to $0.045 of the $5.00 cap.
+Caps: $1.00 a payment, $5.00 this run.
+  single-use: pays "GDPAPDZWAKBXUPCNMI4YHAZ7DS7UOUTPGXAFDSWZG4URRMWHFSQTDQBM" in "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA", up to $0.045
+    X402-06 100000, X402-07 100000, X402-09 50000, X402-10 100000, X402-11 100000 (base units)
+Worst case: $0.045 of $5.00.
+Environment local: http://127.0.0.1:3010
+Network: stellar:testnet (test network)
+Endpoints: 1
+  single-use  x402  GET /protected
+Tier: payment on stellar:testnet. The run charged $0.01 of the $5.00 cap, at most $1.00 a payment; every signature is counted as if it settled.
+
+single-use  x402  GET /protected: conformant
+  PASS  X402-01  402 Response Status
+        Server responded with 402 as required.
+  PASS  X402-02  Payment Header Present
+        Payment header found.
+  PASS  X402-03  Header Payload Decodable
+        Header decoded to valid JSON.
+  PASS  X402-04  Required Fields Present
+        All required v2 fields present.
+  PASS  X402-05  Network Identifier Valid
+        Network identifier "stellar:testnet" is valid.
+  PASS  X402-06  Signature Resubmit Accepted
+        Valid payment accepted (HTTP 200) and settled on-chain for exactly the advertised 100000 base units of CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA to GDPAPDZWAKBXUPCNMI4YHAZ7DS7UOUTPGXAFDSWZG4URRMWHFSQTDQBM, verified from the transfer event (tx f94672c60f6b9a730a210011aef09bd4c7edc5de472384d18e5a70044a2d647b).
+  SKIP  X402-07  Invalid Signature Rejected
+        Skipped: resource consumed: the route answered 409 to a new request after X402-06's payment was accepted, a single-use resource that the payment used up, so this check has no new challenge to pay, and nothing was signed for it. X402-08, the replay, needs no new challenge and still runs.
+  PASS  X402-08  Payment Replay Rejected
+        The same payment, sent again, was refused (HTTP 409: resource_consumed).
+  SKIP  X402-09, X402-10, X402-11
+        Skipped: resource consumed: the route answered 409 to a new request after X402-06's payment was accepted, a single-use resource that the payment used up, so this check has no new challenge to pay, and nothing was signed for it. X402-08, the replay, needs no new challenge and still runs.
+
+Summary: 1 graded.
+Result: 1 graded (exit 0).
+
+--- `wasit ci-report` (the command the Action runs to write the comment) ---
+
+$ wasit ci-report --report report.json --comment comment.md --summary summary.md
+Wrote comment.md
+Appended the summary to summary.md
+
+(The comment is in this folder: comment.md. The report is report.json. The report holds no key; its only 64-hex value is the
+transaction hash.)
+
+--- Read back from the chain by the assistant, 2026-11-27 (Horizon, Stellar test network, public read) ---
+
+Transaction f94672c6...a2d647b: successful, ledger 5949904, 2026-11-27T09:52:44Z; effects: account_debited GCWG7X3Z...TKPB2
+0.0100000 USDC, account_credited GDPAPDZW...TDQBM 0.0100000 USDC. One payment, as the run said ("charged $0.01").
+Before this change, the same route would have ended X402-07, 09, 10 and 11 as "ERROR (harness)" with the challenge reported
+unreadable: read from the code, not from an earlier run.
