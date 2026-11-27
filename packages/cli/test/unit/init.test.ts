@@ -261,6 +261,40 @@ describe("wasit init: an existing config", () => {
     assert.equal(await readFile(configFile(), "utf-8"), before);
   });
 
+  it("the same route again, as given: exit 0, and the file is left as it is", async () => {
+    assert.equal((await init(EXAMPLE_FLAGS)).code, 0);
+    const before = await readFile(configFile(), "utf-8");
+    const { code, stdout, stderr } = await init(EXAMPLE_FLAGS);
+    assert.equal(code, 0, stderr);
+    assert.match(
+      stdout,
+      /^wasit init: wasit\.config\.json already has the endpoint quote-of-the-day as given, in the environment local: the file was left as it is\./,
+    );
+    assert.equal(await readFile(configFile(), "utf-8"), before);
+    assert.match(stdout, /\nNext: wasit run --read-only$/);
+  });
+
+  it("a file in the builder's own layout that holds the route: not rewritten, byte for byte", async () => {
+    // Another key order, one line, and the method left to its default: the same route as the loader reads it.
+    const own =
+      '{"endpoints":[{"path":"/paid","name":"quote-of-the-day","protocol":"x402"}],' +
+      '"environments":{"local":{"operatedByMe":true,"baseUrl":"http://127.0.0.1:4402"}},"version":1}';
+    await writeFile(configFile(), own);
+    const { code, stdout, stderr } = await init({ url: "http://127.0.0.1:4402/paid", name: "quote-of-the-day" });
+    assert.equal(code, 0, stderr);
+    assert.match(stdout, /already has the endpoint quote-of-the-day as given/);
+    assert.equal(await readFile(configFile(), "utf-8"), own);
+  });
+
+  it("the same name with another request to refuse: refused, and the file is left as it was", async () => {
+    assert.equal((await init(EXAMPLE_FLAGS)).code, 0);
+    const before = await readFile(configFile(), "utf-8");
+    const { code, stderr } = await init({ ...EXAMPLE_FLAGS, rejectHeader: ["x-quote-lang: zz"] });
+    assert.equal(code, 2);
+    assert.match(stderr, /already has an endpoint named "quote-of-the-day" whose reject differs/);
+    assert.equal(await readFile(configFile(), "utf-8"), before);
+  });
+
   it("replaces it with --force", async () => {
     assert.equal((await init(first)).code, 0);
     const { code, stdout } = await init({ ...first, url: "http://127.0.0.1:5000/paid", force: true });

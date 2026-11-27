@@ -477,7 +477,9 @@ protocol, the network, the receiving address and asset (pinned) and an MPP
 channel. A route that answers 200, 500 or 503, or does not answer, writes
 nothing: --no-read writes it from the flags alone, as x402.
 An existing config is added to (one more endpoint), never overwritten: --force
-replaces it. Mainnet is not written in this version, and neither is a header of
+replaces it. A route the config already has exactly as given, in the same
+environment, is left as it is, so init can run again (to set up its key, say).
+Mainnet is not written in this version, and neither is a header of
 the route: send a credential in a WASIT_HEADER_<NAME> variable. After writing,
 init prints what it read from your service, what you gave, what it filled in by
 default and what it did not read, then the next command.
@@ -492,7 +494,8 @@ XLM for test USDC on the public test exchange, then prints a status table. For
 an MPP channel it makes no key: COMMITMENT_SECRET_HEX must be the key the
 channel was opened with. On other test networks it names the variable and the
 faucet. The key setup never changes the exit code.
-Exit codes: 0 the config was written; 2 nothing was written.`,
+Exit codes: 0 the config has the route (written now, or already there as
+given); 2 init refused, and nothing was written.`,
   )
   .exitOverride(exitTwoOnUsageError)
   .action(async (opts) => {

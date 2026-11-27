@@ -728,6 +728,28 @@ describe("wasit init with the key setup", () => {
     assertNoSecret("stderr", stderr, canary);
   });
 
+  it("run again on the same route with --setup-keys: the config is left as it is, and the key is set up", async () => {
+    assert.equal((await init({ setupKeys: false }, untouchable)).code, 0);
+    const before = readFileSync(path.join(dir, "wasit.config.json"), "utf-8");
+    const w = world(repo());
+    const { code, stdout, stderr } = await init({ setupKeys: true }, w.deps);
+    assert.equal(code, 0, stderr);
+    assert.match(stdout, /already has the endpoint paid as given, in the environment local: the file was left as it is/);
+    assert.equal(readFileSync(path.join(dir, "wasit.config.json"), "utf-8"), before);
+    assert.match(readFileSync(envPath(), "utf-8"), /^STELLAR_PRIVATE_KEY=S[A-Z2-7]{55}\n$/);
+    assert.match(stdout, /USDC: {6}ready/);
+    assertNoSecret("stdout", stdout, w.made[0]!);
+    assertNoSecret("the config", before, w.made[0]!);
+  });
+
+  it("run again on the same route with another method: refused before any key is made, exit 2", async () => {
+    assert.equal((await init({ setupKeys: false }, untouchable)).code, 0);
+    const { code, stderr } = await init({ setupKeys: true, method: "POST", bodyFile: undefined }, untouchable);
+    assert.equal(code, 2);
+    assert.match(stderr, /already has an endpoint named "paid" whose method differs/);
+    assert.ok(!existsSync(envPath()));
+  });
+
   it("--setup-keys with the payer variable set to nothing: the config is written, no key, exit 0", async () => {
     const w = world(repo());
     const { code, stdout } = await init({ setupKeys: true }, w.deps, { env: { STELLAR_PRIVATE_KEY: "" } });

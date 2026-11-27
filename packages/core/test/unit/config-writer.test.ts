@@ -171,9 +171,131 @@ describe("writeConfigText: adding to an existing file", () => {
     assert.deepEqual(Object.keys(written.environments.local), ["baseUrl", "operatedByMe"], "the network default is not written in");
   });
 
-  it("refuses an endpoint name the file already has", () => {
-    const error = refusal(() => writeConfigText({ ...EXAMPLE_INPUT, service: undefined }, { existing }));
-    assert.match(error.message, /already has an endpoint named "quote-of-the-day".*--force/);
+  it("an endpoint the file already has exactly as given, in the same environment: unchanged, nothing to write", () => {
+    const result = writeConfigText({ ...EXAMPLE_INPUT, service: undefined }, { existing });
+    assert.deepEqual(result.unchanged, ["quote-of-the-day"]);
+    assert.deepEqual(result.added, []);
+    assert.equal(result.environmentAdded, false);
+    assert.equal(result.changed, false);
+    assert.deepEqual(JSON.parse(result.text), EXAMPLE, "the endpoint is not added a second time");
+  });
+
+  it("the same, with the same service given again: still nothing to write", () => {
+    const result = writeConfigText(EXAMPLE_INPUT, { existing });
+    assert.equal(result.serviceAdded, false);
+    assert.equal(result.changed, false);
+  });
+
+  it("compares as the loader reads: a method left out is GET, any case; an object's keys in any order", () => {
+    const file = JSON.stringify({
+      version: 1,
+      environments: { local: { baseUrl: "http://127.0.0.1:4402", operatedByMe: true } },
+      endpoints: [
+        { name: "paid", protocol: "x402", path: "/paid" },
+        { protocol: "x402", name: "ask", path: "/ask", method: "post", body: { b: [1, 2], a: "x" } },
+      ],
+    });
+    const result = writeConfigText(
+      {
+        environment: EXAMPLE_INPUT.environment,
+        endpoints: [
+          { name: "paid", protocol: "x402", path: "/paid", method: "GET" },
+          { name: "ask", protocol: "x402", path: "/ask", method: "POST", body: { a: "x", b: [1, 2] } },
+        ],
+      },
+      { existing: file },
+    );
+    assert.deepEqual(result.unchanged, ["paid", "ask"]);
+    assert.equal(result.changed, false);
+  });
+
+  it("keeps the builder's own headers and expect: init never writes them, so they do not make the route another one", () => {
+    const channel = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC";
+    const stream = { name: "stream", protocol: "mpp-channel", path: "/mpp/stream", method: "GET", channel } as const;
+    const file = `${JSON.stringify({
+      version: 1,
+      environments: { local: { baseUrl: "http://127.0.0.1:3000", network: "stellar:testnet", operatedByMe: true } },
+      endpoints: [{ ...stream, headers: { "x-lang": "en" }, expect: { refundWaitingPeriod: 10 } }],
+    })}\n`;
+    const environment = { name: "local", baseUrl: "http://127.0.0.1:3000", network: "stellar:testnet", operatedByMe: true } as const;
+    const result = writeConfigText({ environment, endpoints: [stream] }, { existing: file });
+    assert.deepEqual(result.unchanged, ["stream"]);
+    assert.equal(result.changed, false);
+    assert.deepEqual(JSON.parse(result.text).endpoints[0].expect, { refundWaitingPeriod: 10 });
+  });
+
+  it("refuses the same name with another value, and names which (never its value)", () => {
+    const base = EXAMPLE_INPUT.endpoints[0]!;
+    const cases: Array<[ConfigWriteInput["endpoints"][number], RegExp]> = [
+      [{ ...base, path: "/other" }, /whose path differs, and init does not overwrite it/],
+      [{ ...base, method: "POST", body: { q: 1 } }, /whose method and body differ, and/],
+      [{ ...base, reject: { headers: { "x-quote-lang": "zz" } } }, /whose reject differs, and/],
+      [{ ...base, protocol: "mpp-charge", path: "/other", reject: undefined }, /whose protocol, path and reject differ, and/],
+    ];
+    for (const [endpoint, pattern] of cases) {
+      const error = refusal(() => writeConfigText({ environment: EXAMPLE_INPUT.environment, endpoints: [endpoint] }, { existing }));
+      assert.match(error.message, /already has an endpoint named "quote-of-the-day" whose /);
+      assert.match(error.message, pattern);
+      assert.match(error.message, /--force/);
+      assert.doesNotMatch(error.message, /zz|\/other/, "values are not echoed");
+    }
+  });
+
+  it("refuses an array in another order: a body is the same only item for item", () => {
+    const file = JSON.stringify({
+      version: 1,
+      environments: { local: { baseUrl: "http://127.0.0.1:4402", operatedByMe: true } },
+      endpoints: [{ name: "ask", protocol: "x402", path: "/ask", method: "POST", body: { ids: [1, 2] } }],
+    });
+    const error = refusal(() =>
+      writeConfigText(
+        { environment: EXAMPLE_INPUT.environment, endpoints: [{ name: "ask", protocol: "x402", path: "/ask", method: "POST", body: { ids: [2, 1] } }] },
+        { existing: file },
+      ),
+    );
+    assert.match(error.message, /whose body differs/);
+  });
+
+  it("refuses another channel, and a body with one more key", () => {
+    const channel = "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC";
+    const other = "CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA";
+    const environment = { name: "local", baseUrl: "http://127.0.0.1:3000", network: "stellar:testnet", operatedByMe: true } as const;
+    const file = JSON.stringify({
+      version: 1,
+      environments: { local: { baseUrl: "http://127.0.0.1:3000", network: "stellar:testnet", operatedByMe: true } },
+      endpoints: [
+        { name: "stream", protocol: "mpp-channel", path: "/mpp/stream", method: "GET", channel },
+        { name: "ask", protocol: "x402", path: "/ask", method: "POST", body: { a: 1 } },
+      ],
+    });
+    const stream = { name: "stream", protocol: "mpp-channel", path: "/mpp/stream", method: "GET", channel: other } as const;
+    assert.match(refusal(() => writeConfigText({ environment, endpoints: [stream] }, { existing: file })).message, /"stream" whose channel differs/);
+    const ask = { name: "ask", protocol: "x402", path: "/ask", method: "POST", body: { a: 1, b: 2 } } as const;
+    assert.match(refusal(() => writeConfigText({ environment, endpoints: [ask] }, { existing: file })).message, /"ask" whose body differs/);
+  });
+
+  it("the route as given with a start command the file does not have yet: the service is added, so the file changes", () => {
+    const withoutService = `${JSON.stringify({ ...EXAMPLE, service: undefined }, null, 2)}\n`;
+    const result = writeConfigText(EXAMPLE_INPUT, { existing: withoutService });
+    assert.deepEqual(result.unchanged, ["quote-of-the-day"]);
+    assert.equal(result.serviceAdded, true);
+    assert.equal(result.changed, true);
+    assert.deepEqual(JSON.parse(result.text).service, EXAMPLE.service);
+    assert.equal(JSON.parse(result.text).endpoints.length, 1);
+  });
+
+  it("refuses an endpoint the file has, given again with a new environment: not added twice, not left silently", () => {
+    const sepolia = { name: "sepolia", baseUrl: "http://127.0.0.1:5000", network: "eip155:84532", operatedByMe: true } as const;
+    const error = refusal(() => writeConfigText({ environment: sepolia, endpoints: EXAMPLE_INPUT.endpoints }, { existing }));
+    assert.match(error.message, /already has an endpoint named "quote-of-the-day", and init does not add it again with the new environment "sepolia"/);
+  });
+
+  it("one endpoint unchanged and one new: only the new one is appended", () => {
+    const result = writeConfigText({ environment: EXAMPLE_INPUT.environment, endpoints: [EXAMPLE_INPUT.endpoints[0]!, CHAT] }, { existing });
+    assert.deepEqual(result.unchanged, ["quote-of-the-day"]);
+    assert.deepEqual(result.added, ["chat"]);
+    assert.equal(result.changed, true);
+    assert.deepEqual(JSON.parse(result.text).endpoints.map((endpoint: { name: string }) => endpoint.name), ["quote-of-the-day", "chat"]);
   });
 
   it("refuses an environment of the same name with another URL, network or pin", () => {

@@ -14,7 +14,10 @@
  * Adding to an existing file is the default: the file is read as it is, its
  * own keys kept, and the new endpoints appended; an endpoint name it already
  * has, or an environment of the same name with other values, is refused, never
- * overwritten. `replace` starts from nothing.
+ * overwritten. One exception, so init can be run again on the same route (to
+ * set up its key, say): an endpoint the file already has with every value init
+ * writes the same, in an environment the file already has the same, is left as
+ * it is and counted as unchanged. `replace` starts from nothing.
  *
  * Pure: no file, no network, no key.
  */
@@ -84,10 +87,18 @@ export interface ConfigWriteResult {
   readonly text: string;
   /** The endpoints this write added, by name. */
   readonly added: readonly string[];
+  /** The endpoints the file already had exactly as given, by name: left as they are. */
+  readonly unchanged: readonly string[];
   /** Whether the environment is new in the file. */
   readonly environmentAdded: boolean;
   /** Whether the service block is new in the file. */
   readonly serviceAdded: boolean;
+  /**
+   * Whether the file needs writing: false when it already holds everything
+   * given (every endpoint unchanged, the environment and the service already
+   * there). The caller then leaves the file as it is, byte for byte.
+   */
+  readonly changed: boolean;
 }
 
 type Raw = Record<string, unknown>;
@@ -193,6 +204,55 @@ function sameEnvironment(existing: unknown, environment: InitEnvironmentInput): 
   return existing["baseUrl"] === environment.baseUrl && network === environment.network && existing["operatedByMe"] === true && pinSame;
 }
 
+/** Whether two JSON values are equal: objects by their keys, in any order; arrays in order. */
+function sameJson(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((item, index) => sameJson(item, b[index]));
+  }
+  if (!isRecord(a) || !isRecord(b)) return false;
+  const keys = Object.keys(a);
+  return keys.length === Object.keys(b).length && keys.every((key) => Object.hasOwn(b, key) && sameJson(a[key], b[key]));
+}
+
+/** A method as the loader reads it: GET when it is left out, in capitals. */
+function methodOf(value: unknown): unknown {
+  const method = value ?? "GET";
+  return typeof method === "string" ? method.toUpperCase() : method;
+}
+
+/**
+ * The values init writes of an endpoint, as the loader reads them, from the
+ * file or from what init would write. `headers` and `expect` are not among
+ * them: init never writes either (a credential goes in `WASIT_HEADER_*`, and
+ * a channel's on-chain terms are the builder's to add by hand), so the file's
+ * own are the builder's and are kept.
+ */
+function writtenValues(endpoint: Raw): Raw {
+  const reject = endpoint["reject"];
+  return {
+    name: endpoint["name"],
+    protocol: endpoint["protocol"],
+    path: endpoint["path"],
+    method: methodOf(endpoint["method"]),
+    body: endpoint["body"],
+    reject: isRecord(reject) ? { ...reject, ...(reject["method"] === undefined ? {} : { method: methodOf(reject["method"]) }) } : reject,
+    channel: endpoint["channel"],
+  };
+}
+
+/** The values of an endpoint init writes that differ between the file's endpoint and the one given: their keys, in order. */
+function endpointDifferences(existing: Raw, given: Raw): string[] {
+  const there = writtenValues(existing);
+  const here = writtenValues(given);
+  return Object.keys(here).filter((key) => !sameJson(there[key], here[key]));
+}
+
+/** "path", "method and body", "path, method and body". */
+function listed(words: readonly string[]): string {
+  return words.length <= 1 ? (words[0] ?? "") : `${words.slice(0, -1).join(", ")} and ${words.at(-1)}`;
+}
+
 function sameService(existing: unknown, service: InitServiceInput): boolean {
   if (!isRecord(existing)) return false;
   const ready = existing["ready"];
@@ -220,6 +280,8 @@ export function writeConfigText(input: ConfigWriteInput, options: ConfigWriteOpt
   let ordered: Raw;
   let environmentAdded = true;
   let serviceAdded = input.service !== undefined;
+  let appended: Raw[] = endpoints;
+  const unchanged: string[] = [];
   if (base === undefined) {
     ordered = {
       version: 1,
@@ -242,14 +304,27 @@ export function writeConfigText(input: ConfigWriteInput, options: ConfigWriteOpt
       environments[environment.name] = rawEnvironment(environment);
     }
     const before = base["endpoints"] as Raw[];
-    const taken = new Set(before.map((endpoint) => endpoint["name"]));
+    appended = [];
     for (const endpoint of endpoints) {
-      if (taken.has(endpoint["name"])) {
-        throw new ConfigWriteError(
-          `The config already has an endpoint named ${shown(endpoint["name"])}, and init does not overwrite it. ` +
-            `Choose another name, or replace the file (--force).`,
-        );
+      const there = before.find((other) => other["name"] === endpoint["name"]);
+      if (there === undefined) {
+        appended.push(endpoint);
+        continue;
       }
+      const differences = endpointDifferences(there, endpoint);
+      // The same route in the same environment: nothing to add, and nothing overwritten.
+      if (differences.length === 0 && !environmentAdded) {
+        unchanged.push(endpoint["name"] as string);
+        continue;
+      }
+      throw new ConfigWriteError(
+        differences.length === 0
+          ? `The config already has an endpoint named ${shown(endpoint["name"])}, and init does not add it again with the ` +
+              `new environment ${shown(environment.name)}. Choose another name, or replace the file (--force).`
+          : `The config already has an endpoint named ${shown(endpoint["name"])} whose ${listed(differences)} ` +
+              `${differences.length === 1 ? "differs" : "differ"}, and init does not overwrite it. Choose another name, or ` +
+              "replace the file (--force).",
+      );
     }
     let service = base["service"];
     if (input.service !== undefined) {
@@ -273,7 +348,7 @@ export function writeConfigText(input: ConfigWriteInput, options: ConfigWriteOpt
       ...(service === undefined ? {} : { service }),
       ...(defaultEnvironment === undefined ? {} : { defaultEnvironment }),
       environments,
-      endpoints: [...before, ...endpoints],
+      endpoints: [...before, ...appended],
     };
   }
 
@@ -288,5 +363,12 @@ export function writeConfigText(input: ConfigWriteInput, options: ConfigWriteOpt
     }
     throw error;
   }
-  return { text, added: input.endpoints.map((endpoint) => endpoint.name), environmentAdded, serviceAdded };
+  return {
+    text,
+    added: appended.map((endpoint) => endpoint["name"] as string),
+    unchanged,
+    environmentAdded,
+    serviceAdded,
+    changed: appended.length > 0 || environmentAdded || serviceAdded,
+  };
 }

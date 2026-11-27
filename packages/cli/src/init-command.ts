@@ -27,7 +27,9 @@
  * Nothing is sent and nothing is written without `--operated-by-me`: Wasit
  * tests only services their operator runs. Every flag is checked before the
  * route is asked anything. An existing config is added to, never overwritten
- * silently; `--force` replaces it. Mainnet is not written in this version, and
+ * silently; `--force` replaces it. A route it already has exactly as given, in
+ * the same environment, is left as it is, byte for byte, and the run goes on
+ * (to the key setup): init can be run again on the same route. Mainnet is not written in this version, and
  * nothing that could hold a secret is: an endpoint's headers are not written (a
  * credential goes in `WASIT_HEADER_*`). What the service answered is data:
  * printed through the sanitiser, never followed or run.
@@ -91,10 +93,10 @@ const NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 
 const HTTP_METHODS: readonly string[] = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];
 
-const PROTOCOLS: readonly RouteProtocol[] = ["x402", "mpp-charge", "mpp-channel"];
-
 /** How often init asks for the method at a terminal before it takes the last answer and refuses it (exit 2). */
 const METHOD_ATTEMPTS = 3;
+
+const PROTOCOLS: readonly RouteProtocol[] = ["x402", "mpp-charge", "mpp-channel"];
 
 /** The most offers printed: the rest is counted. */
 const MAX_OFFER_LINES = 10;
@@ -768,10 +770,11 @@ function commandArgument(value: string): string {
 }
 
 /**
- * Runs `wasit init`. Returns the exit code: 0 the file was written; 2 nothing
- * was written (a flag is missing or wrong, the service is not yours, the route
- * is not a paywall init can read, or the writer refused the data). The key
- * setup runs after the file is written and never changes the exit code: what
+ * Runs `wasit init`. Returns the exit code: 0 the file has the route (written
+ * now, or already there as given and left as it is); 2 nothing was written (a
+ * flag is missing or wrong, the service is not yours, the route is not a
+ * paywall init can read, or the writer refused the data). The key setup runs
+ * after the file is written and never changes the exit code: what
  * it could not do is in its status table, with the command that finishes it
  * (Najmi, 2026-11-27).
  */
@@ -920,15 +923,23 @@ export async function executeInit(given: InitCommandOptions, context: InitContex
     const keys = context.keys;
     if (keyStep?.run === true && keys === undefined) throw new Error("the key setup was asked for, and init was given no way to run it");
 
-    try {
-      writeFileSync(configPath, result.text, { flag: before === undefined ? "wx" : "w" });
-    } catch (error) {
-      refuse(`cannot write the config ${shown(options.config)} (${errorCode(error)}). Nothing was written.`);
+    // A file that already holds this route as given is left as it is, byte for byte (run again to set up the key, say).
+    if (result.changed) {
+      try {
+        writeFileSync(configPath, result.text, { flag: before === undefined ? "wx" : "w" });
+      } catch (error) {
+        refuse(`cannot write the config ${shown(options.config)} (${errorCode(error)}). Nothing was written.`);
+      }
     }
 
     const shownFile = options.config;
     const lines: string[] = [];
-    if (before === undefined) {
+    if (!result.changed) {
+      lines.push(
+        `wasit init: ${shownFile} already has the endpoint ${name} as given, in the environment ${environmentName}: ` +
+          "the file was left as it is.",
+      );
+    } else if (before === undefined) {
       lines.push(`wasit init: wrote ${shownFile}: the environment ${environmentName} and the endpoint ${name}.`);
     } else if (options.force) {
       lines.push(`wasit init: replaced ${shownFile} (--force): the environment ${environmentName} and the endpoint ${name}.`);
