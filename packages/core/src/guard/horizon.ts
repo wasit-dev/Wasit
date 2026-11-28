@@ -12,8 +12,8 @@
  * cannot be read plainly is a {@link MainnetPlanRefusedError}. A message names
  * Horizon by its origin only.
  *
- * Read-only: no key, nothing signed or sent but two GET requests. This version
- * has no mainnet opt-in (spec B12), and nothing calls these yet.
+ * Read-only: no key, nothing signed or sent but two GET requests. The plan of a
+ * mainnet run (L1) and its close (L4) call them.
  */
 
 import { Networks, StrKey } from "@stellar/stellar-sdk";

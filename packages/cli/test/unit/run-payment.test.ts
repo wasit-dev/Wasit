@@ -262,7 +262,7 @@ describe("wasit run, payment tier", () => {
     assert.equal(paywall.paid.size, 0);
   });
 
-  it("refuses stellar:pubnet before any request: the mainnet opt-in is not part of this version", async () => {
+  it("refuses stellar:pubnet without --mainnet before any request, and says to add it", async () => {
     paywall = await multiPaywall({ "/weather": [option("10000")] });
     const config = await writePaymentConfig(dir, paywall.base, {
       network: "stellar:pubnet",
@@ -270,7 +270,7 @@ describe("wasit run, payment tier", () => {
     });
     const run = await pay({ config }, { STELLAR_PRIVATE_KEY: "SXXX" });
     assert.equal(run.code, 2);
-    assert.match(run.stderr, /mainnet opt-in is not part of this version/);
+    assert.match(run.stderr, /stellar:pubnet is Stellar mainnet: a paying run there needs --mainnet/);
     assert.equal(paywall.requests, 0, "a request was sent on a network the payment tier refuses");
     assert.equal(recorder.signed.length, 0);
   });

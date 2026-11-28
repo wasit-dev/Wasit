@@ -4,7 +4,7 @@ The check suite behind [`@wasit-dev/cli`](https://www.npmjs.com/package/@wasit-d
 
 This package holds the actual check logic. The CLI and the MCP server are thin adapters over these same functions, so a CLI run and an agent's run can never disagree about the same target — there is only one implementation of each check.
 
-**Testnet only.** Several checks settle real transactions on-chain. In 0.8.0-beta.1 (npm tag `beta`; `latest` is 0.7.0) every payment check pays on test networks only: any other network, `stellar:pubnet` included, is refused before a key is read.
+**Testnet only.** Several checks settle real transactions on-chain. In 0.8.0-beta.1 (npm tag `beta`; `latest` is 0.7.0) every payment check pays on test networks only: any other network, `stellar:pubnet` included, is refused before a key is read. The mainnet opt-in (beta, not in 0.8.0-beta.1) is the one exception: x402 on `stellar:pubnet` through `openMainnetOptIn`, which every front end calls.
 
 Most people should reach for [`@wasit-dev/cli`](https://www.npmjs.com/package/@wasit-dev/cli) (terminal) or [`@wasit-dev/server`](https://www.npmjs.com/package/@wasit-dev/server) (MCP / agents) instead of this package directly. Install `@wasit-dev/core` yourself only if you're building your own tooling on top of the check suite.
 

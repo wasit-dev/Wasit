@@ -11,6 +11,7 @@
 import type { PaymentRequirements } from "@x402/core/types";
 import type { x402Client } from "@x402/fetch";
 
+import type { MainnetOptIn } from "../../guard/optin.js";
 import type { SigningGate } from "../../guard/signed-terms.js";
 import type { ExpectedSettlement, SettlementVerdict } from "../../settlement.js";
 
@@ -137,7 +138,8 @@ export interface PaymentChain {
    * `rpcUrl` is for client schemes that read the chain while building a
    * payment (EVM Permit2 checks the token allowance, Solana fetches the mint
    * and a blockhash); others ignore it. An adapter with `signedTerms` signs
-   * only through `gate`; the others ignore it.
+   * only through `gate`; the others ignore it. `mainnet` is the run's opt-in
+   * on a mainnet network (spec B5), absent everywhere else.
    */
   registerPayer(
     client: x402Client,
@@ -145,6 +147,7 @@ export interface PaymentChain {
     payerKey: string,
     rpcUrl: string,
     gate: SigningGate,
+    mainnet?: MainnetOptIn,
   ): void | Promise<void>;
   /**
    * The client builds the payment through the run's RPC and accepts only an
@@ -172,6 +175,11 @@ export interface PaymentChain {
    * verdict.
    */
   payerBalance(network: string, rpcUrl: string, payer: string, asset: string): Promise<bigint | undefined>;
+  /**
+   * The token's decimals as the chain reports them, read without a key;
+   * undefined when there is no clear answer. A mainnet plan reads them (B4).
+   */
+  assetDecimals?(network: string, rpcUrl: string, asset: string): Promise<number | undefined>;
   /** Whether `reference` has the shape of a settlement on this chain. */
   isSettlementReference(reference: string): boolean;
   /**

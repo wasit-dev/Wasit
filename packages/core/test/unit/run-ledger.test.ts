@@ -324,6 +324,111 @@ describe("balances and the ledger's result", () => {
   });
 });
 
+describe("a gap the checks that FAILed explain", () => {
+  const entry = (overrides: Partial<LedgerEntry>): LedgerEntry => ({
+    id: 1,
+    endpoint: "weather",
+    check: "X402-06",
+    network: "stellar:pubnet",
+    asset: USDC,
+    payTo: PAY_TO,
+    amount: "100000",
+    intentAt: "2026-11-22T11:01:30.123Z",
+    state: "signed",
+    expiresAtLedger: 65_594_600,
+    sent: { at: "2026-11-22T11:01:31.000Z", status: 200 },
+    ...overrides,
+  });
+  const verified = { reference: "d".repeat(64), verified: true };
+  const before = { usdc: 1_000_000n, native: 50_000_000n };
+  const after = (usdc: bigint, native = 50_000_000n) => ({ usdc, native });
+  /** A lax service, price 0.01: X402-06 settled and verified; X402-09 (half) and X402-11 settled, not verified, both FAIL. */
+  const lax = (overrides: { readonly nine?: Partial<LedgerEntry>; readonly eleven?: Partial<LedgerEntry> } = {}): LedgerEntry[] => [
+    entry({ settlement: verified, verdict: "pass" }),
+    entry({ id: 2, check: "X402-07", verdict: "pass", sent: { at: "t", status: 402 } }),
+    entry({ id: 3, check: "X402-09", amount: "50000", verdict: "fail", ...overrides.nine }),
+    entry({ id: 4, check: "X402-10", verdict: "pass", sent: { at: "t", status: 402 } }),
+    entry({ id: 5, check: "X402-11", verdict: "fail", ...overrides.eleven }),
+  ];
+
+  it("is explained when the USDC above the verified settlements is within the payments of checks that FAILed", () => {
+    const result = ledgerConsistency(before, after(750_000n), lax());
+    assert.equal(result.result, "explained", result.reasons.join("; "));
+    assert.equal(result.consistent, false, "explained is not consistent");
+    assert.equal(result.spentUsdc, 250_000n);
+    assert.equal(result.settledUsdc, 100_000n);
+    const text = result.reasons.join(" ");
+    assert.match(text, /went down by 250000 base units: 100000 in the settlements this run verified, and 150000 more/);
+    assert.match(text, /X402-09 of weather, entry 3, 50000; X402-11 of weather, entry 5, 100000/);
+    // No more than: a gap smaller than the FAILed payments is explained too (only one of them settled).
+    assert.equal(ledgerConsistency(before, after(850_000n), lax()).result, "explained");
+  });
+
+  it("is consistent, not explained, once the settlements of the FAILed checks are verified on chain", () => {
+    const result = ledgerConsistency(before, after(750_000n), lax({ nine: { settlement: verified }, eleven: { settlement: verified } }));
+    assert.equal(result.result, "consistent", result.reasons.join("; "));
+    assert.equal(result.consistent, true);
+    assert.equal(result.settledUsdc, 250_000n);
+  });
+
+  it("is inconsistent when the gap is more than the payments of the checks that FAILed", () => {
+    const result = ledgerConsistency(before, after(749_999n), lax());
+    assert.equal(result.result, "inconsistent");
+    assert.match(result.reasons.join(" "), /went down by 250001 base units, and the settlements this run verified add up to 100000; the payments of the checks that FAILed add up to only 150000 more/);
+  });
+
+  it("is inconsistent when the only unverified payment belongs to a check that passed, had no verdict, was skipped or has none recorded", () => {
+    for (const verdict of ["pass", "no-verdict", "skipped", undefined] as const) {
+      const entries = lax({ eleven: verdict === undefined ? { verdict: undefined } : { verdict } }).filter((item) => item.check !== "X402-09");
+      const result = ledgerConsistency(before, after(800_000n), entries);
+      assert.equal(result.result, "inconsistent", `X402-11 ${String(verdict)}`);
+    }
+  });
+
+  it("a FAILed check's payment that was discarded unsent, or never signed, explains nothing", () => {
+    const discarded = lax({ nine: { discarded: "not sent", sent: undefined }, eleven: { verdict: "pass" } });
+    assert.equal(ledgerConsistency(before, after(850_000n), discarded).result, "inconsistent");
+    const unsigned = lax({ nine: { state: "not-signed", sent: undefined }, eleven: { verdict: "pass" } });
+    assert.equal(ledgerConsistency(before, after(850_000n), unsigned).result, "inconsistent");
+  });
+
+  it("is inconsistent when the XLM moved, or a reading is missing, or less left than was verified, whatever FAILed", () => {
+    const xlm = ledgerConsistency(before, after(750_000n, 49_999_000n), lax());
+    assert.equal(xlm.result, "inconsistent");
+    assert.match(xlm.reasons.join(" "), /XLM/);
+    assert.equal(ledgerConsistency(undefined, after(750_000n), lax()).result, "inconsistent");
+    assert.equal(ledgerConsistency(before, undefined, lax()).result, "inconsistent");
+    assert.equal(ledgerConsistency(before, after(950_000n), lax()).result, "inconsistent");
+  });
+
+  it("records each check's verdict on its own entries, once, and writes explained on close", () => {
+    const ledger = RunLedger.create(folder(), header, { now });
+    ledger.recordBalancesBefore({ usdc: 1_000_000n, native: 50_000_000n }, "horizon");
+    const book = ledger.forEndpoint("weather");
+    const honest = book.intent(intent);
+    honest.signed(65_594_600);
+    honest.sent({ status: 200 });
+    honest.settled("e".repeat(64), true);
+    // Another endpoint's verdict for the same check id is not this endpoint's.
+    ledger.forEndpoint("other").verdict!("X402-06", "fail");
+    assert.equal(ledger.entries[0]!.verdict, undefined);
+    book.verdict!("X402-06", "pass");
+    const under = book.intent({ ...intent, check: "X402-09", amount: "50000" });
+    under.signed(65_594_600);
+    under.sent({ status: 200 });
+    book.verdict!("X402-09", "fail");
+    // A second verdict for the same check changes nothing.
+    book.verdict!("X402-09", "pass");
+    assert.deepEqual(ledger.entries.map((item) => [item.check, item.verdict]), [["X402-06", "pass"], ["X402-09", "fail"]]);
+    assert.deepEqual((onDisk(ledger)["entries"] as LedgerEntry[]).map((item) => item.verdict), ["pass", "fail"]);
+    assert.throws(() => book.verdict!("X402-09", "maybe" as never), RunLedgerError);
+    const result = ledger.close({ after: { usdc: 850_000n, native: 50_000_000n }, source: "horizon" });
+    assert.equal(result.result, "explained", result.reasons.join("; "));
+    assert.equal(onDisk(ledger)["result"], "explained");
+    assert.throws(() => book.verdict!("X402-06", "fail"), RunLedgerError, "a closed ledger takes no verdict");
+  });
+});
+
 describe("when every authorization of the run has expired (L4)", () => {
   const base = { endpoint: "w", network: "stellar:pubnet", asset: USDC, payTo: PAY_TO, amount: "1", intentAt: "t" };
   it("is after the latest expiry of every entry that may be signed", () => {

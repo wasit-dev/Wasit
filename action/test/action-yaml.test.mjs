@@ -48,11 +48,30 @@ describe("action.yml", () => {
     assert.ok(!Object.keys(action.inputs).some((name) => /key|secret|dry|destructive|payer/i.test(name)));
   });
 
-  it("has one input about mainnet, mainnet, off by default and refused in this version (B12)", () => {
+  it("has one input about mainnet, mainnet, off by default, that says when it is honoured (B5, B18 O3)", () => {
     assert.deepEqual(Object.keys(action.inputs).filter((name) => /mainnet|pubnet|optin/i.test(name)), ["mainnet"]);
     assert.equal(action.inputs.mainnet.default, "false");
-    assert.match(action.inputs.mainnet.description, /^Refused in this version: the mainnet opt-in is not part of it\./);
-    assert.match(action.inputs.mainnet.description, /exit 2/);
+    const text = action.inputs.mainnet.description;
+    assert.match(text, /^Beta\. true pays on Stellar mainnet \(stellar:pubnet\), real funds,/);
+    for (const rule of [/workflow_dispatch/, /GitHub-hosted/, /tier: payment/, /WASIT_MAINNET_PAYER_SECRET/, /exit 2/, /wasit-mainnet-ledger/]) {
+      assert.match(text, rule);
+    }
+    assert.ok(!/not part of/.test(text), text);
+  });
+
+  it("gives the step that checks the inputs an id, for the mainnet output the ledger upload reads", () => {
+    assert.equal(stepByName("Check the inputs").id, "inputs");
+  });
+
+  it("uploads the mainnet ledger after a mainnet run, whatever its result, and only then (B18 O3)", () => {
+    const upload = stepByName("Upload the mainnet ledger");
+    assert.equal(upload.uses, "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02");
+    assert.match(upload.if, /^\$\{\{ always\(\) && steps\.inputs\.outputs\.mainnet == 'true' && steps\.run\.conclusion != 'skipped' \}\}$/);
+    assert.equal(upload.with.name, "wasit-mainnet-ledger");
+    assert.equal(upload.with.path, "${{ runner.temp }}/wasit/ledger/wasit-ledger-*.json");
+    assert.equal(upload.with["if-no-files-found"], "warn");
+    assert.ok(index("Run Wasit") < index("Upload the mainnet ledger"));
+    assert.equal(index("Upload the mainnet ledger"), steps.length - 1, "the last step");
   });
 
   it("hands the mainnet input to the step that checks the inputs and to the run step, and to no other", () => {
@@ -293,8 +312,8 @@ describe("action.yml", () => {
   describe("third-party actions", () => {
     const used = steps.filter((step) => step.uses !== undefined).map((step) => step.uses);
 
-    it("uses only actions/upload-artifact, pinned to a full commit SHA", () => {
-      assert.deepEqual(used, ["actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02"]);
+    it("uses only actions/upload-artifact, pinned to a full commit SHA: the baseline and the mainnet ledger", () => {
+      assert.deepEqual(used, ["actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02", "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02"]);
     });
 
     it("never names a branch or an invented commit", () => {

@@ -70,8 +70,13 @@ describe("the mainnet USDC constant (B4), checked three ways", () => {
     assert.notEqual(MAINNET_USDC.asset, USDC_TESTNET_ADDRESS);
   });
 
-  it("is not valued by the run budget in this version (B12): no charge on stellar:pubnet can pass", () => {
-    assert.equal(usdAsset(PUBNET, MAINNET_USDC.asset), undefined);
+  it("is the one mainnet asset the run budget values, at its decimals (the opt-in, B4); L0 still needs the opt-in", () => {
+    assert.deepEqual(usdAsset(PUBNET, MAINNET_USDC.asset), {
+      network: PUBNET,
+      asset: MAINNET_USDC.asset,
+      decimals: MAINNET_USDC.decimals,
+      symbol: MAINNET_USDC.symbol,
+    });
   });
 
   it("goes with fixed limits: 300 s of lifetime, 12 ledgers between the RPC and Horizon, Horizon at its public address", () => {

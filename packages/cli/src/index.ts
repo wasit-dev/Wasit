@@ -101,15 +101,17 @@ Full check catalogue (every check ID, spec reference, pass criteria):
   https://github.com/wasit-dev/wasit/blob/main/docs/CHECKS.md`,
   );
 
-// `.env` is loaded before a command's action, as it always was, with two
-// exceptions (spec A8 #2, A-A01): `wasit run` does not load it in CI, where the
-// working directory is a checked-out pull request and a `.env` it added could
-// steer the run; `wasit ci-report` never does, it has no use for it. CI is read
-// from the real environment, before any `.env` could change it.
+// `.env` is loaded before a command's action, as it always was, with three
+// exceptions (spec A8 #2, A-A01, B5): `wasit run` does not load it in CI, where
+// the working directory is a checked-out pull request and a `.env` it added
+// could steer the run; nor with --mainnet, whose key comes from the shell's
+// WASIT_MAINNET_PAYER_SECRET only, never from a file in the service's folder
+// that an agent could read; `wasit ci-report` never does, it has no use for it.
+// CI is read from the real environment, before any `.env` could change it.
 program.hook("preAction", (_program, action) => {
   const name = action.name();
   if (name === "ci-report") return;
-  if (name === "run" && inCi(process.env)) return;
+  if (name === "run" && (inCi(process.env) || action.opts()["mainnet"] === true)) return;
   loadDotenv();
 });
 
@@ -324,8 +326,19 @@ program
   )
   .option(
     "--mainnet",
-    "Refused in this version: the mainnet opt-in is not part of it. The run stops with exit 2 before the config is read; nothing is started, sent or signed.",
+    "Pay real USDC on stellar:pubnet (x402 only). Runs only when every rule holds: the environment is on stellar:pubnet with " +
+      "operatedByMe true and pinned payTo and asset (mainnet USDC); the key is in WASIT_MAINNET_PAYER_SECRET and in no other " +
+      "variable; an https RPC for stellar:pubnet is set (rpcUrl or WASIT_RPC_URL); the payer holds at most $10.00 of USDC; " +
+      "no other mainnet run holds the lock; in GitHub Actions, the run is started by hand on the default branch on a " +
+      "GitHub-hosted runner, tests a deployed service and has no other key variable set. Otherwise exit 2 before anything " +
+      "is started, sent or signed. With --mainnet, wasit run does not read .env: the variables come from the shell. " +
+      "Not with --read-only.",
     false,
+  )
+  .option(
+    "--ledger-dir <dir>",
+    "With --mainnet: the folder of the run ledger (wasit-ledger-<UTC time>.json, every signature written before the key " +
+      "signs) and of the lock that keeps a second mainnet run from starting beside it. Default: the working directory.",
   )
   .addHelpText(
     "after",
@@ -337,13 +350,24 @@ Examples:
   $ wasit run --read-only --start-if-local --env mainnet
   $ wasit run --dry-run --start
   $ wasit run --start                     (payment tier: STELLAR_PRIVATE_KEY on stellar:testnet)
+  $ wasit run --dry-run --env mainnet      (the plan on stellar:pubnet: no key is read)
+  $ wasit run --mainnet --env mainnet      (real funds: WASIT_MAINNET_PAYER_SECRET on stellar:pubnet)
 
 Exit codes: 0 every graded endpoint conforms; 1 an endpoint does not conform, or one
 graded on the baseline is not graded now; 2 no verdict (nothing could be graded, a
 check could not run, the config or the service could not be used, or the payment
 tier was asked for and did not pay: no payer key, or operatedByMe not true).
-The payment tier pays on test networks only: at most $1.00 a payment and $5.00 a run
+The payment tier pays on test networks: at most $1.00 a payment and $5.00 a run
 (lower with maxRunUsd), only the pinned payTo and asset when the config pins them.
+On stellar:pubnet it pays only with --mainnet: the first line says MAINNET RUN; the
+plan reads the payer's balances on the RPC and public Horizon first, and refuses a
+payer holding less than the run needs to finish its checks (the prices plus the
+highest price again; a warning below the worst case); every signature
+is in the run ledger; one refusal stops the whole run (exit 2); at the end the run
+waits until every authorization it signed has expired (up to about five minutes),
+reads the payer's balances again and says whether they match the ledger: consistent;
+explained (more USDC left than the run verified settled, within the payments of
+checks that FAILed: exit 1, by the checks); or inconsistent (exit 2).
 In GitHub Actions it pays only on push to the default branch, schedule and
 workflow_dispatch; a pull request runs the read-only checks, and a payer key set on
 a run that may not pay is refused before the service starts. In another CI (CI set,
@@ -372,6 +396,7 @@ In CI (CI or GITHUB_ACTIONS set) a .env file in the working directory is not rea
           startIfLocal: opts.startIfLocal === true,
           ...(opts.baseline === undefined ? {} : { baseline: opts.baseline as string }),
           mainnet: opts.mainnet === true,
+          ...(opts.ledgerDir === undefined ? {} : { ledgerDir: opts.ledgerDir as string }),
         },
         { env: process.env, stdout: (line) => console.log(line), stderr: (line) => console.error(line) },
       );

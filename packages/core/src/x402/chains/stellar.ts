@@ -22,6 +22,7 @@ import {
 
 import { CheckSetupError } from "../../errors.js";
 import { PaymentGuardRefusedError } from "../../guard/budget.js";
+import { isLiveOptIn } from "../../guard/optin.js";
 import { checkStellarPreimage, type SigningGate } from "../../guard/signed-terms.js";
 import { networkPassphrase, resolveRpcUrl } from "../../mpp/network.js";
 import { readTransferData, verifySettlement } from "../../settlement.js";
@@ -411,12 +412,16 @@ export const stellarChain: PaymentChain = {
   resolveRpcUrl: (network, override) => resolveRpcUrl(network, override),
   // The x402 Stellar client builds its RPC client without `allowHttp`.
   httpsRpcOnly: true,
-  registerPayer(client, network, payerKey, rpcUrl, gate) {
+  registerPayer(client, network, payerKey, rpcUrl, gate, mainnet) {
     // The payment is built and simulated through the run's RPC: the one whose
     // network was checked (D-023), the anchor is read from, and the settlement
-    // is read from. Not on stellar:pubnet: the SDK refuses it without an RPC of
-    // its own, and no endpoint is handed to it before the mainnet opt-in.
-    const rpcConfig = network === "stellar:testnet" ? { url: rpcUrl } : undefined;
+    // is read from. On stellar:pubnet only with a live mainnet opt-in whose RPC
+    // this is (spec B5 point 4): without one the SDK gets no RPC, and refuses
+    // pubnet itself (B-A01).
+    const rpcConfig =
+      network === "stellar:testnet" || (network === "stellar:pubnet" && isLiveOptIn(mainnet, network) && mainnet.rpcUrl === rpcUrl)
+        ? { url: rpcUrl }
+        : undefined;
     client.register("stellar:*", new ExactStellarClientScheme(gatedSigner(payerKey, network, gate), rpcConfig));
   },
   signedTerms: stellarSignedTerms,
@@ -425,6 +430,11 @@ export const stellarChain: PaymentChain = {
   expiredSigning: async () => ({ terms: { maxTimeoutSeconds: 1 }, holdMs: 20_000 }),
   payerAddress: (payerKey) => Keypair.fromSecret(payerKey).publicKey(),
   payerBalance: stellarTokenBalance,
+  async assetDecimals(network, rpcUrl, asset) {
+    if (!StrKey.isValidContract(asset)) return undefined;
+    const decimals = await simulateTokenRead(rpcServer(rpcUrl), networkPassphrase(network), asset, "decimals", []);
+    return typeof decimals === "number" ? decimals : undefined;
+  },
   generatePayerKey: () => Keypair.random().secret(),
   isSettlementReference: (reference) => TRANSACTION_HASH.test(reference),
   verifySettlement: (_network, rpcUrl, reference, expected) => verifySettlement(rpcUrl, reference, expected),

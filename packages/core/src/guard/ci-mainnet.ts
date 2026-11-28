@@ -19,9 +19,8 @@
  * required reviewer. Outside GitHub Actions none of these rules applies: on a
  * builder's own machine the CLI may test a local service.
  *
- * This version has no mainnet opt-in (spec B12): its switches refuse before
- * any of this is read. The opt-in calls {@link assertMainnetJob} before it
- * reads a key.
+ * The opt-in (`openMainnetOptIn`) calls {@link assertMainnetJob} whenever
+ * `GITHUB_ACTIONS` is true, before the lock is taken and anything is sent.
  */
 
 import { existsSync } from "node:fs";

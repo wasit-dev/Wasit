@@ -143,16 +143,8 @@ export {
 } from "./guard/networks.js";
 export type { NetworkClass, PaymentProtocol } from "./guard/networks.js";
 
-// The mainnet opt-in switches of this version: each one refuses (spec B12).
-export {
-  MAINNET_OPT_IN_ABSENT,
-  MainnetOptInRefusedError,
-  mainnetStartupSwitches,
-  refuseMainnetSwitch,
-} from "./guard/mainnet-optin.js";
 export { MainnetJobRefusedError, assertMainnetJob, isLocalHost, mainnetJobRefusals, type MainnetJob } from "./guard/ci-mainnet.js";
-export type { MainnetSwitch } from "./guard/mainnet-optin.js";
-// The mainnet payer's $10 and the lock of a mainnet run (spec B17.5): rules that only refuse; nothing calls them yet.
+// The mainnet payer's $10 and the lock of a mainnet run (spec B17.5): rules that only refuse; the opt-in and its plan call them.
 export {
   MAINNET_PAYER_MAX_BASE_UNITS,
   MAINNET_PAYER_MAX_USD,
@@ -168,7 +160,7 @@ export {
   type LockHolder,
   type MainnetRunLock,
 } from "./guard/run-lock.js";
-// L1's mainnet rules and the two reads on public Horizon (spec B3, B4, B17.2): rules that only refuse; nothing calls them yet.
+// L1's mainnet rules and the two reads on public Horizon (spec B3, B4, B17.2): rules that only refuse; the plan and the close call them.
 export {
   MAINNET_ANCHOR_MAX_GAP_LEDGERS,
   MAINNET_MAX_TIMEOUT_SECONDS,
@@ -201,6 +193,8 @@ export {
   type LedgerEntry,
   type LedgerEntryHandle,
   type LedgerEntryState,
+  type LedgerResult,
+  type LedgerVerdict,
   type PaymentLedger,
   type RunLedgerHeader,
 } from "./guard/run-ledger.js";
@@ -211,7 +205,7 @@ export { RpcIdentityError, assertRpcServesNetwork } from "./guard/rpc-identity.j
 export type { RpcInUse, RpcSource } from "./guard/rpc-in-use.js";
 
 // Which GitHub events may run the payment tier (D-022a), and which key variables are set.
-export { inGithubActions, payerKeyVariables, paymentEventGate, readGithubEvent } from "./guard/ci-event.js";
+export { githubDefaultBranch, inGithubActions, payerKeyVariables, paymentEventGate, readGithubEvent } from "./guard/ci-event.js";
 export type { PaymentEventGate } from "./guard/ci-event.js";
 
 // L1 and L2: the plan, and the caps every signature is charged against.
@@ -223,8 +217,29 @@ export {
   formatUsd,
 } from "./guard/budget.js";
 export type { GuardRefusal, PinTerms, PlannedSignature } from "./guard/budget.js";
-export { describePlan, planX402Run } from "./x402/plan.js";
-export type { EndpointPlan, EndpointPlanStatus, PlannedOption, RunPlan, X402PlanOptions } from "./x402/plan.js";
+export { describePlan, mainnetFirstLine, mainnetOpeningLine, planMainnetDryRun, planX402Run } from "./x402/plan.js";
+export type {
+  EndpointPlan,
+  EndpointPlanStatus,
+  MainnetDryRunOptions,
+  MainnetFunding,
+  MainnetReadings,
+  PlannedOption,
+  RunPlan,
+  X402PlanOptions,
+} from "./x402/plan.js";
+// The mainnet opt-in (spec B5): made by openMainnetOptIn only, for one run. The type is exported, the class is not.
+export {
+  MAINNET_PAYER_KEY_ENV,
+  MainnetRunRefusedError,
+  closeMainnetRun,
+  openMainnetOptIn,
+  type MainnetCloseOptions,
+  type MainnetCloseResult,
+  type MainnetOptInInput,
+  type MainnetRunRefusal,
+} from "./guard/mainnet-run.js";
+export type { MainnetFrontEnd, MainnetOptIn } from "./guard/optin.js";
 
 export * from "./x402/simulator.js";
 export * from "./mpp/channel.js";

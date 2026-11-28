@@ -4,7 +4,7 @@ MCP server exposing [Wasit](https://github.com/wasit-dev/wasit)'s **x402** / **M
 
 The suite logic isn't reimplemented here — this is a thin adapter over [`@wasit-dev/core`](https://www.npmjs.com/package/@wasit-dev/core), the same package [`@wasit-dev/cli`](https://www.npmjs.com/package/@wasit-dev/cli) runs. An agent's run and a CLI run against the same target can never disagree.
 
-**Testnet only.** Several tools settle real transactions. In 0.8.0-beta.1 (npm tag `beta`; `latest` is 0.7.0) the tools pay on test networks only: any other network, `stellar:pubnet` included, is refused before a key is read. `WASIT_MAINNET_OPT_IN`, `WASIT_MAINNET_CONFIG` and `--mainnet` stop the server at start: the mainnet opt-in is not part of this version.
+**Testnet by default.** Several tools settle real transactions. The tools an agent can call with a network pay on test networks only: any other network, `stellar:pubnet` included, is refused before a key is read. The one exception is the [mainnet opt-in](#mainnet-beta) (beta), which a person sets when the server starts, never an agent. In 0.8.0-beta.1 (npm tag `beta`; `latest` is 0.7.0) there is no opt-in: its variables stop the server at start.
 
 ## Install
 
@@ -73,6 +73,7 @@ Full snippets are in the [MCP guide](https://github.com/wasit-dev/wasit/blob/mai
 | `wasit_mpp_charge_test` | `MPP-01` | Settles a real payment every call |
 | `wasit_mpp_channel_test` | `MPP-10`–`12`, `14` | Free |
 | `wasit_mpp_channel_test_with_close` | + `MPP-13` | **Destroys a channel — permanent** |
+| `wasit_x402_mainnet_test` | `X402-01`–`11` on `stellar:pubnet` | **Real USDC (beta).** Registered only with the [mainnet opt-in](#mainnet-beta) |
 
 `wasit_x402_test` also takes an optional `readOnly` (skips the payment checks even when a payer key is set) and optional `method`, `body` and `headers` for a paid endpoint that is not a plain `GET`, matching the CLI's `--method`, `--body` and `--header`. Every probe, including the payment checks, uses the same request shape. Header values appear in the agent's transcript, so never pass a credential as a header; test an endpoint that needs one with the CLI instead. Its optional `rpcUrl`, like the CLI's `--rpc-url`, overrides the Soroban RPC endpoint `X402-06` reads to verify the settlement on-chain.
 
@@ -97,6 +98,14 @@ Signing keys are read from the server process's own environment, never accepted 
 ## The RPC lock
 
 `WASIT_RPC_URL`, read when the server starts, fixes the RPC of every tool call, and a tool call that names another `rpcUrl` is then refused before anything is sent. A result that reads the chain names its RPC by origin, where it came from, and when it is not Wasit's default (in the text and in `structuredContent.rpc`). New in 0.8.0-beta.1.
+
+## Mainnet (beta)
+
+Started with all three of `WASIT_MAINNET_OPT_IN=1`, `WASIT_MAINNET_CONFIG` (the absolute path of a `wasit.config.json`) and `WASIT_MAINNET_ENVIRONMENT` (one environment of it), the server reads that config once and registers `wasit_x402_mainnet_test`. Its only argument is the name of an x402 endpoint of that environment: the agent gives no URL, network, RPC, payee or amount, and an edit of the file changes nothing until the server is restarted. The server does not start (exit 2, the reasons on stderr) unless the environment is on `stellar:pubnet` with `operatedByMe: true`, pins mainnet USDC, has an https RPC and an x402 endpoint, `WASIT_MAINNET_PAYER_SECRET` is set, and it is not running in CI.
+
+Each call opens its own mainnet run with every rule of `wasit run --mainnet` (see the [CLI](https://www.npmjs.com/package/@wasit-dev/cli)): its first line says `MAINNET RUN`, it pays only the pinned payee in USDC, at most $1.00 a payment, and it writes a run ledger next to the config. The $5.00 cap (or the config's lower `maxRunUsd`) is for the whole server process, shared by every call; a restart resets it. One call at a time. The service must already be running: the tool never starts it. A call waits for every authorization it signed to expire, so it can take several minutes, and it runs to its end even when the client cancels it. Its result's `mainnet.ledgerResult` compares the run ledger with the payer's balances on public Horizon: `consistent`, `explained` (more USDC left than the run verified settled, within the payments of checks that FAILed) or `inconsistent`. A call that stops, or whose ledger is inconsistent, is `no-verdict` and locks the tool: every later call is refused until you have compared the ledger with the chain and restarted the server.
+
+This is the weakest of the three mainnet switches. An MCP server takes its environment from the client's configuration, so the key may sit in a file the agent can read, and an agent that reads the key is outside every limit of Wasit. Use a dedicated account (the run refuses a payer holding more than $10.00 in USDC), start the server from a shell that already holds `WASIT_MAINNET_PAYER_SECRET`, and never write the key into an MCP config file. An agent with a shell can still read it.
 
 ## Results
 

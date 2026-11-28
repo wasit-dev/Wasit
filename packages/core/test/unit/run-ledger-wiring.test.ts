@@ -190,6 +190,65 @@ describe("the run ledger in the payment checks", () => {
     assert.equal(entries[0]!.settlement?.verified, true);
     assert.match(entries[0]!.settlement?.reference ?? "", /^tx-/);
     assert.equal(entries[1]!.settlement, undefined);
+    // The paywall serves the underpaid payment and names its settlement: read back as X402-06's is, and recorded.
+    assert.deepEqual(entries[2]!.settlement, { reference: "tx-4", verified: true });
+    assert.equal(entries[3]!.settlement, undefined);
+    // Each entry carries the verdict of its check: X402-07, 09 and 10 FAIL against a paywall that serves everything.
+    assert.deepEqual(entries.map((entry) => entry.verdict), ["pass", "fail", "fail", "fail"]);
+  });
+
+  it("X402-09 accepted: its settlement is held to the payment signed, and what the chain shows is added to the FAIL", async () => {
+    const ledger = newLedger();
+    const asked: Array<{ reference: string; amount: bigint; recipient: string }> = [];
+    install({
+      ...gatedChain(),
+      verifySettlement: async (_network, _rpc, reference, expected) => {
+        asked.push({ reference, amount: expected.amount, recipient: expected.recipient });
+        return { pass: true, detail: "settled (stand-in)" };
+      },
+    });
+    const target = await wall("10000");
+    const results = await run(target.url, ledger.forEndpoint("paid"));
+    const nine = byId(results, "X402-09");
+    assert.equal(nine.pass, false);
+    assert.equal(nine.error, undefined, nine.detail);
+    assert.match(nine.detail, /was accepted \(HTTP 200\)/);
+    assert.match(nine.detail, /It settled on chain: 5000 base units moved from the payer to payTo in tx-4/);
+    assert.deepEqual(asked.at(-1), { reference: "tx-4", amount: 5000n, recipient: PAY_TO });
+  });
+
+  it("X402-09 accepted with a settlement the chain does not show as this payment: recorded unverified, still a FAIL", async () => {
+    const ledger = newLedger();
+    install({
+      ...gatedChain(),
+      verifySettlement: async (_network, _rpc, _reference, expected) =>
+        expected.amount === 5000n ? { pass: false, detail: "no such transfer (stand-in)" } : { pass: true, detail: "settled (stand-in)" },
+    });
+    const target = await wall("10000");
+    const results = await run(target.url, ledger.forEndpoint("paid"));
+    const nine = byId(results, "X402-09");
+    assert.equal(nine.pass, false);
+    assert.equal(nine.error, undefined);
+    assert.match(nine.detail, /names tx-4, which the chain does not show as this payment: no such transfer/);
+    assert.deepEqual(entriesOf(ledger)[2]!.settlement, { reference: "tx-4", verified: false });
+  });
+
+  it("X402-09 accepted and the chain gives no answer: recorded unverified, the FAIL stands", async () => {
+    const ledger = newLedger();
+    install({
+      ...gatedChain(),
+      verifySettlement: async (_network, _rpc, _reference, expected) => {
+        if (expected.amount === 5000n) throw new Error("rpc down");
+        return { pass: true, detail: "settled (stand-in)" };
+      },
+    });
+    const target = await wall("10000");
+    const results = await run(target.url, ledger.forEndpoint("paid"));
+    const nine = byId(results, "X402-09");
+    assert.equal(nine.pass, false);
+    assert.equal(nine.error, undefined, "a chain that gives no answer does not turn the FAIL into no verdict");
+    assert.match(nine.detail, /names tx-4, which could not be read on chain \(rpc down\)/);
+    assert.deepEqual(entriesOf(ledger)[2]!.settlement, { reference: "tx-4", verified: false });
   });
 
   it("records not signed when the run stops before the key is asked (the payer cannot pay)", async () => {

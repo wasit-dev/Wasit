@@ -239,6 +239,23 @@ function notUntaken(evidence: RejectedRequestEvidence): string | undefined {
   return undefined;
 }
 
+/**
+ * The settlement the chain shows for X402-11's payment, for the run ledger:
+ * the chain records its authorization as used, and the second readings agree
+ * (a transfer of the price from the payer to payTo, and the payer's balance
+ * down by at least it). The nonce read is a reading of this payment's own
+ * authorization, so the settlement counts as verified. The reference is the
+ * one transfer in the ledger the nonce was used in, or the only one the watch
+ * saw; when neither names one, undefined, and the ledger leaves it unverified.
+ */
+export function rejectedRequestSettlement(evidence: RejectedRequestEvidence): string | undefined {
+  const { watch, transfers } = evidence;
+  if (watch.kind !== "used" || transfers === undefined || notTaken(evidence) !== undefined) return undefined;
+  const there = transfers.filter((transfer) => transfer.ledger === watch.ledger);
+  if (there.length === 1) return there[0]!.reference;
+  return transfers.length === 1 ? transfers[0]!.reference : undefined;
+}
+
 const SERVED_HINT =
   "Refuse an invalid request before its payment is settled. The official x402 Express middleware does not settle " +
   "when the handler answers 400 or above; a route that serves every request it is paid for sells what it should refuse.";

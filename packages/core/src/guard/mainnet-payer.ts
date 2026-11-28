@@ -12,10 +12,10 @@
  * whose network was checked; a reader the caller hands in, so the rule itself
  * is pure.
  *
- * This version has no mainnet opt-in (spec B12): `stellar:pubnet` is refused
- * before any of this is read, and nothing here says "allowed" for it. The
- * opt-in calls {@link assertMainnetPayerBalance} in L1, after it takes the
- * run's lock (`run-lock.ts`) and before anything is signed.
+ * Nothing here says "allowed" for `stellar:pubnet`: the plan of a mainnet run
+ * (`planX402Run` with the opt-in) calls {@link assertMainnetPayerBalance} in
+ * L1, after the opt-in took the run's lock (`run-lock.ts`) and before anything
+ * is signed.
  */
 
 import { ConfigurationError } from "../errors.js";

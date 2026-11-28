@@ -7,10 +7,9 @@
  * as expected. Each rule here throws {@link MainnetPlanRefusedError} when it
  * does not hold; nothing was signed at that point.
  *
- * This version has no mainnet opt-in (spec B12): `stellar:pubnet` is refused
- * by L0 before any of this is reached, and nothing here says "allowed". The
- * opt-in calls these in L1, before anything is signed. The run budget does not
- * value {@link MAINNET_USDC} in this version, so no charge on mainnet passes.
+ * Nothing here says "allowed": the plan of a mainnet run (L1, with the opt-in)
+ * and its signatures (L2) call these before anything is signed, and the dry
+ * run on `stellar:pubnet` calls them with no key.
  *
  * Pure: no network, no key. The reads they judge are `horizon.ts` and the
  * chain adapter's.
@@ -74,7 +73,9 @@ export type MainnetPlanRefusal =
   /** The RPC's USDC balance of the payer differs from Horizon's, or has no reading. */
   | "balance"
   /** Horizon could not be read, or its answer cannot be trusted. */
-  | "horizon";
+  | "horizon"
+  /** The endpoint's URL: not https (and not on this machine), credentials in it, or a redirect elsewhere. */
+  | "endpoint";
 
 /**
  * A mainnet run does not start, or stops, because of one of L1's rules. A
@@ -98,9 +99,10 @@ function isStellarAddress(value: unknown): value is string {
  * The pin a mainnet environment must have (B5 point 2): a payee that is a
  * valid Stellar address and not the payer itself, and mainnet USDC as the
  * asset. A transfer to the payer would leave its balance as it was and hide
- * what the run paid.
+ * what the run paid. `payer` undefined: the dry run, which reads no key; the
+ * paid run holds the payee to the payer's address when it opens.
  */
-export function assertMainnetPin(pin: PinTerms | undefined, payer: string): void {
+export function assertMainnetPin(pin: PinTerms | undefined, payer: string | undefined): void {
   if (pin === undefined) {
     throw new MainnetPlanRefusedError(
       "pin",
@@ -118,13 +120,23 @@ export function assertMainnetPin(pin: PinTerms | undefined, payer: string): void
   if (!isStellarAddress(pin.payTo)) {
     throw new MainnetPlanRefusedError("pin", "pinned.payTo of a mainnet environment is not a valid Stellar address.");
   }
-  if (pin.payTo === payer) {
+  if (payer !== undefined && pin.payTo === payer) {
     throw new MainnetPlanRefusedError(
       "pin",
       "pinned.payTo is the payer's own address: on mainnet the payee must be another account, so the payer's " +
         "balance shows what the run paid.",
     );
   }
+}
+
+/**
+ * Where a URL pays, as a mainnet plan records it and L2 holds each payment to
+ * it: origin and path, the query and the fragment left out (a query may hold
+ * a key, and the plan is written to the ledger).
+ */
+export function paidUrlOf(target: string): string {
+  const url = new URL(target);
+  return `${url.origin}${url.pathname}`;
 }
 
 /** The fields of a challenge's option these rules judge. */

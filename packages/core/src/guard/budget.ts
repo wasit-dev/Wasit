@@ -6,8 +6,9 @@
  * in USDC (the SDK client's default assets, plus Circle's USDC on Ethereum
  * Sepolia), so the table below lists USDC on each test network with its
  * decimals, and a payment in any other asset is refused: Wasit cannot hold it
- * to the cap. Nothing on mainnet is listed: this version pays on test networks
- * only, and the mainnet USDC constant waits for the opt-in (B4, B12).
+ * to the cap. On mainnet it lists Circle's USDC on Stellar mainnet only, the
+ * one asset a mainnet run pays in (B4); L0 refuses that network without the
+ * mainnet opt-in, so valuing it allows nothing by itself.
  *
  * Amounts in dollars are bigints at 10^-18 of a dollar, so 6 and 7 decimal
  * tokens add up exactly.
@@ -46,6 +47,8 @@ export const USD_ASSETS: readonly UsdAsset[] = [
   { network: "eip155:84532", asset: "0x036CbD53842c5426634e7929541eC2318f3dCF7e", decimals: 6, symbol: "USDC" },
   { network: "eip155:11155111", asset: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238", decimals: 6, symbol: "USDC" },
   { network: "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1", asset: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU", decimals: 6, symbol: "USDC" },
+  // MAINNET_USDC of guard/mainnet-plan.ts (checked three ways there); a test asserts they are the same.
+  { network: "stellar:pubnet", asset: "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75", decimals: 7, symbol: "USDC" },
 ];
 
 /** Whether two addresses on `network` are the same: an EVM address in any letter case, others exactly. */

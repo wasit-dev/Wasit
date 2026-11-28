@@ -70,6 +70,45 @@ describe("wasit.mjs check", () => {
     const { RUNNER_TEMP: _omitted, ...rest } = env();
     assert.equal((await runMain("check", rest)).code, 2);
   });
+
+  describe("the step's mainnet output (B18 O3: the ledger upload's condition)", () => {
+    const output = () => path.join(temp, "github-output");
+    const mainnetEnv = (overrides = {}) => ({
+      ...env(),
+      GITHUB_OUTPUT: output(),
+      INPUT_MAINNET: "true",
+      INPUT_TIER: "payment",
+      GITHUB_EVENT_NAME: "workflow_dispatch",
+      RUNNER_ENVIRONMENT: "github-hosted",
+      ...overrides,
+    });
+
+    it("says mainnet=true for a mainnet run it lets through: workflow_dispatch, GitHub-hosted, the payment tier", async () => {
+      await writeFile(output(), "");
+      const result = await runMain("check", mainnetEnv());
+      assert.equal(result.code, 0, result.stderr);
+      assert.equal(await readFile(output(), "utf-8"), "mainnet=true\n");
+    });
+
+    it("says mainnet=false for every other run", async () => {
+      await writeFile(output(), "");
+      const result = await runMain("check", { ...env(), GITHUB_OUTPUT: output() });
+      assert.equal(result.code, 0, result.stderr);
+      assert.equal(await readFile(output(), "utf-8"), "mainnet=false\n");
+    });
+
+    it("writes no output for a mainnet run it refuses, and exits 2", async () => {
+      await writeFile(output(), "");
+      const result = await runMain("check", mainnetEnv({ GITHUB_EVENT_NAME: "push" }));
+      assert.equal(result.code, 2);
+      assert.equal(await readFile(output(), "utf-8"), "");
+    });
+
+    it("needs no output file: a check without one still passes", async () => {
+      const { GITHUB_OUTPUT: _omitted, ...rest } = mainnetEnv();
+      assert.equal((await runMain("check", rest)).code, 0);
+    });
+  });
 });
 
 describe("wasit.mjs run and report, with a fake CLI", () => {
@@ -179,6 +218,24 @@ if (process.env.FAKE_WAIT) {
     assert.equal(argv[0], "run");
     assert.ok(!argv.includes("--read-only"));
     assert.ok(!argv.some((arg) => /key|secret|mainnet/i.test(arg)), argv.join(" "));
+  });
+
+  it("run: mainnet: true calls the CLI with --mainnet and the ledger folder in the temp directory, never --read-only or --start-if-local (B18 O3)", async () => {
+    await clearRecord();
+    const result = await runMain("run", env({ INPUT_MAINNET: "true", INPUT_TIER: "payment", GITHUB_EVENT_NAME: "workflow_dispatch", RUNNER_ENVIRONMENT: "github-hosted" }));
+    assert.equal(result.code, 0, result.stderr);
+    const argv = (await lastCall()).argv;
+    assert.deepEqual(argv, [
+      "run", "--mainnet", "--ledger-dir", path.join(temp, "wasit", "ledger"), "--json", "--out", path.join(temp, "wasit", "report.json"),
+      "--config", "wasit.config.json",
+    ]);
+  });
+
+  it("run: mainnet: true on a push is refused before the CLI runs", async () => {
+    await clearRecord();
+    const result = await runMain("run", env({ INPUT_MAINNET: "true", INPUT_TIER: "payment", GITHUB_EVENT_NAME: "push", RUNNER_ENVIRONMENT: "github-hosted" }));
+    assert.equal(result.code, 2);
+    assert.equal((await readFile(record, "utf-8")).trim(), "", "the CLI ran");
   });
 
   it("run: exits 2 when the CLI is not where the action's checkout says (the install did not happen)", async () => {
@@ -467,15 +524,20 @@ http.createServer((req, res) => {
     assert.equal(existsSync(path.join(temp, "wasit", "baseline-next.json")), false, "a run that graded nothing is never a baseline");
   });
 
-  it("refuses mainnet: true in the check step, exit 2, and writes the refusal to the job summary (B5: the report says so)", async () => {
+  it("refuses mainnet: true on a push in the check step, exit 2, and writes the refusal to the job summary (B5: the report says so)", async () => {
     await writeFile(summary, "");
-    const check = await runScript("check", stepEnv({ INPUT_CONFIG: "x.json", INPUT_MAINNET: "true", GITHUB_EVENT_NAME: "push" }), workspace);
+    const check = await runScript(
+      "check",
+      stepEnv({ INPUT_CONFIG: "x.json", INPUT_MAINNET: "true", INPUT_TIER: "payment", GITHUB_EVENT_NAME: "push", RUNNER_ENVIRONMENT: "github-hosted" }),
+      workspace,
+    );
     assert.equal(check.code, 2, check.stderr);
-    assert.match(check.stderr, /^Wasit: mainnet: true is refused: the mainnet opt-in is not part of this version\./);
-    assert.match(check.stderr, /this run's event is push\./);
+    assert.match(check.stderr, /^Wasit: mainnet: true is refused: it is honoured only on workflow_dispatch/);
+    assert.match(check.stderr, /this run's event is push/);
     const written = await readFile(summary, "utf-8");
-    assert.match(written, /^## Wasit: refused\n\nmainnet: true is refused: the mainnet opt-in is not part of this version\./);
+    assert.match(written, /^## Wasit: refused\n\nmainnet: true is refused: it is honoured only on workflow_dispatch/);
     assert.match(written, /Nothing was installed, started, sent or signed\./);
+    assert.ok(!/not part of this version/.test(written), written);
   });
 
   it("refuses mainnet: true in the run step as well, before the CLI runs: no report is written", async () => {
@@ -484,6 +546,19 @@ http.createServer((req, res) => {
     assert.equal(run.code, 2, run.stderr);
     assert.match(run.stderr, /mainnet: true is refused/);
     assert.equal(existsSync(path.join(temp, "wasit", "report.json")), false, "the CLI ran");
+  });
+
+  it("mainnet: true on workflow_dispatch with a config on a test network: the CLI refuses, exit 2, and starts nothing", { skip: !built && "run npm run build first" }, async () => {
+    const port = await freePort();
+    const service = await writeService("mainnet-on-testnet", port, false);
+    await rm(path.join(temp, "wasit", "report.json"), { force: true });
+    const inputs = { INPUT_CONFIG: service.config, INPUT_MAINNET: "true", INPUT_TIER: "payment", GITHUB_EVENT_NAME: "workflow_dispatch", RUNNER_ENVIRONMENT: "github-hosted" };
+    assert.equal((await runScript("check", stepEnv(inputs), workspace)).code, 0);
+    const run = await runScript("run", stepEnv(inputs), workspace);
+    assert.equal(run.code, 2, run.stderr);
+    assert.match(run.stderr, /A mainnet run is on stellar:pubnet only/);
+    assert.equal(existsSync(service.envFile), false, "the service was started");
+    assert.equal(existsSync(path.join(temp, "wasit", "report.json")), false, "a report was written");
   });
 
   it("accepts the payment tier and refuses pull_request_target as a process", async () => {

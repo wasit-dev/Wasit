@@ -317,7 +317,7 @@ describe("wasit test, as the built binary", () => {
     assert.match(text, /^ payment · stellar:pubnet · not a test network: refused$/m);
     assert.ok(!/funds move|settles a real payment/.test(text), "a mainnet run was told that money moves");
     assert.match(text, /! PREFLIGHT .*ERROR /);
-    assert.match(text, /Nothing was sent and\s+nothing was signed\./);
+    assert.match(text, /Nothing\s+was\s+sent\s+and\s+nothing\s+was\s+signed\./);
   });
 
   it("keeps --json plain JSON, even with FORCE_COLOR", async () => {
